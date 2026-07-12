@@ -3,6 +3,8 @@ node_modules/
 *.env
 *.pdf
 dist/
+build/
 server/data/characters/*.json
 server/uploads/
 .claude/
+package-lock.json

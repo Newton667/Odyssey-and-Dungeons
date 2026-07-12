@@ -15,8 +15,14 @@ const homebrewRoutes = require('./routes/homebrew');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Serve built client in production (Electron or deployed)
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+}
 
 // Serve uploaded files
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -135,6 +141,13 @@ app.get('/api/config/database', (req, res) => {
   const masked = uri.replace(/:([^@]+)@/, ':****@');
   res.json({ uri: masked, connected: mongoose.connection.readyState === 1 });
 });
+
+// Catch-all: serve React app for client-side routing
+if (fs.existsSync(clientDist)) {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // Start server — connect to MongoDB if URI exists, otherwise start without DB
 const startServer = () => {
