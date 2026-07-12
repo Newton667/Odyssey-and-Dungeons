@@ -1,9 +1,7 @@
 @echo off
 :: Keep window open if double-clicked
-if "%~1"=="" (
-    cmd /k "%~f0" run
-    exit /b
-)
+if "%~1"=="" cmd /k "%~f0" run
+if "%~1"=="" exit /b
 setlocal enabledelayedexpansion
 title OND - Odyssey ^& Dragons
 echo.
