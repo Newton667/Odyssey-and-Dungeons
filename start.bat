@@ -15,11 +15,12 @@ if %ERRORLEVEL% neq 0 (
     echo  Opening download page...
     start "" "https://nodejs.org/en/download"
     echo.
-    echo  1. Install Node.js (LTS version recommended)
-    echo  2. RESTART this script after installing
+    echo  Install Node.js (LTS version recommended).
+    echo  After installing, press any key and this script will restart.
     echo.
     pause
-    exit /b 1
+    start "" "%~f0"
+    exit /b 0
 )
 
 :: ─── Step 2: Check Git ───────────────────────────────
@@ -29,11 +30,12 @@ if %ERRORLEVEL% neq 0 (
     echo  Opening download page...
     start "" "https://git-scm.com/downloads"
     echo.
-    echo  1. Install Git (use default settings)
-    echo  2. CLOSE and REOPEN this script after installing
+    echo  Install Git (use default settings).
+    echo  After installing, press any key and this script will restart.
     echo.
     pause
-    exit /b 1
+    start "" "%~f0"
+    exit /b 0
 )
 
 :: ─── Step 3: Clone repo if not present ───────────────
