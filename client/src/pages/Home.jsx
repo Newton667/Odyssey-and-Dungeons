@@ -49,7 +49,7 @@ export default function Home() {
       </div>
 
       <div style={{ position: 'fixed', bottom: '16px', right: '20px', fontSize: '16px', color: 'var(--text-dim)', opacity: 0.5, fontFamily: 'Cinzel, serif', fontWeight: 600 }}>
-        v0.1.0
+        v0.2.0
       </div>
     </div>
   );
