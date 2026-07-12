@@ -37,19 +37,13 @@
         "filter": ["**/*", "!node_modules/.cache/**"]
       },
       {
-        "from": "client/dist",
-        "to": "client/dist"
+        "from": "client",
+        "to": "client",
+        "filter": ["dist/**/*", "src/data/**/*"]
       }
     ],
     "win": {
-      "target": [
-        {
-          "target": "dir"
-        }
-      ],
-      "icon": null,
-      "signDll": false,
-      "sign": null
+      "target": "dir"
     }
   }
 }
