@@ -1,0 +1,470 @@
+:root {
+  --bg-dark: #1a1209;
+  --bg-card: #231a0e;
+  --bg-card-hover: #2e2210;
+  --border: #5c3d1e;
+  --border-light: #7a5230;
+  --gold: #c9a227;
+  --gold-light: #e8c547;
+  --gold-dim: #8a6f1a;
+  --red: #8b1a1a;
+  --red-light: #c0392b;
+  --green: #1a5c2a;
+  --green-light: #27ae60;
+  --text: #e8d5b0;
+  --text-dim: #a08060;
+  --text-dark: #5c4020;
+  --accent: #7b3f00;
+  --hp-bar: #27ae60;
+  --hp-low: #e67e22;
+  --hp-crit: #c0392b;
+  --surface: #1e1509;
+  --nav-bg: #0d0800;
+  --input-bg: #120d05;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-dark);
+  color: var(--text);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at top, #2a1a05 0%, #1a1209 60%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%235c3d1e' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Cinzel', serif;
+  color: var(--gold);
+}
+
+a {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--gold-light);
+}
+
+button {
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+}
+
+input, textarea, select {
+  font-family: 'Inter', sans-serif;
+  background: var(--input-bg, #120d05);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--gold);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-dim); }
+
+/* Cards */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.card:hover {
+  border-color: var(--gold-dim);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  transition: all 0.15s;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #1a0a00;
+}
+.btn-primary:hover { background: var(--gold-light); }
+
+.btn-danger {
+  background: var(--red);
+  color: var(--text);
+}
+.btn-danger:hover { background: var(--red-light); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { border-color: var(--gold-dim); color: var(--text); }
+
+/* HP bar */
+.hp-bar-wrap {
+  height: 8px;
+  background: #0a0603;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.hp-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+/* Ability score box */
+.ability-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--input-bg, #120d05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 8px;
+  min-width: 70px;
+}
+
+.ability-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.ability-score {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.ability-modifier {
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 600;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-class {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.badge-race {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.badge-level {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--gold);
+}
+
+/* Divider */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+/* Page layout */
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+/* Grid */
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* Stat block */
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  background: var(--input-bg, #120d05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ── Tooltip ── */
+.ond-tip { position: relative; }
+.ond-tip-box {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  max-width: 300px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-dark, #0d0800);
+  border: 1px solid var(--gold-dim, #8a6f1a);
+  color: var(--text, #e8d5b0);
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 400;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+  z-index: 100;
+  pointer-events: none;
+  transition: opacity 0.15s, visibility 0.15s;
+  white-space: pre-line;
+  text-align: left;
+}
+.ond-tip-box::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--gold-dim, #8a6f1a);
+}
+.ond-tip:hover .ond-tip-box {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* ── Fade in ── */
+@keyframes fadeIn {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Roll animation ── */
+@keyframes rollPop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Dice button hover ── */
+.dice-fab {
+  transition: all 0.2s ease;
+}
+.dice-fab:hover {
+  transform: scale(1.15);
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.45) !important;
+}
+.dice-fab:active {
+  transform: scale(0.95);
+}
+
+/* ── Dice roller panel buttons ── */
+.dice-select-btn {
+  transition: all 0.15s ease;
+}
+.dice-select-btn:hover {
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(201, 162, 39, 0.25);
+}
+.dice-select-btn:active {
+  transform: scale(0.92);
+}
+
+.dice-action-btn {
+  transition: all 0.15s ease;
+}
+.dice-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px rgba(201, 162, 39, 0.3);
+  border-color: var(--gold) !important;
+}
+.dice-action-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+}
+
+.dice-pm-btn {
+  transition: all 0.1s ease;
+}
+.dice-pm-btn:hover {
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+  transform: scale(1.2);
+}
+.dice-pm-btn:active {
+  transform: scale(0.9);
+}
+
+/* ── Navbar link hover ── */
+.nav-link {
+  transition: all 0.15s ease;
+}
+.nav-link:hover {
+  color: var(--gold) !important;
+  background: var(--bg-card-hover) !important;
+}
+
+/* ── Character creation hover effects ── */
+.cc-card {
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.2s, transform 0.15s;
+}
+.cc-card:hover {
+  border-color: var(--gold-dim) !important;
+  background: var(--bg-card-hover);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.cc-step-tab {
+  transition: all 0.15s ease;
+}
+.cc-step-tab:hover {
+  filter: brightness(1.25);
+}
+
+.cc-pill {
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.cc-pill:hover {
+  border-color: var(--gold-dim) !important;
+  background: var(--bg-card-hover) !important;
+  transform: translateY(-1px);
+}
+
+.cc-skill {
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.cc-skill:hover {
+  border-color: var(--gold-dim) !important;
+  background: var(--bg-card-hover) !important;
+  transform: translateY(-2px);
+}
+
+.cc-pm-btn {
+  transition: all 0.1s ease;
+}
+.cc-pm-btn:hover {
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+  transform: scale(1.15);
+}
+.cc-pm-btn:active {
+  transform: scale(0.9);
+}
+
+/* ── General button hover ── */
+.btn {
+  transition: all 0.15s ease;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--gold-dim) !important;
+  color: var(--text) !important;
+}
+
+/* ── Spell card hover ── */
+.spell-card {
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.2s, transform 0.15s;
+}
+.spell-card:hover {
+  border-color: var(--gold-dim) !important;
+  background: var(--bg-card-hover);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+/* ── Spell roll buttons ── */
+.spell-roll-btn {
+  transition: all 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.spell-roll-btn:hover:not(:disabled) {
+  border-color: var(--gold) !important;
+  background: var(--accent, var(--surface)) !important;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 4px 16px rgba(201, 162, 39, 0.25);
+}
+.spell-roll-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+}

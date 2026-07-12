@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.env
+*.pdf
+dist/
+server/data/characters/*.json
+server/uploads/
+.claude/

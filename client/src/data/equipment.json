@@ -1,0 +1,4635 @@
+[
+  {
+    "_id": "local_eq_0",
+    "name": "Padded",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "5 gp",
+    "weight": "8 lb.",
+    "ac": "11 + Dex",
+    "stealthDisadv": true,
+    "description": "Padded armor consists of quilted layers of cloth and batting.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_1",
+    "name": "Leather",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "10 gp",
+    "weight": "10 lb.",
+    "ac": "11 + Dex",
+    "description": "The breastplate and shoulder protectors of this armor are made of leather that has been stiffened by being boiled in oil.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_2",
+    "name": "Studded Leather",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "45 gp",
+    "weight": "13 lb.",
+    "ac": "12 + Dex",
+    "description": "Made from tough but flexible leather, studded leather is reinforced with close-set rivets or spikes.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_3",
+    "name": "Hide",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "10 gp",
+    "weight": "12 lb.",
+    "ac": "12 + Dex (max 2)",
+    "description": "This crude armor consists of thick furs and pelts.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_4",
+    "name": "Chain Shirt",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "50 gp",
+    "weight": "20 lb.",
+    "ac": "13 + Dex (max 2)",
+    "description": "Made of interlocking metal rings, worn between layers of clothing or leather.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_5",
+    "name": "Scale Mail",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "50 gp",
+    "weight": "45 lb.",
+    "ac": "14 + Dex (max 2)",
+    "stealthDisadv": true,
+    "description": "This armor consists of a coat and leggings of leather covered with overlapping pieces of metal.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_6",
+    "name": "Breastplate",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "400 gp",
+    "weight": "20 lb.",
+    "ac": "14 + Dex (max 2)",
+    "description": "This armor consists of a fitted metal chest piece worn with supple leather.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_7",
+    "name": "Half Plate",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "750 gp",
+    "weight": "40 lb.",
+    "ac": "15 + Dex (max 2)",
+    "stealthDisadv": true,
+    "description": "Half plate consists of shaped metal plates that cover most of the body.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_8",
+    "name": "Ring Mail",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "30 gp",
+    "weight": "40 lb.",
+    "ac": "14",
+    "stealthDisadv": true,
+    "description": "This armor is leather armor with heavy rings sewn into it.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_9",
+    "name": "Chain Mail",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "75 gp",
+    "weight": "55 lb.",
+    "ac": "16",
+    "strReq": 13,
+    "stealthDisadv": true,
+    "description": "Made of interlocking metal rings, chain mail includes a layer of quilted fabric worn underneath.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_10",
+    "name": "Splint",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "200 gp",
+    "weight": "60 lb.",
+    "ac": "17",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "description": "This armor is made of narrow vertical strips of metal riveted to a backing of leather.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_11",
+    "name": "Plate",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "1,500 gp",
+    "weight": "65 lb.",
+    "ac": "18",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "description": "Plate consists of shaped, interlocking metal plates to cover the entire body. Includes gauntlets, heavy leather boots, a visored helmet, and thick layers of padding.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_12",
+    "name": "Shield",
+    "category": "armor",
+    "subcategory": "Shield",
+    "cost": "10 gp",
+    "weight": "6 lb.",
+    "ac": "+2",
+    "description": "A shield is made from wood or metal and is carried in one hand. Wielding a shield increases your AC by 2.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_13",
+    "name": "Club",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "1 sp",
+    "weight": "2 lb.",
+    "damage": "1d4",
+    "damageType": "bludgeoning",
+    "properties": [
+      "light"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_14",
+    "name": "Dagger",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "2 gp",
+    "weight": "1 lb.",
+    "damage": "1d4",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_15",
+    "name": "Greatclub",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "2 sp",
+    "weight": "10 lb.",
+    "damage": "1d8",
+    "damageType": "bludgeoning",
+    "properties": [
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_16",
+    "name": "Handaxe",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "5 gp",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "slashing",
+    "properties": [
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_17",
+    "name": "Javelin",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "5 sp",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (30/120)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_18",
+    "name": "Light Hammer",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "2 gp",
+    "weight": "2 lb.",
+    "damage": "1d4",
+    "damageType": "bludgeoning",
+    "properties": [
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_19",
+    "name": "Mace",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "5 gp",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_20",
+    "name": "Quarterstaff",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "2 sp",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d8)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_21",
+    "name": "Sickle",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "1 gp",
+    "weight": "2 lb.",
+    "damage": "1d4",
+    "damageType": "slashing",
+    "properties": [
+      "light"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_22",
+    "name": "Spear",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "1 gp",
+    "weight": "3 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d8)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_23",
+    "name": "Light Crossbow",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "25 gp",
+    "weight": "5 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (80/320)",
+      "loading",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_24",
+    "name": "Dart",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "5 cp",
+    "weight": "1/4 lb.",
+    "damage": "1d4",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "thrown (20/60)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_25",
+    "name": "Shortbow",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "25 gp",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (80/320)",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_26",
+    "name": "Sling",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "1 sp",
+    "weight": "—",
+    "damage": "1d4",
+    "damageType": "bludgeoning",
+    "properties": [
+      "ammunition (30/120)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_27",
+    "name": "Battleaxe",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "10 gp",
+    "weight": "4 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_28",
+    "name": "Flail",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "10 gp",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_29",
+    "name": "Glaive",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "20 gp",
+    "weight": "6 lb.",
+    "damage": "1d10",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_30",
+    "name": "Greataxe",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "30 gp",
+    "weight": "7 lb.",
+    "damage": "1d12",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_31",
+    "name": "Greatsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "50 gp",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_32",
+    "name": "Halberd",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "20 gp",
+    "weight": "6 lb.",
+    "damage": "1d10",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_33",
+    "name": "Lance",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "10 gp",
+    "weight": "6 lb.",
+    "damage": "1d12",
+    "damageType": "piercing",
+    "properties": [
+      "reach",
+      "special"
+    ],
+    "description": "You have disadvantage when you use a lance to attack a target within 5 feet of you. A lance requires two hands to wield when you aren't mounted.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_34",
+    "name": "Longsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "15 gp",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_35",
+    "name": "Maul",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "10 gp",
+    "weight": "10 lb.",
+    "damage": "2d6",
+    "damageType": "bludgeoning",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_36",
+    "name": "Morningstar",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "15 gp",
+    "weight": "4 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_37",
+    "name": "Pike",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "5 gp",
+    "weight": "18 lb.",
+    "damage": "1d10",
+    "damageType": "piercing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_38",
+    "name": "Rapier",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "25 gp",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_39",
+    "name": "Scimitar",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "25 gp",
+    "weight": "3 lb.",
+    "damage": "1d6",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_40",
+    "name": "Shortsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "10 gp",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_41",
+    "name": "Trident",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "5 gp",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d8)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_42",
+    "name": "War Pick",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "5 gp",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_43",
+    "name": "Warhammer",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "15 gp",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_44",
+    "name": "Whip",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "2 gp",
+    "weight": "3 lb.",
+    "damage": "1d4",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "reach"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_45",
+    "name": "Blowgun",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "10 gp",
+    "weight": "1 lb.",
+    "damage": "1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (25/100)",
+      "loading"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_46",
+    "name": "Hand Crossbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "75 gp",
+    "weight": "3 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (30/120)",
+      "light",
+      "loading"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_47",
+    "name": "Heavy Crossbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "50 gp",
+    "weight": "18 lb.",
+    "damage": "1d10",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (100/400)",
+      "heavy",
+      "loading",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_48",
+    "name": "Longbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "50 gp",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (150/600)",
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_49",
+    "name": "Net",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "1 gp",
+    "weight": "3 lb.",
+    "damage": "—",
+    "damageType": "",
+    "properties": [
+      "special",
+      "thrown (5/15)"
+    ],
+    "description": "A Large or smaller creature hit by a net is restrained until freed. A net has no effect on formless or Huge+ creatures. DC 10 STR check or deal 5 slashing damage to the net (AC 10, 5 HP) to free.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_50",
+    "name": "Abacus",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_51",
+    "name": "Acid (vial)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "1 lb.",
+    "description": "As an action, splash onto a creature within 5 feet or throw up to 20 feet. Ranged attack, 2d6 acid damage on hit.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_52",
+    "name": "Alchemist's Fire (flask)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "50 gp",
+    "weight": "1 lb.",
+    "description": "As an action, throw up to 20 feet. Ranged attack, 1d4 fire damage at start of each turn. DC 10 DEX to extinguish.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_53",
+    "name": "Antitoxin (vial)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "50 gp",
+    "weight": "—",
+    "description": "Advantage on saves vs. poison for 1 hour.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_54",
+    "name": "Backpack",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "5 lb.",
+    "description": "Holds 1 cubic foot / 30 pounds of gear.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_55",
+    "name": "Ball Bearings (bag of 1,000)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "2 lb.",
+    "description": "Covers 10×10 ft. DEX DC 10 save or fall prone.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_56",
+    "name": "Barrel",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "70 lb.",
+    "description": "Holds 40 gallons liquid or 4 cubic feet solid.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_57",
+    "name": "Bedroll",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "7 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_58",
+    "name": "Bell",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_59",
+    "name": "Blanket",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "3 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_60",
+    "name": "Block and Tackle",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "5 lb.",
+    "description": "Allows you to hoist up to 4× the weight you can normally lift.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_61",
+    "name": "Book",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_62",
+    "name": "Caltrops (bag of 20)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "2 lb.",
+    "description": "Covers 5×5 ft. DEX DC 15 or take 1 piercing and stop moving. Speed reduced by 10 until healed.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_63",
+    "name": "Candle",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 cp",
+    "weight": "—",
+    "description": "Bright light 5 ft, dim light additional 5 ft. Lasts 1 hour.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_64",
+    "name": "Case, Crossbow Bolt",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "1 lb.",
+    "description": "Holds up to 20 crossbow bolts.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_65",
+    "name": "Case, Map or Scroll",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_66",
+    "name": "Chain (10 feet)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "10 lb.",
+    "description": "AC 20, 10 HP. Can be burst with DC 20 STR check.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_67",
+    "name": "Chalk (1 piece)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 cp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_68",
+    "name": "Chest",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "25 lb.",
+    "description": "Holds 12 cubic feet / 300 pounds of gear.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_69",
+    "name": "Climber's Kit",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "12 lb.",
+    "description": "Includes pitons, boot tips, gloves, and a harness. Allows anchoring; fall no more than 25 feet.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_70",
+    "name": "Component Pouch",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "2 lb.",
+    "description": "A small pouch that holds all material components and focuses needed for spellcasting (except those with a cost).",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_71",
+    "name": "Crowbar",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "5 lb.",
+    "description": "Advantage on STR checks where leverage can be applied.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_72",
+    "name": "Fishing Tackle",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "4 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_73",
+    "name": "Flask or Tankard",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 cp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_74",
+    "name": "Grappling Hook",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "4 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_75",
+    "name": "Hammer",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "3 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_76",
+    "name": "Hammer, Sledge",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "10 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_77",
+    "name": "Healer's Kit",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "3 lb.",
+    "description": "10 uses. As an action, stabilize a creature at 0 HP without a Medicine check.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_78",
+    "name": "Holy Water (flask)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "1 lb.",
+    "description": "As an action, splash onto a creature within 5 feet or throw up to 20 feet. 2d6 radiant damage to fiends and undead.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_79",
+    "name": "Hourglass",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "25 gp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_80",
+    "name": "Hunting Trap",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "25 lb.",
+    "description": "DC 13 DEX or take 1d4 piercing and stop moving. DC 13 STR to free.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_81",
+    "name": "Ink (1 ounce bottle)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "10 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_82",
+    "name": "Ink Pen",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 cp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_83",
+    "name": "Jug or Pitcher",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 cp",
+    "weight": "4 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_84",
+    "name": "Ladder (10-foot)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 sp",
+    "weight": "25 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_85",
+    "name": "Lamp",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "1 lb.",
+    "description": "Bright light 15 ft, dim light additional 30 ft. Burns 6 hours on 1 pint of oil.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_86",
+    "name": "Lantern, Bullseye",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "10 gp",
+    "weight": "2 lb.",
+    "description": "Bright light 60 ft cone, dim light additional 60 ft. Burns 6 hours on 1 pint of oil.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_87",
+    "name": "Lantern, Hooded",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "2 lb.",
+    "description": "Bright light 30 ft, dim light additional 30 ft. Burns 6 hours. Can lower hood to dim light 5 ft.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_88",
+    "name": "Lock",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "10 gp",
+    "weight": "1 lb.",
+    "description": "DC 15 DEX check with thieves' tools to pick.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_89",
+    "name": "Magnifying Glass",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "100 gp",
+    "weight": "—",
+    "description": "Grants advantage on Appraisal checks for small/detailed items. Can start fires with sunlight.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_90",
+    "name": "Manacles",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "6 lb.",
+    "description": "DC 20 STR to break. DC 15 DEX with thieves' tools to escape.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_91",
+    "name": "Mess Kit",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 sp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_92",
+    "name": "Mirror, Steel",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "1/2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_93",
+    "name": "Oil (flask)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 sp",
+    "weight": "1 lb.",
+    "description": "Splash on creature within 5 feet or throw 20 feet. If ignited, 5 fire damage for 2 rounds.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_94",
+    "name": "Paper (one sheet)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 sp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_95",
+    "name": "Parchment (one sheet)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 sp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_96",
+    "name": "Perfume (vial)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_97",
+    "name": "Pick, Miner's",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "10 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_98",
+    "name": "Piton",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 cp",
+    "weight": "1/4 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_99",
+    "name": "Poison, Basic (vial)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "100 gp",
+    "weight": "—",
+    "description": "Apply to one weapon or up to 3 pieces of ammunition. Next hit deals extra 1d4 poison damage. Dries after 1 minute.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_100",
+    "name": "Pole (10-foot)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 cp",
+    "weight": "7 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_101",
+    "name": "Pot, Iron",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "10 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_102",
+    "name": "Potion of Healing",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "50 gp",
+    "weight": "1/2 lb.",
+    "description": "Drink as an action to regain 2d4+2 hit points.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_103",
+    "name": "Pouch",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "1 lb.",
+    "description": "Holds 1/5 cubic foot / 6 pounds of gear.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_104",
+    "name": "Quiver",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "1 lb.",
+    "description": "Holds up to 20 arrows.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_105",
+    "name": "Ram, Portable",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "4 gp",
+    "weight": "35 lb.",
+    "description": "+4 bonus to STR checks to break down doors. Another character can assist for advantage.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_106",
+    "name": "Rations (1 day)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_107",
+    "name": "Robes",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "4 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_108",
+    "name": "Rope, Hempen (50 feet)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "10 lb.",
+    "description": "2 HP, can be burst with DC 17 STR check.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_109",
+    "name": "Rope, Silk (50 feet)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "10 gp",
+    "weight": "5 lb.",
+    "description": "2 HP, can be burst with DC 17 STR check.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_110",
+    "name": "Sack",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 cp",
+    "weight": "1/2 lb.",
+    "description": "Holds 1 cubic foot / 30 pounds of gear.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_111",
+    "name": "Scale, Merchant's",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "3 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_112",
+    "name": "Sealing Wax",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_113",
+    "name": "Shovel",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_114",
+    "name": "Signal Whistle",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 cp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_115",
+    "name": "Signet Ring",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_116",
+    "name": "Soap",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 cp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_117",
+    "name": "Spellbook",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "50 gp",
+    "weight": "3 lb.",
+    "description": "Essential for wizards. Can hold up to 100 pages of spells.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_118",
+    "name": "Spikes, Iron (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_119",
+    "name": "Spyglass",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1,000 gp",
+    "weight": "1 lb.",
+    "description": "Objects viewed through a spyglass are magnified to twice their size.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_120",
+    "name": "Tent, Two-Person",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 gp",
+    "weight": "20 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_121",
+    "name": "Tinderbox",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "5 sp",
+    "weight": "1 lb.",
+    "description": "Lighting a torch takes an action. Lighting anything else takes 1 minute.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_122",
+    "name": "Torch",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 cp",
+    "weight": "1 lb.",
+    "description": "Bright light 20 ft, dim light additional 20 ft. Burns 1 hour. Melee attack: 1 fire damage.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_123",
+    "name": "Vial",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 gp",
+    "weight": "—",
+    "description": "Holds up to 4 ounces of liquid.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_124",
+    "name": "Waterskin",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "2 sp",
+    "weight": "5 lb. (full)",
+    "description": "Holds 4 pints of liquid.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_125",
+    "name": "Whetstone",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "1 cp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_126",
+    "name": "Arrows (20)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "1 gp",
+    "weight": "1 lb.",
+    "description": "A quiver of 20 standard arrows for use with longbows and shortbows.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_127",
+    "name": "Blowgun Needles (50)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "1 gp",
+    "weight": "1 lb.",
+    "description": "A case of 50 tiny needles for use with a blowgun.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_128",
+    "name": "Crossbow Bolts (20)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "1 gp",
+    "weight": "1½ lb.",
+    "description": "A case of 20 crossbow bolts for use with light, heavy, or hand crossbows.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_129",
+    "name": "Sling Bullets (20)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "4 cp",
+    "weight": "1½ lb.",
+    "description": "A pouch of 20 lead sling bullets.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_130",
+    "name": "Arrows +1 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "25 gp",
+    "weight": "½ lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with these magic arrows. Once an arrow hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_131",
+    "name": "Arrows +2 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "100 gp",
+    "weight": "½ lb.",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with these magic arrows. Once an arrow hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_132",
+    "name": "Arrows +3 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "400 gp",
+    "weight": "½ lb.",
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to attack and damage rolls made with these magic arrows. Once an arrow hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_133",
+    "name": "Bolts +1 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "25 gp",
+    "weight": "¾ lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with these magic bolts. Once a bolt hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_134",
+    "name": "Bolts +2 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "100 gp",
+    "weight": "¾ lb.",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with these magic bolts. Once a bolt hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_135",
+    "name": "Bolts +3 (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "400 gp",
+    "weight": "¾ lb.",
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to attack and damage rolls made with these magic bolts. Once a bolt hits or misses, it loses its magic."
+  },
+  {
+    "_id": "local_eq_136",
+    "name": "Arrow of Slaying",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "600 gp",
+    "weight": "—",
+    "rarity": "very-rare",
+    "magical": true,
+    "description": "An arrow designed to slay a particular type of creature. If it hits the target creature type, it must make a DC 17 Constitution saving throw, taking 6d10 extra piercing damage on a failed save, or half as much on a success. After dealing this extra damage, the arrow becomes nonmagical."
+  },
+  {
+    "_id": "local_eq_137",
+    "name": "Unbreakable Arrow",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "50 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": true,
+    "description": "This arrow can't be broken, except when it is within an antimagic field. It is not consumed on use."
+  },
+  {
+    "_id": "local_eq_138",
+    "name": "Walloping Arrows (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "50 gp",
+    "weight": "½ lb.",
+    "rarity": "common",
+    "magical": true,
+    "description": "A creature hit by this ammunition must succeed on a DC 10 Strength saving throw or be knocked prone."
+  },
+  {
+    "_id": "local_eq_139",
+    "name": "Walloping Bolts (10)",
+    "category": "adventuring-gear",
+    "subcategory": "Ammunition",
+    "cost": "50 gp",
+    "weight": "¾ lb.",
+    "rarity": "common",
+    "magical": true,
+    "description": "A creature hit by this ammunition must succeed on a DC 10 Strength saving throw or be knocked prone."
+  },
+  {
+    "_id": "local_eq_140",
+    "name": "Alchemist's Supplies",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "50 gp",
+    "weight": "8 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_141",
+    "name": "Brewer's Supplies",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "20 gp",
+    "weight": "9 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_142",
+    "name": "Calligrapher's Supplies",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "10 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_143",
+    "name": "Carpenter's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "8 gp",
+    "weight": "6 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_144",
+    "name": "Cartographer's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "15 gp",
+    "weight": "6 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_145",
+    "name": "Cobbler's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "5 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_146",
+    "name": "Cook's Utensils",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "1 gp",
+    "weight": "8 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_147",
+    "name": "Glassblower's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "30 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_148",
+    "name": "Jeweler's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "25 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_149",
+    "name": "Leatherworker's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "5 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_150",
+    "name": "Mason's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "10 gp",
+    "weight": "8 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_151",
+    "name": "Painter's Supplies",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "10 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_152",
+    "name": "Potter's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "10 gp",
+    "weight": "3 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_153",
+    "name": "Smith's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "20 gp",
+    "weight": "8 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_154",
+    "name": "Tinker's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "50 gp",
+    "weight": "10 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_155",
+    "name": "Weaver's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "1 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_156",
+    "name": "Woodcarver's Tools",
+    "category": "tool",
+    "subcategory": "Artisan Tools",
+    "cost": "1 gp",
+    "weight": "5 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_157",
+    "name": "Dice Set",
+    "category": "tool",
+    "subcategory": "Gaming Set",
+    "cost": "1 sp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_158",
+    "name": "Dragonchess Set",
+    "category": "tool",
+    "subcategory": "Gaming Set",
+    "cost": "1 gp",
+    "weight": "1/2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_159",
+    "name": "Playing Card Set",
+    "category": "tool",
+    "subcategory": "Gaming Set",
+    "cost": "5 sp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_160",
+    "name": "Three-Dragon Ante Set",
+    "category": "tool",
+    "subcategory": "Gaming Set",
+    "cost": "1 gp",
+    "weight": "—",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_161",
+    "name": "Bagpipes",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "30 gp",
+    "weight": "6 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_162",
+    "name": "Drum",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "6 gp",
+    "weight": "3 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_163",
+    "name": "Dulcimer",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "25 gp",
+    "weight": "10 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_164",
+    "name": "Flute",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "2 gp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_165",
+    "name": "Lute",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "35 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_166",
+    "name": "Lyre",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "30 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_167",
+    "name": "Horn",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "3 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_168",
+    "name": "Pan Flute",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "12 gp",
+    "weight": "2 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_169",
+    "name": "Shawm",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "2 gp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_170",
+    "name": "Viol",
+    "category": "tool",
+    "subcategory": "Musical Instrument",
+    "cost": "30 gp",
+    "weight": "1 lb.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_171",
+    "name": "Disguise Kit",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "25 gp",
+    "weight": "3 lb.",
+    "description": "Proficiency lets you add your proficiency bonus to ability checks to create visual disguises.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_172",
+    "name": "Forgery Kit",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "15 gp",
+    "weight": "5 lb.",
+    "description": "Proficiency lets you add your proficiency bonus to ability checks to create physical forgeries.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_173",
+    "name": "Herbalism Kit",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "5 gp",
+    "weight": "3 lb.",
+    "description": "Proficiency lets you add your proficiency bonus to checks for identifying or applying herbs. Required to create antitoxin and potions of healing.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_174",
+    "name": "Navigator's Tools",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "25 gp",
+    "weight": "2 lb.",
+    "description": "Proficiency lets you chart a ship's course and follow navigation charts.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_175",
+    "name": "Poisoner's Kit",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "50 gp",
+    "weight": "2 lb.",
+    "description": "Proficiency lets you add your proficiency bonus to checks for crafting or applying poisons.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_176",
+    "name": "Thieves' Tools",
+    "category": "tool",
+    "subcategory": "Other Tools",
+    "cost": "25 gp",
+    "weight": "1 lb.",
+    "description": "Proficiency lets you add your proficiency bonus to checks for disarming traps or opening locks.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_177",
+    "name": "Burglar's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "16 gp",
+    "weight": "—",
+    "description": "Includes a backpack, bag of 1,000 ball bearings, 10 feet of string, a bell, 5 candles, a crowbar, a hammer, 10 pitons, a hooded lantern, 2 flasks of oil, 5 days rations, a tinderbox, a waterskin, and 50 feet of hempen rope.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_178",
+    "name": "Diplomat's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "39 gp",
+    "weight": "—",
+    "description": "Includes a chest, 2 cases for maps and scrolls, a set of fine clothes, a bottle of ink, an ink pen, a lamp, 2 flasks of oil, 5 sheets of paper, a vial of perfume, sealing wax, and soap.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_179",
+    "name": "Dungeoneer's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "12 gp",
+    "weight": "—",
+    "description": "Includes a backpack, a crowbar, a hammer, 10 pitons, 10 torches, a tinderbox, 10 days of rations, a waterskin, and 50 feet of hempen rope.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_180",
+    "name": "Entertainer's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "40 gp",
+    "weight": "—",
+    "description": "Includes a backpack, a bedroll, 2 costumes, 5 candles, 5 days of rations, a waterskin, and a disguise kit.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_181",
+    "name": "Explorer's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "10 gp",
+    "weight": "—",
+    "description": "Includes a backpack, a bedroll, a mess kit, a tinderbox, 10 torches, 10 days of rations, a waterskin, and 50 feet of hempen rope.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_182",
+    "name": "Priest's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "19 gp",
+    "weight": "—",
+    "description": "Includes a backpack, a blanket, 10 candles, a tinderbox, an alms box, 2 blocks of incense, a censer, vestments, 2 days of rations, and a waterskin.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_183",
+    "name": "Scholar's Pack",
+    "category": "pack",
+    "subcategory": "Pack",
+    "cost": "40 gp",
+    "weight": "—",
+    "description": "Includes a backpack, a book of lore, a bottle of ink, an ink pen, 10 sheets of parchment, a little bag of sand, and a small knife.",
+    "rarity": "common",
+    "magical": false
+  },
+  {
+    "_id": "local_eq_184",
+    "name": "+1 Longsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_185",
+    "name": "+1 Shortsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_186",
+    "name": "+1 Greatsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_187",
+    "name": "+1 Rapier",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_188",
+    "name": "+1 Battleaxe",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_189",
+    "name": "+1 Warhammer",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_190",
+    "name": "+1 Dagger",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "1 lb.",
+    "damage": "1d4+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_191",
+    "name": "+1 Longbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (150/600)",
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_192",
+    "name": "+1 Hand Crossbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (30/120)",
+      "light",
+      "loading"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_193",
+    "name": "+2 Longsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+2",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+2)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_194",
+    "name": "+2 Greatsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+2",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_195",
+    "name": "+2 Rapier",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+2",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_196",
+    "name": "+2 Battleaxe",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d8+2",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+2)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_197",
+    "name": "+2 Longbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+2",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (150/600)",
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_198",
+    "name": "+3 Longsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+3",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+3)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_199",
+    "name": "+3 Greatsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+3",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_200",
+    "name": "+3 Rapier",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+3",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_201",
+    "name": "+1 Leather Armor",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "—",
+    "weight": "10 lb.",
+    "ac": "12 + Dex",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_202",
+    "name": "+1 Studded Leather",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "—",
+    "weight": "13 lb.",
+    "ac": "13 + Dex",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_203",
+    "name": "+1 Chain Shirt",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "20 lb.",
+    "ac": "14 + Dex (max 2)",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_204",
+    "name": "+1 Breastplate",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "20 lb.",
+    "ac": "15 + Dex (max 2)",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_205",
+    "name": "+1 Half Plate",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "40 lb.",
+    "ac": "16 + Dex (max 2)",
+    "stealthDisadv": true,
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_206",
+    "name": "+1 Chain Mail",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "55 lb.",
+    "ac": "17",
+    "strReq": 13,
+    "stealthDisadv": true,
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_207",
+    "name": "+1 Splint",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "60 lb.",
+    "ac": "18",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_208",
+    "name": "+1 Plate",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "19",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_209",
+    "name": "+1 Shield",
+    "category": "armor",
+    "subcategory": "Shield",
+    "cost": "—",
+    "weight": "6 lb.",
+    "ac": "+3",
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "While holding this shield, you have a +1 bonus to AC in addition to the shield's normal AC bonus."
+  },
+  {
+    "_id": "local_eq_210",
+    "name": "+2 Studded Leather",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "—",
+    "weight": "13 lb.",
+    "ac": "14 + Dex",
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_211",
+    "name": "+2 Half Plate",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "40 lb.",
+    "ac": "17 + Dex (max 2)",
+    "stealthDisadv": true,
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_212",
+    "name": "+2 Plate",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "20",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_213",
+    "name": "+2 Shield",
+    "category": "armor",
+    "subcategory": "Shield",
+    "cost": "—",
+    "weight": "6 lb.",
+    "ac": "+4",
+    "rarity": "very-rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "While holding this shield, you have a +2 bonus to AC in addition to the shield's normal AC bonus."
+  },
+  {
+    "_id": "local_eq_214",
+    "name": "+3 Studded Leather",
+    "category": "armor",
+    "subcategory": "Light Armor",
+    "cost": "—",
+    "weight": "13 lb.",
+    "ac": "15 + Dex",
+    "rarity": "legendary",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_215",
+    "name": "+3 Plate",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "21",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "legendary",
+    "magical": true,
+    "bonus": 3,
+    "description": "You have a +3 bonus to AC while wearing this armor."
+  },
+  {
+    "_id": "local_eq_216",
+    "name": "+3 Shield",
+    "category": "armor",
+    "subcategory": "Shield",
+    "cost": "—",
+    "weight": "6 lb.",
+    "ac": "+5",
+    "rarity": "legendary",
+    "magical": true,
+    "bonus": 3,
+    "description": "While holding this shield, you have a +3 bonus to AC in addition to the shield's normal AC bonus."
+  },
+  {
+    "_id": "local_eq_217",
+    "name": "Flame Tongue",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8 + 2d6 fire",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. These flames shed bright light in a 40-foot radius and dim light for an additional 40 feet. While the sword is ablaze, it deals an extra 2d6 fire damage to any target it hits."
+  },
+  {
+    "_id": "local_eq_218",
+    "name": "Frost Brand",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8 + 1d6 cold",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you hit with an attack using this magic sword, the target takes an extra 1d6 cold damage. In addition, while you hold the sword, you have resistance to fire damage. In freezing temperatures, the blade sheds bright light in a 10-foot radius and dim light for an additional 10 feet."
+  },
+  {
+    "_id": "local_eq_219",
+    "name": "Vorpal Sword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+3",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls made with this magic weapon. When you attack a creature that has at least one head with this weapon and roll a 20 on the attack roll, you cut off one of the creature's heads."
+  },
+  {
+    "_id": "local_eq_220",
+    "name": "Holy Avenger",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+3",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+3)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls. When you hit a fiend or undead, it takes an extra 2d10 radiant damage. While you hold the drawn sword, it creates an aura in a 10-foot radius around you. You and all creatures friendly to you in the aura have advantage on saving throws against spells. Requires attunement by a paladin."
+  },
+  {
+    "_id": "local_eq_221",
+    "name": "Defender",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+3",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+3)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls. The first time you attack with the sword on each of your turns, you can transfer some or all of the sword's bonus to your AC instead. The adjusted bonuses remain in effect until the start of your next turn."
+  },
+  {
+    "_id": "local_eq_222",
+    "name": "Oathbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8 + 3d6",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (150/600)",
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you nock an arrow on this bow, it whispers \"Swift defeat to my enemies.\" When you use this weapon to make a ranged attack, you can speak its command phrase to designate a sworn enemy. Your ranged attacks with this weapon deal an extra 3d6 piercing damage against your sworn enemy."
+  },
+  {
+    "_id": "local_eq_223",
+    "name": "Sunblade",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "—",
+    "damage": "1d8+2 radiant",
+    "damageType": "radiant",
+    "properties": [
+      "versatile (1d10+2)",
+      "finesse"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 2,
+    "description": "This item appears to be a longsword hilt. While grasping the hilt, you can use a bonus action to create a blade of pure radiance. The blade deals radiant damage instead of slashing. Undead take an extra 1d8 radiant damage. The sword's luminous blade emits bright light in a 15-foot radius and dim light for an additional 15 feet."
+  },
+  {
+    "_id": "local_eq_224",
+    "name": "Mithral Armor (Chain Shirt)",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "20 lb.",
+    "ac": "13 + Dex (max 2)",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not."
+  },
+  {
+    "_id": "local_eq_225",
+    "name": "Mithral Armor (Breastplate)",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "20 lb.",
+    "ac": "14 + Dex (max 2)",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not."
+  },
+  {
+    "_id": "local_eq_226",
+    "name": "Mithral Armor (Half Plate)",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "40 lb.",
+    "ac": "15 + Dex (max 2)",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "Mithral is a light, flexible metal. A mithral half plate does not impose disadvantage on Stealth checks."
+  },
+  {
+    "_id": "local_eq_227",
+    "name": "Mithral Armor (Plate)",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "18",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "Mithral is a light, flexible metal. A mithral plate does not impose disadvantage on Stealth checks or have a Strength requirement."
+  },
+  {
+    "_id": "local_eq_228",
+    "name": "Adamantine Armor (Chain Mail)",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "55 lb.",
+    "ac": "16",
+    "strReq": 13,
+    "stealthDisadv": true,
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+  },
+  {
+    "_id": "local_eq_229",
+    "name": "Adamantine Armor (Splint)",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "60 lb.",
+    "ac": "17",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+  },
+  {
+    "_id": "local_eq_230",
+    "name": "Adamantine Armor (Plate)",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "18",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+  },
+  {
+    "_id": "local_eq_231",
+    "name": "Dragon Scale Mail",
+    "category": "armor",
+    "subcategory": "Medium Armor",
+    "cost": "—",
+    "weight": "45 lb.",
+    "ac": "14 + Dex (max 2) + 1",
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "Dragon scale mail is made of the scales of one kind of dragon. You have resistance to the damage type associated with the dragon. You have advantage on saving throws against the Frightful Presence and breath weapons of dragons. You can use an action to detect the distance and direction to the closest dragon of that kind within 30 miles."
+  },
+  {
+    "_id": "local_eq_232",
+    "name": "Armor of Invulnerability",
+    "category": "armor",
+    "subcategory": "Heavy Armor",
+    "cost": "—",
+    "weight": "65 lb.",
+    "ac": "18",
+    "strReq": 15,
+    "stealthDisadv": true,
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "You have resistance to nonmagical damage while you wear this armor. Additionally, you can use an action to make yourself immune to nonmagical damage for 10 minutes or until you are no longer wearing the armor. Once this special action is used, it can't be used again until the next dawn."
+  },
+  {
+    "_id": "local_eq_233",
+    "name": "Bag of Holding",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "15 lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This bag has an interior space considerably larger than its outside dimensions (roughly 2 feet in diameter, 4 feet deep). The bag can hold up to 500 pounds, not exceeding a volume of 64 cubic feet. Retrieving an item requires an action."
+  },
+  {
+    "_id": "local_eq_234",
+    "name": "Boots of Speed",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While you wear these boots, you can use a bonus action to click the boots' heels together. The boots double your walking speed and opportunity attacks against you have disadvantage. The effect lasts 10 minutes (charges reset at dawn)."
+  },
+  {
+    "_id": "local_eq_235",
+    "name": "Cloak of Protection",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "You gain a +1 bonus to AC and saving throws while you wear this cloak."
+  },
+  {
+    "_id": "local_eq_236",
+    "name": "Cloak of Displacement",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While you wear this cloak, it projects an illusion that makes you appear to be standing in a place near your actual location, causing any creature to have disadvantage on attack rolls against you. If you take damage, the property ceases to function until the start of your next turn."
+  },
+  {
+    "_id": "local_eq_237",
+    "name": "Gauntlets of Ogre Power",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "Your Strength score is 19 while you wear these gauntlets. They have no effect on you if your Strength is already 19 or higher."
+  },
+  {
+    "_id": "local_eq_238",
+    "name": "Amulet of Health",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "Your Constitution score is 19 while you wear this amulet. It has no effect on you if your Constitution is already 19 or higher."
+  },
+  {
+    "_id": "local_eq_239",
+    "name": "Headband of Intellect",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "Your Intelligence score is 19 while you wear this headband. It has no effect on you if your Intelligence is already 19 or higher."
+  },
+  {
+    "_id": "local_eq_240",
+    "name": "Belt of Giant Strength (Hill)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this belt, your Strength score changes to 21. The item has no effect on you if your Strength without the belt is equal to or greater than the belt's score."
+  },
+  {
+    "_id": "local_eq_241",
+    "name": "Belt of Giant Strength (Frost/Stone)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this belt, your Strength score changes to 23. The item has no effect on you if your Strength without the belt is equal to or greater than the belt's score."
+  },
+  {
+    "_id": "local_eq_242",
+    "name": "Belt of Giant Strength (Fire/Cloud)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this belt, your Strength score changes to 25 (Fire) or 27 (Cloud). The item has no effect on you if your Strength without the belt is equal to or greater than the belt's score."
+  },
+  {
+    "_id": "local_eq_243",
+    "name": "Belt of Giant Strength (Storm)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this belt, your Strength score changes to 29. The item has no effect on you if your Strength without the belt is equal to or greater than the belt's score."
+  },
+  {
+    "_id": "local_eq_244",
+    "name": "Ring of Protection",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You gain a +1 bonus to AC and saving throws while wearing this ring."
+  },
+  {
+    "_id": "local_eq_245",
+    "name": "Ring of Spell Storing",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "This ring stores spells cast into it, holding them until the attuned wearer uses them. The ring can store up to 5 levels worth of spells at a time."
+  },
+  {
+    "_id": "local_eq_246",
+    "name": "Winged Boots",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While you wear these boots, you have a flying speed equal to your walking speed. You can use the boots to fly for up to 4 hours. The boots regain 2 hours of flying capability for every 12 hours they aren't in use."
+  },
+  {
+    "_id": "local_eq_247",
+    "name": "Portable Hole",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "description": "This fine black cloth, soft as silk, is folded up to the dimensions of a handkerchief. Unfolds to a circular sheet 6 feet in diameter. Placing it on a solid surface creates a 10-foot-deep extradimensional hole."
+  },
+  {
+    "_id": "local_eq_248",
+    "name": "Immovable Rod",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "2 lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This flat iron rod has a button on one end. You can use an action to press the button, which causes the rod to become magically fixed in place. It can hold up to 8,000 pounds of weight. A DC 30 STR check moves it 10 feet."
+  },
+  {
+    "_id": "local_eq_249",
+    "name": "Decanter of Endless Water",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "2 lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This stoppered flask sloshes when shaken. You can use an action to remove the stopper and speak a command word to produce fresh or salt water: Stream (1 gallon), Fountain (5 gallons), or Geyser (30 gallons, 30 ft line, DC 13 STR or prone)."
+  },
+  {
+    "_id": "local_eq_250",
+    "name": "Sword of Life Stealing",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you attack a creature with this magic weapon and roll a 20 on the attack roll, the target takes an extra 10 necrotic damage if it isn't a construct or undead. You also gain 10 temporary hit points."
+  },
+  {
+    "_id": "local_eq_251",
+    "name": "Sword of Sharpness",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you attack an object with this magic sword and hit, maximize your weapon damage dice. When you roll a 20 on an attack roll, the target takes an extra 14 slashing damage. Then roll another d20. If you roll a 20, you lop off one of the target's limbs."
+  },
+  {
+    "_id": "local_eq_252",
+    "name": "Sword of Wounding",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "Hit points lost to this weapon's damage can be regained only through a short or long rest, rather than by regeneration, magic, or any other means. Once per turn, when you hit a creature, you can wound it. A wounded creature takes 1d4 necrotic damage at the start of each of its turns for each wound, then makes a DC 15 CON save to end all wounds."
+  },
+  {
+    "_id": "local_eq_253",
+    "name": "Dancing Sword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to toss this magic sword into the air and speak the command word. It hovers, flies up to 30 feet, and attacks one creature of your choice within 5 feet of it (using your attack bonus and ability modifier). On each of your turns, you can use a bonus action to direct the sword to fly up to 30 feet and repeat the attack. After 4 rounds, it falls."
+  },
+  {
+    "_id": "local_eq_254",
+    "name": "Nine Lives Stealer",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+2",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+2)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 2,
+    "description": "You gain a +2 bonus to attack and damage rolls. The sword has 1d8+1 charges. If you score a critical hit against a creature that has fewer than 100 hit points, it must succeed on a DC 15 Constitution saving throw or be slain instantly. The sword loses one charge each time it slays a creature this way."
+  },
+  {
+    "_id": "local_eq_255",
+    "name": "Luck Blade",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. While the sword is on your person, you also gain a +1 bonus to saving throws. The sword has 1d4-1 charges. You can use one charge to cast Wish. Luck: If the sword is on your person, you can reroll one attack roll, ability check, or saving throw you dislike (you must use the second roll)."
+  },
+  {
+    "_id": "local_eq_256",
+    "name": "Scimitar of Speed",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d6+2",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 2,
+    "description": "You gain a +2 bonus to attack and damage rolls made with this magic weapon. In addition, you can make one attack with it as a bonus action on each of your turns."
+  },
+  {
+    "_id": "local_eq_257",
+    "name": "Javelin of Lightning",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (30/120)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "When you hurl this javelin and speak its command word, it transforms into a bolt of lightning, forming a 5-foot-wide line between you and the target. Each creature in the line (excluding you and the target) must make a DC 13 Dexterity saving throw, taking 4d6 lightning damage on a failed save, or half on a success. The javelin deals its normal damage plus 4d6 lightning damage to the target. This property can't be used again until the next dawn."
+  },
+  {
+    "_id": "local_eq_258",
+    "name": "Trident of Fish Command",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d8)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "This trident is a magic weapon. It has 3 charges. While you carry it, you can use an action and expend 1 charge to cast Dominate Beast (save DC 15) from it on a beast that has an innate swimming speed. The trident regains 1d3 charges daily at dawn."
+  },
+  {
+    "_id": "local_eq_259",
+    "name": "Dagger of Venom",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "1 lb.",
+    "damage": "1d4+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. You can use an action to cause thick, black poison to coat the blade (lasts 1 min or until hit). A creature hit must succeed on a DC 15 Constitution saving throw or take 2d10 poison damage and become poisoned for 1 minute. This property can't be used again until the next dawn."
+  },
+  {
+    "_id": "local_eq_260",
+    "name": "Mace of Smiting",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+3",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls (+3 vs. constructs). When you roll a 20 on an attack roll against a construct, the hit deals an extra 7 bludgeoning damage. If the construct has 25 hit points or fewer after taking this damage, it is destroyed."
+  },
+  {
+    "_id": "local_eq_261",
+    "name": "Mace of Disruption",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you hit a fiend or undead with this magic weapon, that creature takes an extra 2d6 radiant damage. If the target has 25 hit points or fewer after taking this damage, it must succeed on a DC 15 Wisdom saving throw or be destroyed. On a successful save, the creature becomes frightened of you until the end of your next turn. While you hold this weapon, it sheds bright light in a 20-foot radius and dim light for an additional 20 feet."
+  },
+  {
+    "_id": "local_eq_262",
+    "name": "Mace of Terror",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "This magic weapon has 3 charges. While holding it, you can use an action and expend 1 charge to release a wave of terror. Each creature of your choice within 30 feet must succeed on a DC 15 Wisdom saving throw or become frightened of you for 1 minute. A frightened creature can repeat the saving throw at the end of each of its turns. The mace regains 1d3 charges daily at dawn."
+  },
+  {
+    "_id": "local_eq_263",
+    "name": "Staff of Striking",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+3",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d8+3)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "This staff has 10 charges. When you hit with a melee attack using it, you can expend up to 3 charges. For each charge you expend, the target takes an extra 1d6 force damage. The staff regains 1d6+4 charges daily at dawn."
+  },
+  {
+    "_id": "local_eq_264",
+    "name": "Staff of Power",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+2",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d8+2)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 2,
+    "description": "You gain a +2 bonus to attack and damage rolls, AC, saving throws, and spell attack rolls. The staff has 20 charges for spellcasting. It regains 2d8+4 charges daily at dawn. If the last charge is expended, roll a d20. On a 1, the staff is destroyed in a retributive strike."
+  },
+  {
+    "_id": "local_eq_265",
+    "name": "Staff of the Magi",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+2",
+    "damageType": "bludgeoning",
+    "properties": [
+      "versatile (1d8+2)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 2,
+    "description": "You gain a +2 bonus to spell attack rolls. The staff has 50 charges. You can use an action to cast one of many spells from it. You have advantage on saving throws against spells. When hit by a spell, you can use your reaction to absorb it, gaining charges equal to the spell's level."
+  },
+  {
+    "_id": "local_eq_266",
+    "name": "Hammer of Thunderbolts",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "10 lb.",
+    "damage": "2d6+1",
+    "damageType": "bludgeoning",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. If wearing a Belt of Giant Strength and Gauntlets of Ogre Power, the bonus increases to +4 and you can use it to hurl a thunderbolt: ranged attack (20/60), dealing weapon damage + 5d6 thunder damage. Target must make DC 17 CON save or be stunned until end of your next turn. Giants hit must make DC 17 CON save or die."
+  },
+  {
+    "_id": "local_eq_267",
+    "name": "Berserker Axe",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "7 lb.",
+    "damage": "1d12+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. You gain 1 extra hit point per level. Curse: while attuned, you are unwilling to part with it. Whenever a hostile creature damages you while the axe is in your possession, you must succeed on a DC 15 Wisdom saving throw or go berserk, using your action to attack the nearest creature."
+  },
+  {
+    "_id": "local_eq_268",
+    "name": "Dragon Slayer",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls made with this magic weapon. When you hit a dragon with this weapon, the dragon takes an extra 3d6 damage. For the purpose of this weapon, \"dragon\" refers to any creature with the dragon type."
+  },
+  {
+    "_id": "local_eq_269",
+    "name": "Giant Slayer",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant with it, the giant takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_270",
+    "name": "Vicious Weapon (Longsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "description": "When you roll a 20 on your attack roll with this magic weapon, the target takes an extra 7 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_271",
+    "name": "Weapon of Warning (Longsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "This magic weapon warns you of danger. While the weapon is on your person, you have advantage on initiative rolls. In addition, you and your companions within 30 feet can't be surprised, except when incapacitated by something other than nonmagical sleep."
+  },
+  {
+    "_id": "local_eq_272",
+    "name": "Cloak of Elvenkind",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While you wear this cloak with its hood up, Wisdom (Perception) checks made to see you have disadvantage, and you have advantage on Dexterity (Stealth) checks made to hide, as the cloak's color shifts to camouflage you."
+  },
+  {
+    "_id": "local_eq_273",
+    "name": "Boots of Elvenkind",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "While you wear these boots, your steps make no sound, regardless of the surface you are moving across. You also have advantage on Dexterity (Stealth) checks that rely on moving silently."
+  },
+  {
+    "_id": "local_eq_274",
+    "name": "Eyes of the Eagle",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "These crystal lenses fit over the eyes. While wearing them, you have advantage on Wisdom (Perception) checks that rely on sight. In conditions of clear visibility, you can make out details of even extremely distant creatures and objects as small as 2 feet across."
+  },
+  {
+    "_id": "local_eq_275",
+    "name": "Bracers of Defense",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing these bracers, you gain a +2 bonus to AC if you are wearing no armor and using no shield."
+  },
+  {
+    "_id": "local_eq_276",
+    "name": "Bracers of Archery",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing these bracers, you have proficiency with the longbow and shortbow, and you gain a +2 bonus to damage rolls on ranged attacks made with such weapons."
+  },
+  {
+    "_id": "local_eq_277",
+    "name": "Gloves of Missile Snaring",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "When a ranged weapon attack hits you while you're wearing these gloves, you can use your reaction to reduce the damage by 1d10 + your Dexterity modifier, provided you have a free hand. If you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in that hand."
+  },
+  {
+    "_id": "local_eq_278",
+    "name": "Periapt of Wound Closure",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While you wear this pendant, you stabilize whenever you are dying at the start of your turn. In addition, whenever you roll a Hit Die to regain hit points, double the number of hit points it restores."
+  },
+  {
+    "_id": "local_eq_279",
+    "name": "Periapt of Health",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "You are immune to contracting any disease while you wear this pendant. If you are already diseased, the effects of the disease are suppressed while you wear the pendant."
+  },
+  {
+    "_id": "local_eq_280",
+    "name": "Periapt of Proof against Poison",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "description": "This pendant renders you immune to poison. You are immune to the poisoned condition and have immunity to poison damage."
+  },
+  {
+    "_id": "local_eq_281",
+    "name": "Amulet of Proof against Detection",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this amulet, you are hidden from divination magic. You can't be targeted by such magic or perceived through magical scrying sensors."
+  },
+  {
+    "_id": "local_eq_282",
+    "name": "Helm of Brilliance",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "This helm is set with 1d10 diamonds, 2d10 rubies, 3d10 fire opals, and 5d10 opals. You can use an action to cast one of several spells by removing gems. You have resistance to fire damage. You can use an action to emit light from the remaining diamonds (30 ft bright, 30 ft dim). Undead within the bright light have disadvantage on attack rolls."
+  },
+  {
+    "_id": "local_eq_283",
+    "name": "Helm of Telepathy",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "uncommon",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this helm, you can use an action to cast the Detect Thoughts spell (save DC 13) from it. You can focus on one creature and telepathically communicate with it, as long as it is within 30 feet. You can use an action to cast the Suggestion spell (save DC 13) on a creature you are focused on. Once used, the suggestion property can't be used again until the next dawn."
+  },
+  {
+    "_id": "local_eq_284",
+    "name": "Cloak of the Bat",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "While wearing this cloak, you have advantage on Dexterity (Stealth) checks. In an area of dim light or darkness, you can grip the edges of the cloak with both hands and use it to fly at a speed of 40 feet. If you ever fail to grip the cloak's edges while flying, or are no longer in dim light or darkness, you lose this flying speed."
+  },
+  {
+    "_id": "local_eq_285",
+    "name": "Cape of the Mountebank",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "description": "This cape smells faintly of brimstone. While wearing it, you can use it to cast the Dimension Door spell as an action. This property can't be used again until the next dawn. When you disappear, you leave behind a cloud of smoke (lightly obscured, 5 ft radius, dissipates at end of your next turn)."
+  },
+  {
+    "_id": "local_eq_286",
+    "name": "Robe of Stars",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You gain a +1 bonus to saving throws while you wear this robe. The robe has 6 embroidered stars. You can use an action to pull off a star and cast Magic Missile as a 5th-level spell. Daily at dusk, 1d6 removed stars reappear. While wearing the robe, you can enter the Astral Plane along with everything you are wearing and carrying."
+  },
+  {
+    "_id": "local_eq_287",
+    "name": "Robe of the Archmagi",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "Requires attunement by a sorcerer, warlock, or wizard. Your base AC is 15 + your Dexterity modifier. You have advantage on saving throws against spells and other magical effects. Your spell save DC and spell attack bonus each increase by 2."
+  },
+  {
+    "_id": "local_eq_288",
+    "name": "Bag of Tricks (Gray)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "½ lb.",
+    "rarity": "uncommon",
+    "magical": true,
+    "description": "This ordinary bag has 3 fuzzy objects inside. You can use an action to pull a fuzzy object and throw it up to 20 feet. It transforms into a random creature (weasel, giant rat, badger, boar, panther, giant badger, dire wolf, or giant elk). The creature is friendly and acts on your turn. It vanishes at the next dawn or when reduced to 0 HP. The bag regains 1d3 fuzzy objects daily at dawn."
+  },
+  {
+    "_id": "local_eq_289",
+    "name": "Ioun Stone (Mastery)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "Your proficiency bonus increases by 1 while this pale green prism orbits your head."
+  },
+  {
+    "_id": "local_eq_290",
+    "name": "Ioun Stone (Protection)",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You gain a +1 bonus to AC while this dusty rose prism orbits your head."
+  },
+  {
+    "_id": "local_eq_291",
+    "name": "Manual of Bodily Health",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "5 lb.",
+    "rarity": "very-rare",
+    "magical": true,
+    "description": "This book contains health and diet tips, and its words are charged with magic. If you spend 48 hours over 6 days studying the book, your Constitution score increases by 2, as does your maximum for that score. The manual then loses its magic, but regains it in a century."
+  },
+  {
+    "_id": "local_eq_292",
+    "name": "Manual of Gainful Exercise",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "5 lb.",
+    "rarity": "very-rare",
+    "magical": true,
+    "description": "This book contains exercise routines, and its words are charged with magic. If you spend 48 hours over 6 days studying the book, your Strength score increases by 2, as does your maximum for that score. The manual then loses its magic, but regains it in a century."
+  },
+  {
+    "_id": "local_eq_293",
+    "name": "Tome of Clear Thought",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "5 lb.",
+    "rarity": "very-rare",
+    "magical": true,
+    "description": "This book contains memory and logic exercises, and its words are charged with magic. If you spend 48 hours over 6 days studying the book, your Intelligence score increases by 2, as does your maximum for that score. The tome then loses its magic, but regains it in a century."
+  },
+  {
+    "_id": "local_eq_294",
+    "name": "Carpet of Flying",
+    "category": "adventuring-gear",
+    "subcategory": "Adventuring Gear",
+    "cost": "—",
+    "weight": "—",
+    "rarity": "very-rare",
+    "magical": true,
+    "description": "You can speak the carpet's command word as an action to make the carpet hover and fly. The carpet can carry up to 400 pounds at a speed of 30 feet, or up to 200 pounds at 60 feet. The carpet can't hover if it carries more than its capacity."
+  },
+  {
+    "_id": "local_eq_295",
+    "name": "Greataxe +1",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "7 lb.",
+    "damage": "1d12+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_296",
+    "name": "Greataxe +2",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "7 lb.",
+    "damage": "1d12+2",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_297",
+    "name": "Battleaxe +2",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d8+2",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+2)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 2,
+    "description": "You have a +2 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_298",
+    "name": "+1 Flail",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_299",
+    "name": "+1 Glaive",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "1d10+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_300",
+    "name": "+1 Halberd",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "1d10+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_301",
+    "name": "+1 Lance",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "1d12+1",
+    "damageType": "piercing",
+    "properties": [
+      "reach",
+      "special"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_302",
+    "name": "+1 Maul",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "10 lb.",
+    "damage": "2d6+1",
+    "damageType": "bludgeoning",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_303",
+    "name": "+1 Morningstar",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_304",
+    "name": "+1 Pike",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "18 lb.",
+    "damage": "1d10+1",
+    "damageType": "piercing",
+    "properties": [
+      "heavy",
+      "reach",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_305",
+    "name": "+1 Scimitar",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_306",
+    "name": "+1 Trident",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d8+1)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_307",
+    "name": "+1 War Pick",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_308",
+    "name": "+1 Whip",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d4+1",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "reach"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_309",
+    "name": "+1 Heavy Crossbow",
+    "category": "weapon",
+    "subcategory": "Martial Ranged",
+    "cost": "—",
+    "weight": "18 lb.",
+    "damage": "1d10+1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (100/400)",
+      "heavy",
+      "loading",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_310",
+    "name": "+1 Light Crossbow",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "—",
+    "weight": "5 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (80/320)",
+      "loading",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_311",
+    "name": "+1 Shortbow",
+    "category": "weapon",
+    "subcategory": "Simple Ranged",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "ammunition (80/320)",
+      "two-handed"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_312",
+    "name": "+1 Mace",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "4 lb.",
+    "damage": "1d6+1",
+    "damageType": "bludgeoning",
+    "properties": [],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_313",
+    "name": "+1 Handaxe",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_314",
+    "name": "+1 Javelin",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (30/120)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_315",
+    "name": "+1 Spear",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d8+1)"
+    ],
+    "rarity": "uncommon",
+    "magical": true,
+    "bonus": 1,
+    "description": "You have a +1 bonus to attack and damage rolls made with this magic weapon."
+  },
+  {
+    "_id": "local_eq_316",
+    "name": "Dwarven Thrower",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+3",
+    "damageType": "bludgeoning",
+    "properties": [
+      "thrown (20/60)",
+      "versatile (1d10+3)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "Requires attunement by a dwarf. You gain a +3 bonus to attack and damage rolls. It has the thrown property with a normal range of 20 feet and a long range of 60 feet. When you hit with a ranged attack using this weapon, it deals an extra 1d8 damage (or 2d8 against giants). Immediately after the attack, the weapon flies back to your hand."
+  },
+  {
+    "_id": "local_eq_317",
+    "name": "Flame Tongue Shortsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6 + 2d6 fire",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. While ablaze, it deals an extra 2d6 fire damage to any target it hits. The flames shed bright light in a 40-foot radius and dim light for an additional 40 feet."
+  },
+  {
+    "_id": "local_eq_318",
+    "name": "Flame Tongue Greatsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6 + 2d6 fire",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. While ablaze, it deals an extra 2d6 fire damage to any target it hits. The flames shed bright light in a 40-foot radius and dim light for an additional 40 feet."
+  },
+  {
+    "_id": "local_eq_319",
+    "name": "Flame Tongue Rapier",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8 + 2d6 fire",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. While ablaze, it deals an extra 2d6 fire damage to any target it hits. The flames shed bright light in a 40-foot radius and dim light for an additional 40 feet."
+  },
+  {
+    "_id": "local_eq_320",
+    "name": "Flame Tongue Scimitar",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d6 + 2d6 fire",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "You can use a bonus action to speak this magic sword's command word, causing flames to erupt from the blade. While ablaze, it deals an extra 2d6 fire damage to any target it hits. The flames shed bright light in a 40-foot radius and dim light for an additional 40 feet."
+  },
+  {
+    "_id": "local_eq_321",
+    "name": "Frost Brand Longsword",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8 + 1d6 cold",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "very-rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you hit with this magic sword, the target takes an extra 1d6 cold damage. You have resistance to fire damage while you hold this sword. In freezing temperatures, the blade sheds bright light in a 10-foot radius and dim light for an additional 10 feet."
+  },
+  {
+    "_id": "local_eq_322",
+    "name": "Moon-Touched Sword (Longsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10)"
+    ],
+    "rarity": "common",
+    "magical": true,
+    "description": "In darkness, the unsheathed blade of this sword sheds moonlight, creating bright light in a 15-foot radius and dim light for an additional 15 feet."
+  },
+  {
+    "_id": "local_eq_323",
+    "name": "Moon-Touched Sword (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "common",
+    "magical": true,
+    "description": "In darkness, the unsheathed blade of this sword sheds moonlight, creating bright light in a 15-foot radius and dim light for an additional 15 feet."
+  },
+  {
+    "_id": "local_eq_324",
+    "name": "Moon-Touched Sword (Rapier)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "common",
+    "magical": true,
+    "description": "In darkness, the unsheathed blade of this sword sheds moonlight, creating bright light in a 15-foot radius and dim light for an additional 15 feet."
+  },
+  {
+    "_id": "local_eq_325",
+    "name": "Moon-Touched Sword (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "common",
+    "magical": true,
+    "description": "In darkness, the unsheathed blade of this sword sheds moonlight, creating bright light in a 15-foot radius and dim light for an additional 15 feet."
+  },
+  {
+    "_id": "local_eq_326",
+    "name": "Sword of Life Stealing (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you attack a creature with this magic weapon and roll a 20 on the attack roll, the target takes an extra 10 necrotic damage if it isn't a construct or undead. You also gain 10 temporary hit points."
+  },
+  {
+    "_id": "local_eq_327",
+    "name": "Sword of Life Stealing (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "When you attack a creature with this magic weapon and roll a 20 on the attack roll, the target takes an extra 10 necrotic damage if it isn't a construct or undead. You also gain 10 temporary hit points."
+  },
+  {
+    "_id": "local_eq_328",
+    "name": "Sword of Wounding (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "Hit points lost to this weapon can only be regained through a short or long rest. Once per turn when you hit, you can wound the target. The wounded creature takes 1d4 necrotic damage at the start of each of its turns per wound, then makes a DC 15 CON save to end all wounds on it."
+  },
+  {
+    "_id": "local_eq_329",
+    "name": "Sword of Wounding (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "attunement": true,
+    "description": "Hit points lost to this weapon can only be regained through a short or long rest. Once per turn when you hit, you can wound the target. The wounded creature takes 1d4 necrotic damage at the start of each of its turns per wound, then makes a DC 15 CON save to end all wounds on it."
+  },
+  {
+    "_id": "local_eq_330",
+    "name": "Vicious Weapon (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "description": "When you roll a 20 on your attack roll with this magic weapon, the target takes an extra 7 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_331",
+    "name": "Vicious Weapon (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "description": "When you roll a 20 on your attack roll with this magic weapon, the target takes an extra 7 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_332",
+    "name": "Vicious Weapon (Rapier)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "description": "When you roll a 20 on your attack roll with this magic weapon, the target takes an extra 7 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_333",
+    "name": "Giant Slayer (Greataxe)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "7 lb.",
+    "damage": "1d12+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant, it takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_334",
+    "name": "Giant Slayer (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant, it takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_335",
+    "name": "Giant Slayer (Handaxe)",
+    "category": "weapon",
+    "subcategory": "Simple Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "light",
+      "thrown (20/60)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant, it takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_336",
+    "name": "Giant Slayer (Longsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+1",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+1)"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant, it takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_337",
+    "name": "Giant Slayer (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a giant, it takes an extra 2d6 damage and must succeed on a DC 15 Strength saving throw or fall prone."
+  },
+  {
+    "_id": "local_eq_338",
+    "name": "Dragon Slayer (Greatsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "6 lb.",
+    "damage": "2d6+1",
+    "damageType": "slashing",
+    "properties": [
+      "heavy",
+      "two-handed"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a dragon, it takes an extra 3d6 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_339",
+    "name": "Dragon Slayer (Shortsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d6+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse",
+      "light"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a dragon, it takes an extra 3d6 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_340",
+    "name": "Dragon Slayer (Rapier)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "2 lb.",
+    "damage": "1d8+1",
+    "damageType": "piercing",
+    "properties": [
+      "finesse"
+    ],
+    "rarity": "rare",
+    "magical": true,
+    "bonus": 1,
+    "description": "You gain a +1 bonus to attack and damage rolls. When you hit a dragon, it takes an extra 3d6 damage of the weapon's type."
+  },
+  {
+    "_id": "local_eq_341",
+    "name": "Sword of Answering (Longsword)",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+3",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+3)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls. When a creature within your reach deals damage to you, you can use your reaction to make one melee attack against that creature with advantage on the attack roll. Must match your alignment."
+  },
+  {
+    "_id": "local_eq_342",
+    "name": "Sword of Kas",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8+3",
+    "damageType": "slashing",
+    "properties": [
+      "versatile (1d10+3)"
+    ],
+    "rarity": "artifact",
+    "magical": true,
+    "attunement": true,
+    "bonus": 3,
+    "description": "You gain a +3 bonus to attack and damage rolls, and score a critical hit on 19 or 20. It deals an extra 2d10 force damage to undead. While attuned, you have advantage on all checks to interact with undead. You can use an action to release a spirit of dread (DC 18 WIS save or frightened). The sword is sentient and may attempt to dominate its wielder."
+  },
+  {
+    "_id": "local_eq_343",
+    "name": "Moonblade",
+    "category": "weapon",
+    "subcategory": "Martial Melee",
+    "cost": "—",
+    "weight": "3 lb.",
+    "damage": "1d8",
+    "damageType": "slashing",
+    "properties": [
+      "finesse",
+      "versatile (1d10)"
+    ],
+    "rarity": "legendary",
+    "magical": true,
+    "attunement": true,
+    "description": "Requires attunement by an elf or half-elf of neutral good alignment. A moonblade has one rune on its blade for each of its former wielders, each granting a random property (increase damage by 1d6, glow bright 20ft/dim 20ft, etc.). A moonblade with multiple runes gains additional abilities."
+  }
+]
