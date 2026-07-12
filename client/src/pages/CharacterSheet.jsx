@@ -524,6 +524,48 @@ export default function CharacterSheet() {
   const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char.skillProficiencies?.includes('Investigation') ? profBonus : 0);
   const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char.skillProficiencies?.includes('Insight') ? profBonus : 0);
   const initiative = modVal(scores.dexterity ?? 10);
+  const dexMod = modVal(scores.dexterity ?? 10);
+
+  // Auto-calculate AC from equipped armor
+  const calcAC = useMemo(() => {
+    const equipped = char.equippedItems || [];
+    const cache = equipCache.current;
+    let baseAC = 10 + dexMod; // unarmored default
+    let shieldBonus = 0;
+    let hasArmor = false;
+
+    for (const name of equipped) {
+      const item = cache[name];
+      if (!item || item.category !== 'armor') continue;
+      const ac = parseInt(item.ac);
+      if (isNaN(ac)) continue;
+      const sub = (item.subcategory || '').toLowerCase();
+
+      if (sub === 'shield') {
+        shieldBonus = Math.max(shieldBonus, ac || 2);
+      } else if (sub === 'heavy') {
+        baseAC = ac;
+        hasArmor = true;
+      } else if (sub === 'medium') {
+        baseAC = ac + Math.min(dexMod, 2);
+        hasArmor = true;
+      } else if (sub === 'light') {
+        baseAC = ac + dexMod;
+        hasArmor = true;
+      } else {
+        // Unknown armor type — use AC + DEX as fallback
+        if (ac > baseAC) { baseAC = ac + dexMod; hasArmor = true; }
+      }
+    }
+    return baseAC + shieldBonus;
+  }, [char.equippedItems, dexMod, equipDataLoaded]);
+
+  // Update char.armorClass when calculated AC changes
+  useEffect(() => {
+    if (calcAC !== char.armorClass) {
+      updateField('armorClass', calcAC);
+    }
+  }, [calcAC]);
 
   // Spell slots
   const spellSlotData = getSpellSlots(char.class, char.level);
@@ -1496,7 +1538,6 @@ export default function CharacterSheet() {
     const spellMod = modVal(scores[char.spellcastingAbility] ?? scores.intelligence ?? 10);
     const attackSpells = spellData.filter(sp => sp.damage || sp.attackType || sp.savingThrow);
     const strMod = modVal(scores.strength ?? 10);
-    const dexMod = modVal(scores.dexterity ?? 10);
 
     // Equipped weapons from cache
     const equippedWeapons = (char.equippedItems || [])
