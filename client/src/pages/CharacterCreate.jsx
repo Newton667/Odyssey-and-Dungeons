@@ -457,17 +457,18 @@ export default function CharacterCreate() {
       {/* Step bar */}
       <div style={{ display: 'flex', marginBottom: '28px', background: 'var(--surface)', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
         {STEPS.map((s, i) => (
-          <div key={s} className={i <= step ? 'cc-step-tab' : ''} onClick={() => i <= step && setStep(i)} style={{
+          <div key={s} className={i <= step ? 'cc-step-tab cc-skill' : ''} onClick={() => i <= step && setStep(i)} style={{
             flex: 1, padding: '12px 6px', textAlign: 'center', fontSize: '11px',
             textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: i <= step ? 'pointer' : 'default',
             background: i === step ? 'var(--accent)' : i < step ? 'var(--surface)' : 'transparent',
-            color: i === step ? 'var(--gold)' : i < step ? 'var(--gold)' : 'var(--text-dim)',
+            color: i === step ? 'var(--gold)' : i < step ? 'var(--gold-dim)' : 'var(--text-dim)',
             fontFamily: 'Cinzel, serif', fontWeight: i === step ? 700 : 400,
             borderRight: i < STEPS.length - 1 ? '1px solid var(--border)' : 'none',
             boxShadow: i === step ? 'inset 0 -3px 0 var(--gold)' : 'none',
-          }}>{i + 1}. {s}</div>
+            opacity: i > step ? 0.4 : 1,
+          }}>{i < step ? '✓ ' : `${i + 1}. `}{s}</div>
         ))}
       </div>
 

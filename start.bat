@@ -11,7 +11,10 @@ echo.
 where node >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo  [ERROR] Node.js is not installed!
-    echo  Download it from: https://nodejs.org
+    echo  Opening download page...
+    start "" "https://nodejs.org/en/download"
+    echo.
+    echo  Install Node.js, then run this script again.
     echo.
     pause
     exit /b 1
