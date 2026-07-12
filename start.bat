@@ -19,8 +19,11 @@ if %ERRORLEVEL% neq 0 (
     pause
     exit /b 1
 )
+echo  Node.js found:
+node --version
 
-:: Check for updates from GitHub
+:: Check for updates from GitHub (only if git repo)
+echo.
 echo  [1/4] Checking for updates...
 cd /d "%~dp0"
 git rev-parse --git-dir >nul 2>nul
@@ -46,31 +49,39 @@ if %ERRORLEVEL% equ 0 (
     )
 ) else (
     echo  Not a git repo - skipping update check.
+    echo  (Tip: use "git clone" instead of downloading zip for auto-updates)
 )
 
-:: Install dependencies if needed
-echo  [2/4] Checking dependencies...
-if not exist "%~dp0server\node_modules" (
-    echo  Installing server dependencies...
-    cd /d "%~dp0server" && npm install
-    cd /d "%~dp0"
+:: Install dependencies (always run to ensure everything is installed)
+echo.
+echo  [2/4] Installing dependencies...
+echo  Installing server dependencies...
+cd /d "%~dp0server"
+call npm install --silent 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo  [WARNING] Server npm install had issues, retrying...
+    call npm install
 )
-if not exist "%~dp0client\node_modules" (
-    echo  Installing client dependencies...
-    cd /d "%~dp0client" && npm install
-    cd /d "%~dp0"
+echo  Installing client dependencies...
+cd /d "%~dp0client"
+call npm install --silent 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo  [WARNING] Client npm install had issues, retrying...
+    call npm install
 )
+cd /d "%~dp0"
 echo  Dependencies ready.
 
 :: Start server
+echo.
 echo  [3/4] Starting backend server...
 start "OND Server" cmd /k "cd /d %~dp0server && node server.js"
 timeout /t 2 >nul
 
 :: Start client
 echo  [4/4] Starting frontend...
-start "OND Client" cmd /k "cd /d %~dp0client && npm run dev"
-timeout /t 4 >nul
+start "OND Client" cmd /k "cd /d %~dp0client && npx vite"
+timeout /t 5 >nul
 
 :: Open browser
 start "" "http://localhost:5173"
