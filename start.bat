@@ -1,4 +1,9 @@
 @echo off
+:: Keep window open if double-clicked
+if "%~1"=="" (
+    cmd /k "%~f0" run
+    exit /b
+)
 setlocal enabledelayedexpansion
 title OND - Odyssey ^& Dragons
 echo.
@@ -15,7 +20,7 @@ if %ERRORLEVEL% neq 0 (
     echo  Opening download page...
     start "" "https://nodejs.org/en/download"
     echo.
-    echo  Install Node.js (LTS version recommended).
+    echo  Install Node.js LTS version.
     echo  After installing, press any key and this script will restart.
     echo.
     pause
@@ -39,13 +44,11 @@ if %ERRORLEVEL% neq 0 (
 )
 
 :: ─── Step 3: Clone repo if not present ───────────────
-:: Check if we're inside the repo already or need to clone
 cd /d "%~dp0"
 if not exist "%~dp0client" (
     if not exist "%~dp0server" (
         echo  [SETUP] App files not found. Downloading from GitHub...
         echo.
-        :: Clone into current directory if empty, or into subfolder
         git clone https://github.com/Newton667/Odyssey-and-Dungeons.git "%~dp0OND-App"
         if %ERRORLEVEL% neq 0 (
             echo.
@@ -53,7 +56,6 @@ if not exist "%~dp0client" (
             pause
             exit /b 1
         )
-        :: Copy this start.bat into the cloned folder and relaunch from there
         copy "%~f0" "%~dp0OND-App\start.bat" >nul 2>nul
         echo.
         echo  Download complete! Launching from OND-App folder...
@@ -84,8 +86,8 @@ echo  [1/4] Checking for updates...
 git fetch origin main >nul 2>nul
 for /f %%i in ('git rev-parse HEAD 2^>nul') do set LOCAL=%%i
 for /f %%i in ('git rev-parse origin/main 2^>nul') do set REMOTE=%%i
-if not "%LOCAL%"=="%REMOTE%" (
-    if not "%REMOTE%"=="" (
+if not "!LOCAL!"=="!REMOTE!" (
+    if not "!REMOTE!"=="" (
         echo  [UPDATE] New version available!
         echo.
         set /p DOUPDATE="  Do you want to update? (y/n): "
