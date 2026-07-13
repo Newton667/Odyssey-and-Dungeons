@@ -190,8 +190,8 @@ export function useCharacterList() {
       }
     }
 
+    setCharacters(localChars.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)));
     if (localChars.length > 0) {
-      setCharacters(localChars.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)));
       setLoading(false);
     }
 
@@ -240,14 +240,33 @@ export function useCharacterList() {
  * Save a newly created character to both local and server.
  */
 export async function createCharacter(data) {
-  const res = await fetch('/api/characters', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  const created = await res.json();
-  if (res.ok && created._id) {
-    try { localStorage.setItem(`${STORAGE_PREFIX}${created._id}`, JSON.stringify(created)); } catch {}
-  }
-  return { ok: res.ok, data: created };
+  // Try server first
+  try {
+    const res = await fetch('/api/characters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      if (created._id) {
+        try { localStorage.setItem(`${STORAGE_PREFIX}${created._id}`, JSON.stringify(created)); } catch {}
+      }
+      return { ok: true, data: created };
+    }
+  } catch { /* server unavailable — fall through to local-only */ }
+
+  // Local-only fallback: generate a local ID
+  const localId = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+  const created = { ...data, _id: localId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  try { localStorage.setItem(`${STORAGE_PREFIX}${localId}`, JSON.stringify(created)); } catch {}
+
+  // Add to character list index
+  try {
+    const index = JSON.parse(localStorage.getItem('ond-char-index') || '[]');
+    index.push(localId);
+    localStorage.setItem('ond-char-index', JSON.stringify(index));
+  } catch {}
+
+  return { ok: true, data: created };
 }
