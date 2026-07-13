@@ -10,7 +10,8 @@
     "stealthDisadv": true,
     "description": "Padded armor consists of quilted layers of cloth and batting.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_1",
@@ -46,7 +47,8 @@
     "ac": "12 + Dex (max 2)",
     "description": "This crude armor consists of thick furs and pelts.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_4",
@@ -71,7 +73,8 @@
     "stealthDisadv": true,
     "description": "This armor consists of a coat and leggings of leather covered with overlapping pieces of metal.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_6",
@@ -96,7 +99,8 @@
     "stealthDisadv": true,
     "description": "Half plate consists of shaped metal plates that cover most of the body.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_8",
@@ -109,7 +113,8 @@
     "stealthDisadv": true,
     "description": "This armor is leather armor with heavy rings sewn into it.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_9",
@@ -123,7 +128,8 @@
     "stealthDisadv": true,
     "description": "Made of interlocking metal rings, chain mail includes a layer of quilted fabric worn underneath.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_10",
@@ -137,7 +143,8 @@
     "stealthDisadv": true,
     "description": "This armor is made of narrow vertical strips of metal riveted to a backing of leather.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_11",
@@ -151,7 +158,8 @@
     "stealthDisadv": true,
     "description": "Plate consists of shaped, interlocking metal plates to cover the entire body. Includes gauntlets, heavy leather boots, a visored helmet, and thick layers of padding.",
     "rarity": "common",
-    "magical": false
+    "magical": false,
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_12",
@@ -2538,7 +2546,8 @@
     "rarity": "rare",
     "magical": true,
     "bonus": 1,
-    "description": "You have a +1 bonus to AC while wearing this armor."
+    "description": "You have a +1 bonus to AC while wearing this armor.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_207",
@@ -2553,7 +2562,8 @@
     "rarity": "rare",
     "magical": true,
     "bonus": 1,
-    "description": "You have a +1 bonus to AC while wearing this armor."
+    "description": "You have a +1 bonus to AC while wearing this armor.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_208",
@@ -2568,7 +2578,8 @@
     "rarity": "rare",
     "magical": true,
     "bonus": 1,
-    "description": "You have a +1 bonus to AC while wearing this armor."
+    "description": "You have a +1 bonus to AC while wearing this armor.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_209",
@@ -2623,7 +2634,8 @@
     "rarity": "very-rare",
     "magical": true,
     "bonus": 2,
-    "description": "You have a +2 bonus to AC while wearing this armor."
+    "description": "You have a +2 bonus to AC while wearing this armor.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_213",
@@ -2664,7 +2676,8 @@
     "rarity": "legendary",
     "magical": true,
     "bonus": 3,
-    "description": "You have a +3 bonus to AC while wearing this armor."
+    "description": "You have a +3 bonus to AC while wearing this armor.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_216",
@@ -2816,7 +2829,8 @@
     "ac": "13 + Dex (max 2)",
     "rarity": "uncommon",
     "magical": true,
-    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not."
+    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not.",
+    "stealthDisadvantage": false
   },
   {
     "_id": "local_eq_225",
@@ -2828,7 +2842,8 @@
     "ac": "14 + Dex (max 2)",
     "rarity": "uncommon",
     "magical": true,
-    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not."
+    "description": "Mithral is a light, flexible metal. If the armor normally imposes disadvantage on Stealth checks or has a Strength requirement, the mithral version does not.",
+    "stealthDisadvantage": false
   },
   {
     "_id": "local_eq_226",
@@ -2840,7 +2855,8 @@
     "ac": "15 + Dex (max 2)",
     "rarity": "uncommon",
     "magical": true,
-    "description": "Mithral is a light, flexible metal. A mithral half plate does not impose disadvantage on Stealth checks."
+    "description": "Mithral is a light, flexible metal. A mithral half plate does not impose disadvantage on Stealth checks.",
+    "stealthDisadvantage": false
   },
   {
     "_id": "local_eq_227",
@@ -2852,7 +2868,8 @@
     "ac": "18",
     "rarity": "uncommon",
     "magical": true,
-    "description": "Mithral is a light, flexible metal. A mithral plate does not impose disadvantage on Stealth checks or have a Strength requirement."
+    "description": "Mithral is a light, flexible metal. A mithral plate does not impose disadvantage on Stealth checks or have a Strength requirement.",
+    "stealthDisadvantage": false
   },
   {
     "_id": "local_eq_228",
@@ -2866,7 +2883,8 @@
     "stealthDisadv": true,
     "rarity": "uncommon",
     "magical": true,
-    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_229",
@@ -2880,7 +2898,8 @@
     "stealthDisadv": true,
     "rarity": "uncommon",
     "magical": true,
-    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_230",
@@ -2894,7 +2913,8 @@
     "stealthDisadv": true,
     "rarity": "uncommon",
     "magical": true,
-    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit."
+    "description": "This suit of armor is reinforced with adamantine. While wearing it, any critical hit against you becomes a normal hit.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_231",
@@ -2922,7 +2942,8 @@
     "rarity": "legendary",
     "magical": true,
     "attunement": true,
-    "description": "You have resistance to nonmagical damage while you wear this armor. Additionally, you can use an action to make yourself immune to nonmagical damage for 10 minutes or until you are no longer wearing the armor. Once this special action is used, it can't be used again until the next dawn."
+    "description": "You have resistance to nonmagical damage while you wear this armor. Additionally, you can use an action to make yourself immune to nonmagical damage for 10 minutes or until you are no longer wearing the armor. Once this special action is used, it can't be used again until the next dawn.",
+    "stealthDisadvantage": true
   },
   {
     "_id": "local_eq_233",

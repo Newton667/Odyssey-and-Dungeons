@@ -134,6 +134,7 @@ export default function CharacterSheet() {
   const [defensePicker, setDefensePicker] = useState(null); // null or { field, label, color }
   const [showAvatar, setShowAvatar] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
+  const [shortRestModal, setShortRestModal] = useState(null); // null or { diceToSpend, rolls, totalHealed }
   const [upcastLevels, setUpcastLevels] = useState({});
   const [showSpellBrowser, setShowSpellBrowser] = useState(false);
   const [spellBrowserSearch, setSpellBrowserSearch] = useState('');
@@ -350,55 +351,6 @@ export default function CharacterSheet() {
     setHpDelta('');
   };
 
-  // Roll using 3D dice system
-  // Short Rest: spend hit dice to heal
-  const doShortRest = useCallback(async () => {
-    if (!char) return;
-    const hd = char.hitDice || HIT_DICE[char.class] || 'd8';
-    const remaining = char.hitDiceRemaining ?? char.level;
-    if (remaining <= 0) {
-      setHealToast({ amount: 0, newHp: char.currentHp, maxHp: char.maxHp, diceUsed: 0, diceMax: char.level, error: 'No hit dice remaining!' });
-      if (healTimer.current) clearTimeout(healTimer.current);
-      healTimer.current = setTimeout(() => setHealToast(null), 2500);
-      return;
-    }
-    if (char.currentHp >= char.maxHp) {
-      setHealToast({ amount: 0, newHp: char.maxHp, maxHp: char.maxHp, diceUsed: remaining, diceMax: char.level, error: 'Already at full HP!' });
-      if (healTimer.current) clearTimeout(healTimer.current);
-      healTimer.current = setTimeout(() => setHealToast(null), 2500);
-      return;
-    }
-    const conMod = modVal(char.abilityScores?.constitution ?? 10);
-    const formula = `1${hd}${conMod >= 0 ? '+' : ''}${conMod}`;
-
-    const { total } = await rollDice3D(formula, 'Short Rest — Hit Die');
-    const healed = Math.max(1, total);
-    const actualHealed = Math.min(char.maxHp - char.currentHp, healed);
-    const newHp = Math.min(char.maxHp, char.currentHp + healed);
-    const newRemaining = remaining - 1;
-
-    // Warlock pact slots recover on short rest
-    const updates = { currentHp: newHp, hitDiceRemaining: newRemaining };
-    if (char.class === 'Warlock') {
-      updates.usedSpellSlots = { ...(char.usedSpellSlots || {}), pact: 0 };
-    }
-    updateChar(prev => ({ ...prev, ...updates }));
-
-    // Show heal animation
-    setHealToast({ amount: actualHealed, newHp, maxHp: char.maxHp, diceUsed: newRemaining, diceMax: char.level });
-    if (healTimer.current) clearTimeout(healTimer.current);
-    healTimer.current = setTimeout(() => setHealToast(null), 3500);
-  }, [char, rollDice3D, updateChar]);
-
-  // Long Rest
-  const doLongRest = useCallback(() => {
-    if (!char) return;
-    const maxDice = char.level || 1;
-    const regainDice = Math.max(1, Math.floor(maxDice / 2));
-    const newRemaining = Math.min(maxDice, (char.hitDiceRemaining ?? maxDice) + regainDice);
-    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: newRemaining, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {} }));
-  }, [char, updateChar]);
-
   // Log a roll and show toast notification (+ sync to campaign if linked)
   const logRoll = useCallback((label, formula, total, tag) => {
     const entry = { label, formula, total, tag, time: Date.now(), who: char?.name || 'Unknown', avatar: char?.avatarUrl || null };
@@ -406,7 +358,6 @@ export default function CharacterSheet() {
     setRollToast(entry);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setRollToast(null), 4000);
-    // Post to campaign shared roll log if character is in a campaign
     if (char?.campaignId) {
       const playerName = localStorage.getItem('ond-player-name') || 'Unknown';
       fetch(`/api/campaigns/${char.campaignId}/rolls`, {
@@ -416,6 +367,70 @@ export default function CharacterSheet() {
       }).catch(() => {});
     }
   }, [char?.campaignId, char?.name, char?.avatarUrl]);
+
+  // Short Rest: spend hit dice to heal
+  const doShortRest = useCallback(() => {
+    if (!char) return;
+    const remaining = char.hitDiceRemaining ?? char.level;
+    if (remaining <= 0 && char.currentHp >= char.maxHp) {
+      setHealToast({ amount: 0, newHp: char.currentHp, maxHp: char.maxHp, diceUsed: 0, diceMax: char.level, error: 'No hit dice and already full HP!' });
+      if (healTimer.current) clearTimeout(healTimer.current);
+      healTimer.current = setTimeout(() => setHealToast(null), 2500);
+      return;
+    }
+    // Open short rest modal
+    setShortRestModal({ rolls: [], totalHealed: 0, diceSpent: 0 });
+  }, [char]);
+
+  const shortRestRollDie = useCallback(async () => {
+    if (!char || !shortRestModal) return;
+    const remaining = (char.hitDiceRemaining ?? char.level) - shortRestModal.diceSpent;
+    if (remaining <= 0) return;
+    if (char.currentHp + shortRestModal.totalHealed >= char.maxHp) return;
+
+    const hd = HIT_DICE[char.class] || 'd8';
+    const conMod = modVal(char.abilityScores?.constitution ?? 10);
+    const formula = `1${hd}${conMod >= 0 ? '+' : ''}${conMod}`;
+    const { total } = await rollDice3D(formula, 'Short Rest — Hit Die');
+    const healed = Math.max(1, total);
+    logRoll('Short Rest Hit Die', formula, total, 'Short Rest');
+
+    setShortRestModal(prev => ({
+      ...prev,
+      rolls: [...prev.rolls, { formula, total: healed }],
+      totalHealed: prev.totalHealed + healed,
+      diceSpent: prev.diceSpent + 1,
+    }));
+  }, [char, shortRestModal, rollDice3D, logRoll]);
+
+  const shortRestFinish = useCallback(() => {
+    if (!char || !shortRestModal) return;
+    const healed = shortRestModal.totalHealed;
+    const newHp = Math.min(char.maxHp, char.currentHp + healed);
+    const actualHealed = newHp - char.currentHp;
+    const newRemaining = (char.hitDiceRemaining ?? char.level) - shortRestModal.diceSpent;
+
+    const updates = { currentHp: newHp, hitDiceRemaining: newRemaining };
+    // Warlock pact slots recover on short rest
+    if (char.class === 'Warlock') {
+      updates.usedSpellSlots = { ...(char.usedSpellSlots || {}), pact: 0 };
+    }
+    updateChar(prev => ({ ...prev, ...updates }));
+
+    setShortRestModal(null);
+    if (actualHealed > 0) {
+      setHealToast({ amount: actualHealed, newHp, maxHp: char.maxHp, diceUsed: newRemaining, diceMax: char.level });
+      if (healTimer.current) clearTimeout(healTimer.current);
+      healTimer.current = setTimeout(() => setHealToast(null), 3500);
+    }
+  }, [char, shortRestModal, updateChar]);
+
+  // Long Rest — full HP, all spell slots, regain ALL hit dice, reset death saves
+  const doLongRest = useCallback(() => {
+    if (!char) return;
+    const maxDice = char.level || 1;
+    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {} }));
+  }, [char, updateChar]);
 
   // Roll with result tracking
   const doRollWithResult = useCallback(async (label, formula) => {
@@ -532,15 +547,15 @@ export default function CharacterSheet() {
       if (isNaN(ac)) continue;
       const sub = (item.subcategory || '').toLowerCase();
 
-      if (sub === 'shield') {
+      if (sub.includes('shield')) {
         shieldBonus = Math.max(shieldBonus, ac || 2);
-      } else if (sub === 'heavy') {
+      } else if (sub.includes('heavy')) {
         baseAC = ac;
         hasArmor = true;
-      } else if (sub === 'medium') {
+      } else if (sub.includes('medium')) {
         baseAC = ac + Math.min(dexMod, 2);
         hasArmor = true;
-      } else if (sub === 'light') {
+      } else if (sub.includes('light')) {
         baseAC = ac + dexMod;
         hasArmor = true;
       } else {
@@ -550,6 +565,15 @@ export default function CharacterSheet() {
     }
     return baseAC + shieldBonus;
   }, [char?.equippedItems, dexMod, equipDataLoaded]);
+
+  // Check if equipped armor gives stealth disadvantage
+  const hasStealthDisadvantage = useMemo(() => {
+    if (!char) return false;
+    return (char.equippedItems || []).some(name => {
+      const item = equipCache.current[name];
+      return item?.category === 'armor' && item?.stealthDisadvantage === true;
+    });
+  }, [char?.equippedItems, equipDataLoaded]);
 
   // Update char.armorClass when calculated AC changes
   useEffect(() => {
@@ -718,8 +742,9 @@ export default function CharacterSheet() {
     const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
     const formula = `1d20${bonus >= 0 ? '+' : ''}${bonus}`;
     const result = rollResults[skill.name];
-    // Conditions affect ability checks
-    const condDis = hasAbilityDisadvantage;
+    // Conditions and armor affect ability checks
+    const armorStealthDis = skill.name === 'Stealth' && hasStealthDisadvantage;
+    const condDis = hasAbilityDisadvantage || armorStealthDis;
     const rollFn = condDis ? () => doDisadvantage(skill.name, formula) : () => doRollWithResult(skill.name, formula);
     return (
       <div
@@ -3525,6 +3550,75 @@ export default function CharacterSheet() {
           <div style={{ fontSize: '22px', fontFamily: 'Cinzel, serif', color: 'var(--gold)', fontWeight: 700, letterSpacing: '1px' }}>{char.name}</div>
         </div>
       )}
+
+      {/* Short Rest Modal */}
+      {shortRestModal && (() => {
+        const hd = HIT_DICE[char.class] || 'd8';
+        const conMod = modVal(scores.constitution ?? 10);
+        const remaining = (char.hitDiceRemaining ?? char.level) - shortRestModal.diceSpent;
+        const currentHpAfter = Math.min(char.maxHp, char.currentHp + shortRestModal.totalHealed);
+        const atMax = currentHpAfter >= char.maxHp;
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--bg-card)', border: '2px solid var(--gold-dim)', borderRadius: '12px', padding: '24px', maxWidth: '400px', width: '90%' }}>
+              <h3 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', marginBottom: '16px', fontSize: '20px' }}>Short Rest</h3>
+
+              {/* HP Bar */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                  <span style={{ color: 'var(--text-dim)' }}>HP</span>
+                  <span style={{ fontWeight: 700 }}>{currentHpAfter} / {char.maxHp}</span>
+                </div>
+                <div style={{ height: '8px', background: 'var(--surface)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${(currentHpAfter / char.maxHp) * 100}%`, background: hpColor(currentHpAfter, char.maxHp), borderRadius: '4px', transition: 'width 0.3s' }} />
+                </div>
+              </div>
+
+              {/* Hit Dice remaining */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Hit Dice Remaining</span>
+                <span style={{ fontWeight: 700, color: remaining > 0 ? 'var(--gold)' : '#f87171' }}>{remaining} / {char.level} ({hd})</span>
+              </div>
+
+              {/* Roll log */}
+              {shortRestModal.rolls.length > 0 && (
+                <div style={{ marginBottom: '12px', maxHeight: '150px', overflowY: 'auto' }}>
+                  {shortRestModal.rolls.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: i % 2 === 0 ? 'var(--surface)' : 'transparent', borderRadius: '4px', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-dim)' }}>Die {i + 1}: {r.formula}</span>
+                      <span style={{ fontWeight: 700, color: '#4ade80' }}>+{r.total} HP</span>
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', borderTop: '1px solid var(--border)', marginTop: '4px', fontSize: '14px', fontWeight: 700 }}>
+                    <span>Total Healed</span>
+                    <span style={{ color: '#4ade80' }}>+{shortRestModal.totalHealed} HP</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button className="btn" style={{ flex: 1, padding: '8px 16px', fontSize: '14px', background: remaining > 0 && !atMax ? 'linear-gradient(135deg, #1a3a1a, #2a5a2a)' : 'var(--surface)', border: `1px solid ${remaining > 0 && !atMax ? '#4ade80' : 'var(--border)'}`, color: remaining > 0 && !atMax ? '#4ade80' : 'var(--text-dim)', fontWeight: 700 }}
+                  disabled={remaining <= 0 || atMax}
+                  onClick={shortRestRollDie}>
+                  Roll {hd} + {conMod}
+                </button>
+                <button className="btn" style={{ flex: 1, padding: '8px 16px', fontSize: '14px', background: 'var(--accent)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', fontWeight: 700 }}
+                  onClick={shortRestFinish}>
+                  {shortRestModal.rolls.length > 0 ? 'Finish Rest' : 'Rest Without Healing'}
+                </button>
+              </div>
+
+              {atMax && <div style={{ textAlign: 'center', fontSize: '12px', color: '#4ade80', marginTop: '8px' }}>Already at full HP!</div>}
+              {remaining <= 0 && !atMax && <div style={{ textAlign: 'center', fontSize: '12px', color: '#f87171', marginTop: '8px' }}>No hit dice remaining!</div>}
+
+              <button onClick={() => setShortRestModal(null)} style={{ display: 'block', margin: '12px auto 0', padding: '4px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '12px' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
