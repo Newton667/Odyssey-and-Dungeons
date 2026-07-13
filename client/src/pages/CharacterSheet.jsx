@@ -508,19 +508,17 @@ export default function CharacterSheet() {
   };
 
 
-  if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;
-  if (!char) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Character not found.</div>;
-
-  const profBonus = char.proficiencyBonus || 2;
-  const scores = char.abilityScores || {};
-  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char.skillProficiencies?.includes('Perception') ? profBonus : 0);
-  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char.skillProficiencies?.includes('Investigation') ? profBonus : 0);
-  const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char.skillProficiencies?.includes('Insight') ? profBonus : 0);
+  const profBonus = char?.proficiencyBonus || 2;
+  const scores = char?.abilityScores || {};
+  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Perception') ? profBonus : 0);
+  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char?.skillProficiencies?.includes('Investigation') ? profBonus : 0);
+  const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Insight') ? profBonus : 0);
   const initiative = modVal(scores.dexterity ?? 10);
   const dexMod = modVal(scores.dexterity ?? 10);
 
   // Auto-calculate AC from equipped armor
   const calcAC = useMemo(() => {
+    if (!char) return 10;
     const equipped = char.equippedItems || [];
     const cache = equipCache.current;
     let baseAC = 10 + dexMod; // unarmored default
@@ -551,14 +549,17 @@ export default function CharacterSheet() {
       }
     }
     return baseAC + shieldBonus;
-  }, [char.equippedItems, dexMod, equipDataLoaded]);
+  }, [char?.equippedItems, dexMod, equipDataLoaded]);
 
   // Update char.armorClass when calculated AC changes
   useEffect(() => {
-    if (calcAC !== char.armorClass) {
+    if (char && calcAC !== char.armorClass) {
       updateField('armorClass', calcAC);
     }
-  }, [calcAC]);
+  }, [calcAC, char?.armorClass]);
+
+  if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;
+  if (!char) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Character not found.</div>;
 
   // Spell slots
   const spellSlotData = getSpellSlots(char.class, char.level);

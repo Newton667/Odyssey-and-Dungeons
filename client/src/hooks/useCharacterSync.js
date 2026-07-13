@@ -76,23 +76,19 @@ export function useCharacter(id, { syncEnabled = true } = {}) {
     const local = readLocal();
     if (local) {
       setChar(local);
-      setLoading(false);
     }
+    setLoading(false); // Always stop loading — show what we have (or "not found")
 
     // Skip server fetch for local-only characters
-    if (id.startsWith('local-')) {
-      if (!local) setLoading(false);
-      return;
-    }
+    if (id.startsWith('local-')) return;
 
-    // Step 2: Fetch from server in background
-    fetch(`/api/characters/${id}`)
-      .then(r => r.ok ? r.json() : null)
+    // Step 2: Fetch from server in background (with 3s timeout)
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 3000);
+    fetch(`/api/characters/${id}`, { signal: controller.signal })
+      .then(r => { clearTimeout(fetchTimeout); return r.ok ? r.json() : null; })
       .then(server => {
-        if (cancelled || !server) {
-          if (!local) setLoading(false);
-          return;
-        }
+        if (cancelled || !server) return;
 
         lastSynced.current = server.updatedAt;
 
@@ -113,13 +109,10 @@ export function useCharacter(id, { syncEnabled = true } = {}) {
             // Local is newer — push to server
             syncToServer(local);
           }
-          // If equal — already in sync
         }
-        setLoading(false);
       })
       .catch(() => {
-        // Server unreachable — use local
-        if (!local) setLoading(false);
+        clearTimeout(fetchTimeout);
         setSyncError('Offline — using local data');
       });
 
@@ -197,13 +190,13 @@ export function useCharacterList() {
     }
 
     setCharacters(localChars.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)));
-    if (localChars.length > 0) {
-      setLoading(false);
-    }
+    setLoading(false);
 
-    // Also fetch from server to discover new characters
-    fetch('/api/characters')
-      .then(r => r.json())
+    // Also fetch from server to discover new characters (3s timeout)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch('/api/characters', { signal: controller.signal })
+      .then(r => { clearTimeout(timeout); return r.json(); })
       .then(serverChars => {
         const merged = new Map();
         // Add local chars
@@ -229,7 +222,7 @@ export function useCharacterList() {
         setCharacters(result);
         setLoading(false);
       })
-      .catch(() => { setLoading(false); });
+      .catch(() => { clearTimeout(timeout); });
   }, []);
 
   // Delete character from both local and server

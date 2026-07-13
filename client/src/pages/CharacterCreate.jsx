@@ -420,7 +420,7 @@ export default function CharacterCreate() {
         ...(Object.keys(homebrewLevels).length > 0 && { homebrewLevels }),
       });
       if (ok) navigate(`/characters/${data._id}`);
-    } catch { alert('Failed to save'); }
+    } catch (err) { console.error('Character creation failed:', err); alert('Failed to save: ' + err.message); }
     finally { setSaving(false); }
   };
 
