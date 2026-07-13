@@ -40,7 +40,7 @@ cd /d "%~dp0"
 if not exist "%~dp0client" if not exist "%~dp0server" (
     echo  [SETUP] App files not found. Downloading...
     echo.
-    git clone https://github.com/Newton667/Odyssey-and-Dungeons.git "%~dp0_temp_clone"
+    git clone https://github.com/Newton667/Odyssey-and-Dungeons.git "%~dp0OND-App"
     if %ERRORLEVEL% neq 0 (
         echo.
         echo  [ERROR] Download failed. Check your internet.
@@ -48,11 +48,11 @@ if not exist "%~dp0client" if not exist "%~dp0server" (
         pause
         goto START
     )
-    echo  Moving files into place...
-    xcopy "%~dp0_temp_clone\*" "%~dp0" /e /y /q >nul 2>nul
-    rmdir /s /q "%~dp0_temp_clone" >nul 2>nul
+    copy "%~f0" "%~dp0OND-App\start.bat" >nul 2>nul
     echo.
-    echo  Download complete!
+    echo  Download complete! Launching from OND-App...
+    cd /d "%~dp0OND-App"
+    goto START
 )
 
 :: ─── Init git if needed ─────────────────────────────
