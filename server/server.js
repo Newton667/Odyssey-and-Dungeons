@@ -60,10 +60,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: dbState === 1 ? 'ok' : 'no-db', db: ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState] || 'unknown' });
 });
 
+// Mark repo as safe for git (fixes "dubious ownership" on some systems)
+const { execSync } = require('child_process');
+const rootDir = path.join(__dirname, '..');
+try { execSync(`git config --global --add safe.directory "${rootDir.replace(/\\/g, '/')}"`, { stdio: 'pipe' }); } catch { /* ignore */ }
+
 // Check for updates from GitHub
 app.get('/api/check-update', (req, res) => {
-  const { execSync } = require('child_process');
-  const rootDir = path.join(__dirname, '..');
   try {
     execSync('git fetch origin main', { cwd: rootDir, timeout: 10000, stdio: 'pipe' });
     const local = execSync('git rev-parse HEAD', { cwd: rootDir, stdio: 'pipe' }).toString().trim();
@@ -76,8 +79,6 @@ app.get('/api/check-update', (req, res) => {
 
 // Pull latest update from GitHub
 app.post('/api/pull-update', (req, res) => {
-  const { execSync } = require('child_process');
-  const rootDir = path.join(__dirname, '..');
   try {
     execSync('git reset --hard origin/main', { cwd: rootDir, timeout: 15000, stdio: 'pipe' });
     execSync('git pull origin main', { cwd: rootDir, timeout: 30000, stdio: 'pipe' });

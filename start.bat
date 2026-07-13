@@ -55,8 +55,11 @@ if not exist "%~dp0client" if not exist "%~dp0server" (
     goto START
 )
 
-:: ─── Init git if needed ─────────────────────────────
+:: ─── Mark directory as safe for git ────────────────
 cd /d "%~dp0"
+git config --global --add safe.directory "%cd:\=/%"  >nul 2>nul
+
+:: ─── Init git if needed ─────────────────────────────
 git rev-parse --git-dir >nul 2>nul
 if %ERRORLEVEL% neq 0 (
     echo  [SETUP] Setting up auto-updates...
