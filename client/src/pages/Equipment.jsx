@@ -106,18 +106,14 @@ export default function Equipment() {
           alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
-    // Fetch homebrew equipment
-    const hbParams = new URLSearchParams();
-    if (filter.search) hbParams.set('search', filter.search);
-    fetch(`/api/homebrew?${hbParams}`)
-      .then(r => r.json())
-      .then(data => {
-        let filtered = (Array.isArray(data) ? data : []).filter(i => i.type !== 'spell');
-        if (filter.category) filtered = filtered.filter(i => i.category === filter.category || i.type === filter.category);
-        if (filter.rarity) filtered = filtered.filter(i => i.rarity === filter.rarity);
-        setHomebrewItems(filtered);
-      })
-      .catch(() => setHomebrewItems([]));
+    // Load homebrew equipment from localStorage
+    try {
+      let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell');
+      if (filter.search) hb = hb.filter(i => i.name?.toLowerCase().includes(filter.search.toLowerCase()));
+      if (filter.category) hb = hb.filter(i => i.category === filter.category || i.type === filter.category);
+      if (filter.rarity) hb = hb.filter(i => i.rarity === filter.rarity);
+      setHomebrewItems(hb);
+    } catch { setHomebrewItems([]); }
   }, [filter, useLocal]);
 
   useEffect(() => { load(); }, [load]);

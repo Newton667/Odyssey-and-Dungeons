@@ -113,19 +113,15 @@ export default function Spells() {
           alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
-    // Also fetch homebrew spells
-    const hbParams = new URLSearchParams({ type: 'spell' });
-    if (filter.search) hbParams.set('search', filter.search);
-    fetch(`/api/homebrew?${hbParams}`)
-      .then(r => r.json())
-      .then(data => {
-        let filtered = Array.isArray(data) ? data : [];
-        if (filter.level !== '') filtered = filtered.filter(s => s.level === Number(filter.level));
-        if (filter.school) filtered = filtered.filter(s => s.school === filter.school);
-        if (filter.cls) filtered = filtered.filter(s => s.classes?.some(c => c.toLowerCase() === filter.cls.toLowerCase()));
-        setHomebrewSpells(filtered);
-      })
-      .catch(() => setHomebrewSpells([]));
+    // Load homebrew spells from localStorage
+    try {
+      let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
+      if (filter.search) hb = hb.filter(s => s.name?.toLowerCase().includes(filter.search.toLowerCase()));
+      if (filter.level !== '') hb = hb.filter(s => s.level === Number(filter.level));
+      if (filter.school) hb = hb.filter(s => s.school === filter.school);
+      if (filter.cls) hb = hb.filter(s => s.classes?.some(c => c.toLowerCase() === filter.cls.toLowerCase()));
+      setHomebrewSpells(hb);
+    } catch { setHomebrewSpells([]); }
   }, [filter, useLocal]);
 
   useEffect(() => { load(); }, [load]);

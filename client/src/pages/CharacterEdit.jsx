@@ -417,7 +417,30 @@ export default function CharacterEdit() {
                   </div>
                   <div>
                     <label style={st.label}>Level</label>
-                    <NumInput style={st.input} min={1} max={20} value={form.level} onChange={v => set('level', v)} />
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <NumInput style={{ ...st.input, flex: 1 }} min={1} max={20} value={form.level} onChange={v => set('level', v)} />
+                      {(form.level || 1) < 20 && (
+                        <button className="btn" style={{ padding: '6px 14px', fontSize: '12px', background: 'linear-gradient(135deg, #1a3a1a, #2a5a2a)', border: '1px solid #4ade80', color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}
+                          onClick={() => {
+                            const newLevel = (form.level || 1) + 1;
+                            const hd = HIT_DICE[form.class] || 'd8';
+                            const dieMax = parseInt(hd.replace('d', ''));
+                            const conMod = modVal((form.abilityScores?.constitution ?? 10));
+                            const avg = Math.floor(dieMax / 2) + 1;
+                            const hpGain = avg + conMod;
+                            const newMaxHp = (form.maxHp || 0) + hpGain;
+                            const newPB = newLevel <= 4 ? 2 : newLevel <= 8 ? 3 : newLevel <= 12 ? 4 : newLevel <= 16 ? 5 : 6;
+                            set('level', newLevel);
+                            set('maxHp', newMaxHp);
+                            set('currentHp', newMaxHp);
+                            set('hitDice', `${newLevel}${hd}`);
+                            set('proficiencyBonus', newPB);
+                            alert(`Leveled up to ${newLevel}!\n+${hpGain} HP (${hd} avg ${avg} + ${conMod} CON)\nNew Max HP: ${newMaxHp}`);
+                          }}>
+                          Lv Up
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

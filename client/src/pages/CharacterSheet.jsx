@@ -1353,10 +1353,42 @@ export default function CharacterSheet() {
                   </span>
                 </div>
 
-                {/* Ready to level up notice */}
+                {/* Ready to level up notice + button */}
                 {readyToLevel && (
-                  <div style={{ textAlign: 'center', fontSize: '12px', color: '#4ade80', fontWeight: 600, marginBottom: '8px', animation: 'pulse 2s infinite' }}>
-                    Ready to level up!
+                  <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', color: '#4ade80', fontWeight: 600, marginBottom: '6px', animation: 'pulse 2s infinite' }}>
+                      Ready to level up!
+                    </div>
+                    <button className="btn" style={{ padding: '6px 20px', fontSize: '13px', background: 'linear-gradient(135deg, #1a3a1a, #2a5a2a)', border: '1px solid #4ade80', color: '#4ade80', fontWeight: 700 }}
+                      onClick={async () => {
+                        const newLevel = (char.level || 1) + 1;
+                        const hd = HIT_DICE[char.class] || 'd8';
+                        const dieMax = parseInt(hd.replace('d', ''));
+                        const conMod = modVal(scores.constitution ?? 10);
+                        const avg = Math.floor(dieMax / 2) + 1;
+                        const useAvg = confirm(`Level up to ${newLevel}!\n\nHP increase: ${hd} (avg ${avg}) + ${conMod} CON mod = ${avg + conMod}\n\nOK = Take average (${avg + conMod} HP)\nCancel = Roll ${hd}`);
+                        let hpGain;
+                        if (useAvg) {
+                          hpGain = avg + conMod;
+                        } else {
+                          const { total } = await rollDice3D(hd);
+                          hpGain = Math.max(1, total + conMod);
+                          logRoll('Level Up HP', hd, total, 'Level Up');
+                        }
+                        const newMaxHp = (char.maxHp || 0) + hpGain;
+                        const newPB = newLevel <= 4 ? 2 : newLevel <= 8 ? 3 : newLevel <= 12 ? 4 : newLevel <= 16 ? 5 : 6;
+                        updateChar(prev => ({
+                          ...prev,
+                          level: newLevel,
+                          maxHp: newMaxHp,
+                          currentHp: newMaxHp,
+                          hitDice: `${newLevel}${hd}`,
+                          hitDiceRemaining: newLevel,
+                          proficiencyBonus: newPB,
+                        }));
+                      }}>
+                      Level Up to {(char.level || 1) + 1}
+                    </button>
                   </div>
                 )}
 
@@ -1501,6 +1533,7 @@ export default function CharacterSheet() {
                 <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{char.hitDice || HIT_DICE[char.class] || 'd8'}</span>
               </div>
             </div>
+
         );
 
       case 'tabs-section':

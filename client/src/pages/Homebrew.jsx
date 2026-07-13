@@ -167,11 +167,16 @@ export default function Homebrew() {
   const [copiedId, setCopiedId] = useState(null);
   const [expanded, setExpanded] = useState(null);
 
+  const STORAGE_KEY = 'ond-homebrew';
+  const readAll = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } };
+  const writeAll = (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
   const load = () => {
-    const params = new URLSearchParams();
-    if (filter) params.set('type', filter);
-    if (search) params.set('search', search);
-    fetch(`/api/homebrew?${params}`).then(r => r.json()).then(data => { setItems(Array.isArray(data) ? data : []); setLoading(false); }).catch(() => setLoading(false));
+    let data = readAll();
+    if (filter) data = data.filter(i => i.type === filter);
+    if (search) data = data.filter(i => i.name?.toLowerCase().includes(search.toLowerCase()));
+    setItems(data);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, [filter, search]);
@@ -191,19 +196,24 @@ export default function Homebrew() {
     });
   };
 
-  const save = async (e) => {
+  const save = (e) => {
     e.preventDefault();
-    const url = editing ? `/api/homebrew/${editing}` : '/api/homebrew';
-    const method = editing ? 'PUT' : 'POST';
+    const all = readAll();
     const playerName = localStorage.getItem('ond-player-name') || '';
-    const body = { ...form, createdBy: form.createdBy || playerName };
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    if (res.ok) {
-      setCreating(false);
-      setEditing(null);
-      setForm({ ...EMPTY_FORM });
-      load();
+    const body = { ...form, createdBy: form.createdBy || playerName, updatedAt: new Date().toISOString() };
+    if (editing) {
+      const idx = all.findIndex(i => i._id === editing);
+      if (idx >= 0) all[idx] = { ...all[idx], ...body };
+    } else {
+      body._id = 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      body.createdAt = new Date().toISOString();
+      all.push(body);
     }
+    writeAll(all);
+    setCreating(false);
+    setEditing(null);
+    setForm({ ...EMPTY_FORM });
+    load();
   };
 
   const startEdit = (item) => {
@@ -212,36 +222,39 @@ export default function Homebrew() {
     setCreating(true);
   };
 
-  const deleteItem = async (id) => {
+  const deleteItem = (id) => {
     if (!confirm('Delete this homebrew item?')) return;
-    await fetch(`/api/homebrew/${id}`, { method: 'DELETE' });
+    const all = readAll().filter(i => i._id !== id);
+    writeAll(all);
     load();
   };
 
-  const exportItem = async (id) => {
-    const res = await fetch(`/api/homebrew/${id}/export`);
-    const data = await res.json();
-    if (data.shareString) {
-      navigator.clipboard.writeText(data.shareString);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
+  const exportItem = (id) => {
+    const item = readAll().find(i => i._id === id);
+    if (!item) return;
+    const { _id, createdAt, updatedAt, ...data } = item;
+    const shareString = btoa(JSON.stringify(data));
+    navigator.clipboard.writeText(shareString);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const doImport = async () => {
+  const doImport = () => {
     setImportError('');
-    const res = await fetch('/api/homebrew/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shareString: importStr.trim() }),
-    });
-    const data = await res.json();
-    if (res.ok) {
+    try {
+      const data = JSON.parse(atob(importStr.trim()));
+      if (!data.name || !data.type) throw new Error('Invalid item');
+      data._id = 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      data.createdAt = new Date().toISOString();
+      data.updatedAt = new Date().toISOString();
+      const all = readAll();
+      all.push(data);
+      writeAll(all);
       setShowImport(false);
       setImportStr('');
       load();
-    } else {
-      setImportError(data.error || 'Import failed');
+    } catch {
+      setImportError('Invalid share code');
     }
   };
 
