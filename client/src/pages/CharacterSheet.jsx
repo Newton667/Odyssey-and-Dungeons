@@ -2305,13 +2305,17 @@ export default function CharacterSheet() {
       {char.feats?.length > 0 && (
         <div style={st.sideCard}>
           <div style={st.sideLabel}>Feats</div>
-          {char.feats.map((f, i) => (
-            <div key={i} style={{ fontSize: '12px', marginBottom: '8px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--gold)', fontSize: '13px', marginBottom: '3px' }}>{f}</div>
-              {FEATS[f]?.prereq && <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', marginBottom: '2px' }}>Requires: {FEATS[f].prereq}</div>}
-              {FEATS[f]?.desc && <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{FEATS[f].desc}</div>}
-            </div>
-          ))}
+          {char.feats.map((f, i) => {
+            const name = typeof f === 'string' ? f : f?.name || f?.desc || 'Unknown Feat';
+            const featData = FEATS[name] || (typeof f === 'object' ? f : null);
+            return (
+              <div key={i} style={{ fontSize: '12px', marginBottom: '8px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--gold)', fontSize: '13px', marginBottom: '3px' }}>{name}</div>
+                {featData?.prereq && <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', marginBottom: '2px' }}>Requires: {featData.prereq}</div>}
+                {featData?.desc && <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{featData.desc}</div>}
+              </div>
+            );
+          })}
         </div>
       )}
 
