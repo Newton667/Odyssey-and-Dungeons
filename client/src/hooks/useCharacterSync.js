@@ -40,7 +40,7 @@ export function useCharacter(id, { syncEnabled = true } = {}) {
 
   // Sync local → server
   const syncToServer = useCallback(async (data) => {
-    if (!syncEnabledRef.current) return;
+    if (!syncEnabledRef.current || id?.startsWith('local-')) return;
     setSyncing(true);
     setSyncError(null);
     try {
@@ -77,6 +77,12 @@ export function useCharacter(id, { syncEnabled = true } = {}) {
     if (local) {
       setChar(local);
       setLoading(false);
+    }
+
+    // Skip server fetch for local-only characters
+    if (id.startsWith('local-')) {
+      if (!local) setLoading(false);
+      return;
     }
 
     // Step 2: Fetch from server in background
@@ -240,13 +246,17 @@ export function useCharacterList() {
  * Save a newly created character to both local and server.
  */
 export async function createCharacter(data) {
-  // Try server first
+  // Try server first (with 3s timeout)
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
     const res = await fetch('/api/characters', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (res.ok) {
       const created = await res.json();
       if (created._id) {
@@ -254,7 +264,7 @@ export async function createCharacter(data) {
       }
       return { ok: true, data: created };
     }
-  } catch { /* server unavailable — fall through to local-only */ }
+  } catch { /* server unavailable or timeout — fall through to local-only */ }
 
   // Local-only fallback: generate a local ID
   const localId = 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
