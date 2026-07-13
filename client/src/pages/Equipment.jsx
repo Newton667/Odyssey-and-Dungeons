@@ -91,13 +91,19 @@ export default function Equipment() {
       if (filter.category) params.set('category', filter.category);
       if (filter.search) params.set('search', filter.search);
       if (filter.rarity) params.set('rarity', filter.rarity);
-      fetch(`/api/equipment?${params}`)
-        .then(r => r.json())
-        .then(data => { setItems(data); setLoading(false); })
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      fetch(`/api/equipment?${params}`, { signal: controller.signal })
+        .then(r => { clearTimeout(timeout); if (!r.ok) throw new Error('Server error'); return r.json(); })
+        .then(data => { if (data.length === 0 && !filter.search && !filter.category && !filter.rarity) throw new Error('Empty'); setItems(data); setLoading(false); })
         .catch(() => {
+          clearTimeout(timeout);
           const fallback = queryLocalEquipment({ category: filter.category, search: filter.search, rarity: filter.rarity });
           setItems(fallback);
           setLoading(false);
+          setUseLocal(true);
+          localStorage.setItem('ond-data-source', 'local');
+          alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
     // Fetch homebrew equipment

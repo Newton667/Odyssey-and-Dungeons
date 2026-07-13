@@ -98,13 +98,19 @@ export default function Spells() {
       if (filter.school) params.set('school', filter.school);
       if (filter.search) params.set('search', filter.search);
       if (filter.cls) params.set('class', filter.cls);
-      fetch(`/api/spells?${params}`)
-        .then(r => r.json())
-        .then(data => { setSpells(data); setLoading(false); })
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      fetch(`/api/spells?${params}`, { signal: controller.signal })
+        .then(r => { clearTimeout(timeout); if (!r.ok) throw new Error('Server error'); return r.json(); })
+        .then(data => { if (data.length === 0 && !filter.search && !filter.school && !filter.cls && filter.level === '') throw new Error('Empty'); setSpells(data); setLoading(false); })
         .catch(() => {
+          clearTimeout(timeout);
           const fallback = queryLocalSpells({ level: filter.level !== '' ? Number(filter.level) : undefined, school: filter.school, search: filter.search, cls: filter.cls });
           setSpells(fallback);
           setLoading(false);
+          setUseLocal(true);
+          localStorage.setItem('ond-data-source', 'local');
+          alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
     // Also fetch homebrew spells
