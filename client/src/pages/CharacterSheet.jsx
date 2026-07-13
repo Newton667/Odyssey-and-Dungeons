@@ -332,19 +332,12 @@ export default function CharacterSheet() {
       openItemPanel(found);
       return;
     }
-    // Fetch from API
-    try {
-      const res = await fetch(`/api/equipment?search=${encodeURIComponent(itemName)}`);
-      const data = await res.json();
-      const match = data.find(d => d.name === itemName) || data[0];
-      if (match) {
-        equipCache.current[itemName] = match;
-        openItemPanel(match);
-      } else {
-        // Fallback: show basic panel with just the name
-        openItemPanel({ name: itemName, category: 'adventuring-gear' });
-      }
-    } catch {
+    // Try local data first
+    const localMatch = getLocalEquipmentByName(itemName);
+    if (localMatch) {
+      equipCache.current[itemName] = localMatch;
+      openItemPanel(localMatch);
+    } else {
       openItemPanel({ name: itemName, category: 'adventuring-gear' });
     }
   };

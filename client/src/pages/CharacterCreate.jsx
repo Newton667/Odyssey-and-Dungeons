@@ -13,6 +13,7 @@ import {
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras } from '../utils/dndHelpers';
 import { RACES, CLASS_LEVELS, CLASSES } from '../utils/classData';
+import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 
 const STEPS = ['Race', 'Class', 'Background', 'Abilities', 'Skills', 'Details', 'Combat', 'Equipment', 'Spells', 'Extras', 'Review'];
 
@@ -312,22 +313,15 @@ export default function CharacterCreate() {
       return;
     }
     setLoadingSpells(true);
-    fetch(`/api/spells?class=${cls}`)
-      .then(r => r.json())
-      .then(data => {
-        setAvailableSpells(data);
-        setLoadingSpells(false);
-      })
-      .catch(() => setLoadingSpells(false));
+    const data = queryLocalSpells({ cls });
+    setAvailableSpells(data);
+    setLoadingSpells(false);
   }, [cls]);
 
   // Fetch wizard cantrips for High Elf
   useEffect(() => {
     if (race === 'Elf' && subrace === 'High Elf') {
-      fetch('/api/spells?class=Wizard&level=0')
-        .then(r => r.json())
-        .then(data => setWizardCantrips(data))
-        .catch(() => {});
+      setWizardCantrips(queryLocalSpells({ cls: 'Wizard', level: 0 }));
     } else {
       setWizardCantrips([]);
     }
@@ -336,10 +330,7 @@ export default function CharacterCreate() {
   // Fetch sorcerer cantrips for Kobold Draconic Sorcery
   useEffect(() => {
     if (race === 'Kobold' && koboldLegacy === 'Draconic Sorcery') {
-      fetch('/api/spells?class=Sorcerer&level=0')
-        .then(r => r.json())
-        .then(data => setSorcererCantrips(data))
-        .catch(() => {});
+      setSorcererCantrips(queryLocalSpells({ cls: 'Sorcerer', level: 0 }));
     } else {
       setSorcererCantrips([]);
     }
@@ -353,28 +344,19 @@ export default function CharacterCreate() {
     const result = mapper(subrace);
     if (!result) { setRacialSpellNames([]); return; }
     const sourceRaces = Array.isArray(result) ? result : [result];
-    Promise.all(sourceRaces.map(sr =>
-      fetch(`/api/spells?source=race&sourceRace=${encodeURIComponent(sr)}`).then(r => r.json())
-    ))
-      .then(arrays => setRacialSpellNames(arrays.flat().map(s => s.name)))
-      .catch(() => setRacialSpellNames([]));
+    const arrays = sourceRaces.map(sr => queryLocalSpells({ source: 'race', sourceRace: sr }));
+    setRacialSpellNames(arrays.flat().map(s => s.name));
   }, [race, subrace]);
 
   // Fetch equipment search results
   useEffect(() => {
     if (!equipSearch && !equipCategory) { setEquipSearchResults([]); return; }
     setEquipSearchLoading(true);
-    const params = new URLSearchParams();
-    if (equipSearch) params.set('search', equipSearch);
-    if (equipCategory) params.set('category', equipCategory);
-    fetch(`/api/equipment?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        const RO = { common: 0, uncommon: 1, rare: 2, 'very-rare': 3, legendary: 4, artifact: 5 };
-        data.sort((a, b) => (RO[a.rarity || 'common'] || 0) - (RO[b.rarity || 'common'] || 0));
-        setEquipSearchResults(data); setEquipSearchLoading(false);
-      })
-      .catch(() => setEquipSearchLoading(false));
+    const data = queryLocalEquipment({ search: equipSearch || undefined, category: equipCategory || undefined });
+    const RO = { common: 0, uncommon: 1, rare: 2, 'very-rare': 3, legendary: 4, artifact: 5 };
+    data.sort((a, b) => (RO[a.rarity || 'common'] || 0) - (RO[b.rarity || 'common'] || 0));
+    setEquipSearchResults(data);
+    setEquipSearchLoading(false);
   }, [equipSearch, equipCategory]);
 
   // Compute selected equipment list from custom equipment
@@ -1351,27 +1333,20 @@ export default function CharacterCreate() {
                           const recSet = new Set(rec);
                           setCustomEquipment(prev => prev.filter(e => !recSet.has(e.name)));
                         } else {
-                          // Add missing recommended items — fetch from API
+                          // Add missing recommended items from local data
                           const missing = rec.filter(name => !customEquipment.some(e => e.name === name));
                           const unique = [...new Set(missing)];
-                          Promise.all(unique.map(name =>
-                            fetch(`/api/equipment?search=${encodeURIComponent(name)}`)
-                              .then(r => r.json())
-                              .then(data => data.find(d => d.name === name) || { name })
-                              .catch(() => ({ name }))
-                          )).then(items => {
-                            const toAdd = [];
-                            missing.forEach(name => {
-                              const item = items.find(it => it.name === name) || { name };
-                              toAdd.push({
-                                name: item.name, category: item.category, damage: item.damage,
-                                damageType: item.damageType, ac: item.ac, properties: item.properties,
-                                description: item.description, rarity: item.rarity, magical: item.magical,
-                                cost: item.cost, weight: item.weight,
-                              });
-                            });
-                            setCustomEquipment(prev => [...prev, ...toAdd]);
+                          const toAdd = unique.map(name => {
+                            const results = queryLocalEquipment({ search: name });
+                            const item = results.find(d => d.name === name) || { name };
+                            return {
+                              name: item.name, category: item.category, damage: item.damage,
+                              damageType: item.damageType, ac: item.ac, properties: item.properties,
+                              description: item.description, rarity: item.rarity, magical: item.magical,
+                              cost: item.cost, weight: item.weight,
+                            };
                           });
+                          setCustomEquipment(prev => [...prev, ...toAdd]);
                         }
                       }}>
                       {allAdded ? '✕ Remove All' : '+ Add All'}

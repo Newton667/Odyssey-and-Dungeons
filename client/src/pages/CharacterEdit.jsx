@@ -10,6 +10,7 @@ import {
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel } from '../utils/dndHelpers';
 import { CLASSES, RACES, SAVING_THROWS_BY_CLASS } from '../utils/classData';
+import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 
 // Skill count by class
 const CLASS_NUM_SKILLS = {
@@ -187,15 +188,10 @@ export default function CharacterEdit() {
     const params = new URLSearchParams();
     if (equipSearch) params.set('search', equipSearch);
     if (equipCategory) params.set('category', equipCategory);
-    fetch(`/api/equipment?${params}`)
-      .then(r => r.json())
-      .then(data => {
-        const items = data.equipment || data || [];
-        items.sort((a, b) => (RARITY_ORDER[a.rarity || 'common'] ?? 0) - (RARITY_ORDER[b.rarity || 'common'] ?? 0));
-        setEquipResults(items);
-        setEquipLoading(false);
-      })
-      .catch(() => setEquipLoading(false));
+    const items = queryLocalEquipment({ search: equipSearch || undefined, category: equipCategory || undefined });
+    items.sort((a, b) => (RARITY_ORDER[a.rarity || 'common'] ?? 0) - (RARITY_ORDER[b.rarity || 'common'] ?? 0));
+    setEquipResults(items);
+    setEquipLoading(false);
   }, [equipSearch, equipCategory]);
 
   // Fetch all available spells for class
@@ -204,10 +200,8 @@ export default function CharacterEdit() {
     if (!form.class) return;
     if (!SPELLCASTING_CLASSES.includes(form.class)) { setAllSpells([]); return; }
     setSpellLoading(true);
-    fetch(`/api/spells?class=${form.class}`)
-      .then(r => r.json())
-      .then(data => { setAllSpells(data.spells || data || []); setSpellLoading(false); })
-      .catch(() => setSpellLoading(false));
+    setAllSpells(queryLocalSpells({ cls: form.class }));
+    setSpellLoading(false);
   }, [form.class]);
 
   // Auto-calculate proficiency bonus from level
@@ -275,15 +269,10 @@ export default function CharacterEdit() {
     const currentSpells = form.preparedSpells || [];
     if (currentSpells.length > 0) {
       try {
-        const fetches = [];
-        if (newIsCaster) fetches.push(fetch(`/api/spells?class=${encodeURIComponent(newClass)}&limit=1000`).then(r => r.json()));
-        else fetches.push(Promise.resolve([]));
-        if (oldIsCaster) fetches.push(fetch(`/api/spells?class=${encodeURIComponent(oldClass)}&limit=1000`).then(r => r.json()));
-        else fetches.push(Promise.resolve([]));
-
-        const [newData, oldData] = await Promise.all(fetches);
-        const newSpellNames = new Set((newData.spells || newData || []).map(s => s.name));
-        const oldSpellNames = new Set((oldData.spells || oldData || []).map(s => s.name));
+        const newData = newIsCaster ? queryLocalSpells({ cls: newClass }) : [];
+        const oldData = oldIsCaster ? queryLocalSpells({ cls: oldClass }) : [];
+        const newSpellNames = new Set(newData.map(s => s.name));
+        const oldSpellNames = new Set(oldData.map(s => s.name));
 
         const spellsToRemove = [];
         const spellsToKeep = [];
