@@ -83,7 +83,10 @@ if "!LOCAL!"=="!REMOTE!" (
     echo  [UPDATE] New version available!
     echo.
     set /p DOUPDATE="  Do you want to update? (y/n): "
-    if /i "!DOUPDATE!"=="y" git pull origin main
+    if /i "!DOUPDATE!"=="y" (
+        git reset --hard origin/main >nul 2>nul
+        git pull origin main
+    )
 )
 
 :: ─── Install dependencies ───────────────────────────
