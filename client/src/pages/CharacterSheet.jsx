@@ -164,25 +164,15 @@ export default function CharacterSheet() {
     if (!char?.preparedSpells?.length) { setSpellData([]); return; }
     setLoadingSpells(true);
     const names = new Set(char.preparedSpells);
-    if (useLocalData) {
-      const all = getAllLocalSpells();
-      setSpellData(all.filter(s => names.has(s.name)));
-      setLoadingSpells(false);
-    } else {
-      fetch('/api/spells')
-        .then(r => r.json())
-        .then(all => {
-          setSpellData(all.filter(s => names.has(s.name)));
-          setLoadingSpells(false);
-        })
-        .catch(() => {
-          // Fallback to local if DB fails
-          const all = getAllLocalSpells();
-          setSpellData(all.filter(s => names.has(s.name)));
-          setLoadingSpells(false);
-        });
-    }
-  }, [char?.preparedSpells, useLocalData]);
+    const all = getAllLocalSpells();
+    // Also include homebrew spells
+    try {
+      const hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
+      all.push(...hb);
+    } catch { /* ignore */ }
+    setSpellData(all.filter(s => names.has(s.name)));
+    setLoadingSpells(false);
+  }, [char?.preparedSpells]);
 
   // Spell browser search
   useEffect(() => {
@@ -191,6 +181,11 @@ export default function CharacterSheet() {
     if (spellBrowserTimer.current) clearTimeout(spellBrowserTimer.current);
     spellBrowserTimer.current = setTimeout(() => {
       const all = getAllLocalSpells();
+      // Include homebrew spells
+      try {
+        const hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
+        all.push(...hb);
+      } catch { /* ignore */ }
       let filtered = all;
       if (spellBrowserSearch) {
         const q = spellBrowserSearch.toLowerCase();
@@ -214,36 +209,23 @@ export default function CharacterSheet() {
     setInvLoading(true);
     if (invSearchTimer.current) clearTimeout(invSearchTimer.current);
     invSearchTimer.current = setTimeout(() => {
-      if (useLocalData) {
+      {
         const data = queryLocalEquipment({ search: invSearch || undefined, category: invCategory || undefined });
+        // Merge homebrew equipment
+        try {
+          let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell');
+          if (invSearch) hb = hb.filter(i => i.name?.toLowerCase().includes(invSearch.toLowerCase()));
+          if (invCategory) hb = hb.filter(i => i.category === invCategory || i.type === invCategory);
+          data.push(...hb);
+        } catch { /* ignore */ }
         data.sort((a, b) => (RARITY_ORDER[a.rarity] || 0) - (RARITY_ORDER[b.rarity] || 0));
         setInvResults(data);
         setInvLoading(false);
         data.forEach(d => { equipCache.current[d.name] = d; });
-      } else {
-        const params = new URLSearchParams();
-        if (invSearch) params.set('search', invSearch);
-        if (invCategory) params.set('category', invCategory);
-        fetch(`/api/equipment?${params}`)
-          .then(r => r.json())
-          .then(data => {
-            data.sort((a, b) => (RARITY_ORDER[a.rarity] || 0) - (RARITY_ORDER[b.rarity] || 0));
-            setInvResults(data);
-            setInvLoading(false);
-            data.forEach(d => { equipCache.current[d.name] = d; });
-          })
-          .catch(() => {
-            // Fallback to local
-            const data = queryLocalEquipment({ search: invSearch || undefined, category: invCategory || undefined });
-            data.sort((a, b) => (RARITY_ORDER[a.rarity] || 0) - (RARITY_ORDER[b.rarity] || 0));
-            setInvResults(data);
-            setInvLoading(false);
-            data.forEach(d => { equipCache.current[d.name] = d; });
-          });
       }
     }, 300);
     return () => { if (invSearchTimer.current) clearTimeout(invSearchTimer.current); };
-  }, [invSearch, invCategory, useLocalData]);
+  }, [invSearch, invCategory]);
 
   // Pre-fetch equipment data for inventory items
   const [equipDataLoaded, setEquipDataLoaded] = useState(false);
@@ -252,27 +234,14 @@ export default function CharacterSheet() {
     if (!items?.length || equipDataLoaded) return;
     const uncached = items.filter(name => !equipCache.current[name]);
     if (uncached.length === 0) { setEquipDataLoaded(true); return; }
-    if (useLocalData) {
-      uncached.forEach(name => {
-        const match = getLocalEquipmentByName(name);
-        if (match) equipCache.current[name] = match;
-      });
-      setEquipDataLoaded(true);
-    } else {
-      Promise.all(uncached.map(name =>
-        fetch(`/api/equipment?search=${encodeURIComponent(name)}`)
-          .then(r => r.json())
-          .then(data => {
-            const match = data.find(d => d.name === name);
-            if (match) equipCache.current[name] = match;
-          })
-          .catch(() => {
-            const local = getLocalEquipmentByName(name);
-            if (local) equipCache.current[name] = local;
-          })
-      )).then(() => setEquipDataLoaded(true));
-    }
-  }, [char?.equipment, equipDataLoaded, useLocalData]);
+    // Check local data + homebrew
+    const hbItems = (() => { try { return JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell'); } catch { return []; } })();
+    uncached.forEach(name => {
+      const match = getLocalEquipmentByName(name) || hbItems.find(h => h.name === name);
+      if (match) equipCache.current[name] = match;
+    });
+    setEquipDataLoaded(true);
+  }, [char?.equipment, equipDataLoaded]);
 
   // Sidebar resize handlers
   useEffect(() => {
@@ -1858,13 +1827,6 @@ export default function CharacterSheet() {
             </div>
           </div>
         )}
-        <div onClick={() => { const next = !useLocalData; setUseLocalData(next); localStorage.setItem('ond-data-source', next ? 'local' : 'db'); }}
-          style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '10px' }}>
-          <div style={{ width: '24px', height: '12px', borderRadius: '6px', position: 'relative', background: useLocalData ? 'var(--gold)' : '#4ade80', transition: 'background 0.2s' }}>
-            <div style={{ position: 'absolute', top: '2px', left: useLocalData ? '12px' : '2px', width: '8px', height: '8px', borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
-          </div>
-          <span style={{ color: useLocalData ? 'var(--gold)' : '#4ade80', fontWeight: 600 }}>{useLocalData ? 'Local' : 'Database'}</span>
-        </div>
       </div>
 
       {/* ── Spell Slots ── */}
@@ -2205,17 +2167,8 @@ export default function CharacterSheet() {
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)' }}>Browse Equipment</span>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <div onClick={() => { const next = !useLocalData; setUseLocalData(next); localStorage.setItem('ond-data-source', next ? 'local' : 'db'); setEquipDataLoaded(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '10px' }}>
-                <div style={{ width: '24px', height: '12px', borderRadius: '6px', position: 'relative', background: useLocalData ? 'var(--gold)' : '#4ade80', transition: 'background 0.2s' }}>
-                  <div style={{ position: 'absolute', top: '2px', left: useLocalData ? '12px' : '2px', width: '8px', height: '8px', borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
-                </div>
-                <span style={{ color: useLocalData ? 'var(--gold)' : '#4ade80', fontWeight: 600 }}>{useLocalData ? 'Local' : 'Database'}</span>
-              </div>
-              <button onClick={() => { setShowInvBrowser(false); setInvSearch(''); setInvCategory(''); }}
-                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
-            </div>
+            <button onClick={() => { setShowInvBrowser(false); setInvSearch(''); setInvCategory(''); }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '16px' }}>✕</button>
           </div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
             <div style={{ flex: 1, position: 'relative' }}>

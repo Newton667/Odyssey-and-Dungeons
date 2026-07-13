@@ -60,6 +60,36 @@ app.get('/api/health', (req, res) => {
   res.json({ status: dbState === 1 ? 'ok' : 'no-db', db: ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState] || 'unknown' });
 });
 
+// Check for updates from GitHub
+app.get('/api/check-update', (req, res) => {
+  const { execSync } = require('child_process');
+  const rootDir = path.join(__dirname, '..');
+  try {
+    execSync('git fetch origin main', { cwd: rootDir, timeout: 10000, stdio: 'pipe' });
+    const local = execSync('git rev-parse HEAD', { cwd: rootDir, stdio: 'pipe' }).toString().trim();
+    const remote = execSync('git rev-parse origin/main', { cwd: rootDir, stdio: 'pipe' }).toString().trim();
+    res.json({ updateAvailable: local !== remote, local: local.slice(0, 7), remote: remote.slice(0, 7) });
+  } catch (err) {
+    res.json({ updateAvailable: false, error: 'Could not check for updates: ' + (err.message || 'unknown error') });
+  }
+});
+
+// Pull latest update from GitHub
+app.post('/api/pull-update', (req, res) => {
+  const { execSync } = require('child_process');
+  const rootDir = path.join(__dirname, '..');
+  try {
+    execSync('git reset --hard origin/main', { cwd: rootDir, timeout: 15000, stdio: 'pipe' });
+    execSync('git pull origin main', { cwd: rootDir, timeout: 30000, stdio: 'pipe' });
+    // Reinstall dependencies
+    try { execSync('npm install --silent', { cwd: path.join(rootDir, 'server'), timeout: 60000, stdio: 'pipe' }); } catch { /* ignore */ }
+    try { execSync('npm install --silent', { cwd: path.join(rootDir, 'client'), timeout: 60000, stdio: 'pipe' }); } catch { /* ignore */ }
+    res.json({ ok: true, message: 'Updated! Please restart the app.' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Upload local data to database
 app.post('/api/config/upload-data', async (req, res) => {
   if (mongoose.connection.readyState !== 1) {

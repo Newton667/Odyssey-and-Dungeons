@@ -173,13 +173,6 @@ export default function Spells() {
       <div className="page-header">
         <h2 style={{ fontSize: '28px' }}>Spells</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div onClick={() => { const next = !useLocal; setUseLocal(next); localStorage.setItem('ond-data-source', next ? 'local' : 'db'); }}
-            style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', padding: '4px 8px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '11px' }}>
-            <div style={{ width: '24px', height: '12px', borderRadius: '6px', position: 'relative', background: useLocal ? 'var(--gold)' : '#4ade80', transition: 'background 0.2s' }}>
-              <div style={{ position: 'absolute', top: '2px', left: useLocal ? '12px' : '2px', width: '8px', height: '8px', borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
-            </div>
-            <span style={{ color: useLocal ? 'var(--gold)' : '#4ade80', fontWeight: 600 }}>{useLocal ? 'Local' : 'Database'}</span>
-          </div>
           <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
             {creating ? '✕ Cancel' : '+ Add Spell'}
           </button>
