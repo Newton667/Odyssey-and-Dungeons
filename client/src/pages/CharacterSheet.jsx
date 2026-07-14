@@ -5,7 +5,7 @@ import { useCharacter } from '../hooks/useCharacterSync';
 import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
-import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES } from '../utils/dndConstants';
+import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES } from '../utils/dndConstants';
 import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
 import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
@@ -1642,7 +1642,21 @@ export default function CharacterSheet() {
                   fontSize: '13px', alignItems: 'center',
                 }}>
                 <div>
-                  <div style={{ fontWeight: 500, color: wpn.rarity && wpn.rarity !== 'common' ? rarityColor(wpn.rarity) : undefined }}>{wpn.name}{wpn.bonus ? ` +${wpn.bonus}` : ''}</div>
+                  <div style={{ fontWeight: 500, color: wpn.rarity && wpn.rarity !== 'common' ? rarityColor(wpn.rarity) : undefined, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {wpn.name}{wpn.bonus ? ` +${wpn.bonus}` : ''}
+                    {(() => {
+                      const baseName = wpn.name.replace(/^\+\d\s+/, '');
+                      const mastery = wpn.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[wpn.name];
+                      const hasMastery = mastery && WEAPON_MASTERY_CLASSES[char.class];
+                      if (!hasMastery) return null;
+                      const masteryData = WEAPON_MASTERIES[mastery];
+                      return (
+                        <span title={masteryData?.desc || ''} style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.4)', color: '#c084fc', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', cursor: 'help' }}>
+                          {mastery}
+                        </span>
+                      );
+                    })()}
+                  </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span>{wpn.subcategory || 'Weapon'}</span>
                     {needsAmmo && char.trackAmmo !== false && (
@@ -2437,7 +2451,10 @@ export default function CharacterSheet() {
         if (choiceKey === 'fighting-style') return char.fightingStyle || null;
         return null;
       };
-      const selected = getSelected();
+      const rawSelected = getSelected();
+      // Normalize: selections might be objects {name, desc, prereq} from old saves — extract name
+      const normalizeSelection = (s) => typeof s === 'object' && s !== null ? (s.name || String(s)) : s;
+      const selected = Array.isArray(rawSelected) ? rawSelected.map(normalizeSelection) : normalizeSelection(rawSelected);
       const isMulti = choice.count && choice.count > 1;
       const selectedArr = Array.isArray(selected) ? selected : (selected ? [selected] : []);
 
@@ -2523,8 +2540,9 @@ export default function CharacterSheet() {
           }
           updates.abilityScores = scores;
 
-          // Update feats list
-          const currentFeats = (char.feats || []).filter(f => f !== prevSelection);
+          // Update feats list — normalize any objects to strings
+          const prevName = typeof prevSelection === 'object' && prevSelection !== null ? prevSelection.name : prevSelection;
+          const currentFeats = (char.feats || []).map(f => typeof f === 'object' && f !== null ? (f.name || String(f)) : f).filter(f => f !== prevName);
           if (FEATS[name]) {
             if (!currentFeats.includes(name)) updates.feats = [...currentFeats, name];
             else updates.feats = currentFeats;
@@ -3298,6 +3316,24 @@ export default function CharacterSheet() {
                       }) : (
                         <div style={{ color: '#f87171', fontStyle: 'italic', fontSize: '11px' }}>No {ammoLabel.toLowerCase()} equipped</div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {/* Weapon Mastery */}
+                {sidePanel.data.category === 'weapon' && (() => {
+                  const baseName = sidePanel.data.name.replace(/^\+\d\s+/, '');
+                  const mastery = sidePanel.data.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[sidePanel.data.name];
+                  const hasMasteryClass = WEAPON_MASTERY_CLASSES[char.class];
+                  if (!mastery) return null;
+                  const masteryData = WEAPON_MASTERIES[mastery];
+                  return (
+                    <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(168, 85, 247, 0.08)', borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: '#c084fc', fontWeight: 700 }}>Mastery: {mastery}</span>
+                        {!hasMasteryClass && <span style={{ fontSize: '10px', color: 'var(--text-dim)', fontStyle: 'italic' }}>({char.class} does not have Weapon Mastery)</span>}
+                      </div>
+                      {masteryData && <p style={{ fontSize: '12px', lineHeight: 1.5, color: 'var(--text-dim)', margin: 0 }}>{masteryData.desc}</p>}
                     </div>
                   );
                 })()}

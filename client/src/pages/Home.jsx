@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { VERSION } from '../version';
 
 export default function Home() {
   const [status, setStatus] = useState('checking...');
@@ -90,7 +91,7 @@ export default function Home() {
           Check Updates
         </button>
         <span style={{ fontSize: '16px', color: 'var(--text-dim)', opacity: 0.5, fontFamily: 'Cinzel, serif', fontWeight: 600 }}>
-          v0.2.0
+          {VERSION}
         </span>
       </div>
     </div>

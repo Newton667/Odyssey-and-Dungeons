@@ -111,9 +111,9 @@ function makeDieBody(geo, type, force = 2) {
     shape = new CANNON.Sphere(0.45);
   }
 
-  // Gentle = high damping (stops fast), Power = lower damping (rolls a bit longer)
-  const linDamp = { 1: 0.5, 2: 0.35, 3: 0.2 }[force] || 0.35;
-  const angDamp = { 1: 0.6, 2: 0.4, 3: 0.25 }[force] || 0.4;
+  // Gentle = high damping (stops fast), Mighty = very low damping (rolls long)
+  const linDamp = { 1: 0.4, 2: 0.25, 3: 0.15, 4: 0.08 }[force] || 0.25;
+  const angDamp = { 1: 0.4, 2: 0.25, 3: 0.15, 4: 0.08 }[force] || 0.25;
 
   return new CANNON.Body({
     mass: 1,
@@ -409,8 +409,8 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
     const f = forceRef.current;
     const dt = themeRef.current;
 
-    // Adjust bounciness per force: gentle = dead stop, power = bouncy
-    S.world.defaultContactMaterial.restitution = { 1: 0.1, 2: 0.2, 3: 0.35 }[f] || 0.2;
+    // Adjust bounciness per force: gentle = low bounce, mighty = very bouncy
+    S.world.defaultContactMaterial.restitution = { 1: 0.2, 2: 0.35, 3: 0.45, 4: 0.6 }[f] || 0.35;
 
     // Clear previous dice
     S.dice.forEach(({ mesh, body }) => { S.scene.remove(mesh); S.world.removeBody(body); });
@@ -427,9 +427,9 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
 
       const body = makeDieBody(geo, d.die, f);
 
-      // Force multipliers: 1=Gentle, 2=Normal, 3=Power
-      const fMul = { 1: 0.4, 2: 0.8, 3: 1.4 }[f] || 0.8;
-      const hMul = { 1: 0.8, 2: 1, 3: 1.2 }[f] || 1;
+      // Force multipliers: 1=Gentle, 2=Normal, 3=Strong, 4=Mighty
+      const fMul = { 1: 0.4, 2: 0.8, 3: 1.4, 4: 2.0 }[f] || 0.8;
+      const hMul = { 1: 0.8, 2: 1, 3: 1.2, 4: 1.5 }[f] || 1;
 
       // Spread dice out, stagger spawn height
       const spread = Math.min(diceToRoll.length, 6);
@@ -451,9 +451,9 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
         (Math.random() - 0.5) * 2.5 * fMul,
       );
       body.angularVelocity.set(
-        (Math.random() - 0.5) * 12 * fMul,
-        (Math.random() - 0.5) * 12 * fMul,
-        (Math.random() - 0.5) * 12 * fMul,
+        (Math.random() - 0.5) * 20 * fMul,
+        (Math.random() - 0.5) * 20 * fMul,
+        (Math.random() - 0.5) * 20 * fMul,
       );
 
       S.scene.add(mesh);
@@ -480,12 +480,12 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
 
         // Check if all dice stopped
         const allStopped = S.dice.every(({ body }) =>
-          body.velocity.length() < 0.15 && body.angularVelocity.length() < 0.25
+          body.velocity.length() < 0.08 && body.angularVelocity.length() < 0.12
         );
 
         if (allStopped) {
           settleFrames++;
-          if (settleFrames > 10) {
+          if (settleFrames > 15) {
             settled = true;
 
             // Detect top faces and add glow

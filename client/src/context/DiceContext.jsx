@@ -6,6 +6,14 @@ const DiceContext = createContext(null);
 
 const DIE_SIDES = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
 
+/** Force presets — controls physics intensity of 3D dice rolls */
+export const FORCE_PRESETS = [
+  { value: 1, label: 'Gentle',  icon: '~',  color: '#6eb5ff', desc: 'Soft toss, minimal bounce' },
+  { value: 2, label: 'Normal',  icon: '●',  color: '#c9a227', desc: 'Standard throw' },
+  { value: 3, label: 'Strong',  icon: '◆',  color: '#ff8c00', desc: 'Hard throw, more bounce' },
+  { value: 4, label: 'Mighty',  icon: '★',  color: '#ff3030', desc: 'Maximum force, chaotic bounce' },
+];
+
 /**
  * Shared 3D dice provider.
  *
@@ -14,6 +22,9 @@ const DIE_SIDES = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20, d100: 100 };
  *     diceArray: [{ die: 'd20', sides: 20 }, ...] or shorthand string '2d8'
  *     label: optional string shown while rolling (e.g. "Fire Bolt — Damage")
  *   Returns: Promise<{ results: [{die,sides,value},...], total: number }>
+ *
+ * Force setting is global and persists to localStorage.
+ *   diceForce / setDiceForce — get/set the current force level (1-4)
  */
 export function DiceProvider({ children }) {
   const { diceTheme } = useTheme();
@@ -23,9 +34,19 @@ export function DiceProvider({ children }) {
   const [rolling, setRolling] = useState(false);
   const [rollLabel, setRollLabel] = useState('');
   const [lastResults, setLastResults] = useState(null);
+  const [diceForce, setDiceForceState] = useState(() => {
+    const saved = localStorage.getItem('ond-dice-force');
+    return saved ? Number(saved) : 2;
+  });
   const resolveRef = useRef(null);
   const bonusRef = useRef(0);
   const fadeTimers = useRef([]);
+
+  const setDiceForce = useCallback((f) => {
+    const val = Math.max(1, Math.min(4, f));
+    setDiceForceState(val);
+    localStorage.setItem('ond-dice-force', String(val));
+  }, []);
 
   const clearFadeTimers = () => {
     fadeTimers.current.forEach(t => clearTimeout(t));
@@ -104,7 +125,7 @@ export function DiceProvider({ children }) {
   }, []);
 
   return (
-    <DiceContext.Provider value={{ rollDice3D, rolling, rollLabel, lastResults }}>
+    <DiceContext.Provider value={{ rollDice3D, rolling, rollLabel, lastResults, diceForce, setDiceForce }}>
       {children}
       {diceToRoll && (
         <Dice3D
@@ -112,7 +133,7 @@ export function DiceProvider({ children }) {
           diceToRoll={diceToRoll}
           onSettled={onDiceSettled}
           fading={fading}
-          force={2}
+          force={diceForce}
           diceTheme={diceTheme}
         />
       )}

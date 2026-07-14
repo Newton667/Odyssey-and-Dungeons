@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { useDice } from '../context/DiceContext';
+import { useDice, FORCE_PRESETS } from '../context/DiceContext';
 
 const DICE = [
   { die: 'd4',   sides: 4 },
@@ -12,11 +12,10 @@ const DICE = [
 ];
 
 export default function DiceRoller({ onClose }) {
-  const { rollDice3D } = useDice();
+  const { rollDice3D, diceForce, setDiceForce } = useDice();
   const [queue, setQueue] = useState({});
   const [results, setResults] = useState(null);
   const [rolling, setRolling] = useState(false);
-  const [force, setForce] = useState(2);
 
   const addDie = (die) => {
     setQueue(p => ({ ...p, [die]: (p[die] || 0) + 1 }));
@@ -72,6 +71,7 @@ export default function DiceRoller({ onClose }) {
   const total = results ? results.reduce((s, r) => s + r.value, 0) : null;
   const queueCount = Object.values(queue).reduce((s, n) => s + n, 0);
   const notation = Object.entries(queue).filter(([, n]) => n > 0).map(([d, n]) => `${n}${d}`).join(' + ');
+  const activePreset = FORCE_PRESETS.find(p => p.value === diceForce) || FORCE_PRESETS[1];
 
   return (
     <div style={{
@@ -167,8 +167,9 @@ export default function DiceRoller({ onClose }) {
                 <button
                   className="dice-select-btn"
                   onClick={() => addDie(die)}
+                  onDoubleClick={() => quickRoll(die)}
                   onContextMenu={e => { e.preventDefault(); removeDie(die); }}
-                  title={`Left-click to add, right-click to remove`}
+                  title={`Left-click to add, right-click to remove, double-click to quick-roll`}
                   style={{
                     width: '38px', height: '38px', borderRadius: '8px', cursor: 'pointer',
                     background: count > 0 ? 'var(--accent, var(--surface))' : 'var(--surface, #1a1205)',
@@ -204,28 +205,48 @@ export default function DiceRoller({ onClose }) {
           })}
         </div>
 
-        {/* Force selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '10px', color: 'var(--text-dim, #a08060)', letterSpacing: '1px', textTransform: 'uppercase' }}>
-            Force
+        {/* Force selector — global, applies to ALL dice rolls */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px',
+          padding: '6px 8px', borderRadius: '8px',
+          background: 'var(--surface, #1a1205)',
+          border: '1px solid var(--border, #4a3010)',
+        }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-dim, #a08060)', letterSpacing: '1px', textTransform: 'uppercase', marginRight: '2px' }}>
+            THROW
           </span>
-          {[{ v: 1, label: 'Gentle' }, { v: 2, label: 'Normal' }, { v: 3, label: 'Power' }].map(({ v, label }) => (
-            <button
-              key={v}
-              className="dice-select-btn"
-              onClick={() => setForce(v)}
-              style={{
-                padding: '3px 10px', borderRadius: '4px', cursor: 'pointer',
-                background: force === v ? 'var(--accent, var(--surface))' : 'transparent',
-                border: force === v ? '1px solid var(--gold, #c9a227)' : '1px solid var(--border, #4a3010)',
-                color: force === v ? 'var(--gold, #c9a227)' : 'var(--text-dim, #a08060)',
-                fontSize: '10px', fontFamily: 'Cinzel, serif', fontWeight: 600,
-                transition: 'all 0.1s',
-              }}
-            >
-              {label}
-            </button>
-          ))}
+          {FORCE_PRESETS.map((preset) => {
+            const isActive = diceForce === preset.value;
+            return (
+              <button
+                key={preset.value}
+                onClick={() => setDiceForce(preset.value)}
+                title={preset.desc}
+                style={{
+                  flex: 1,
+                  padding: '5px 0', borderRadius: '6px', cursor: 'pointer',
+                  background: isActive ? `${preset.color}22` : 'transparent',
+                  border: isActive ? `2px solid ${preset.color}` : '1px solid transparent',
+                  color: isActive ? preset.color : 'var(--text-dim, #a08060)',
+                  fontSize: '11px', fontFamily: 'Cinzel, serif', fontWeight: isActive ? 800 : 600,
+                  transition: 'all 0.15s',
+                  textShadow: isActive ? `0 0 8px ${preset.color}60` : 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
+                }}
+              >
+                <span style={{ fontSize: '14px', lineHeight: 1 }}>{preset.icon}</span>
+                <span style={{ fontSize: '9px' }}>{preset.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Current force indicator */}
+        <div style={{
+          fontSize: '10px', color: activePreset.color, textAlign: 'center',
+          marginBottom: '8px', fontStyle: 'italic', opacity: 0.8,
+        }}>
+          {activePreset.desc} — applies to all rolls
         </div>
 
         {/* Actions */}

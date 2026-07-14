@@ -228,3 +228,41 @@ export const ARMORS = {
 };
 
 export const PB_COSTS = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
+
+// ─── Weapon Masteries (2024 PHB) ─────────────────────────────────────
+// Each weapon has a mastery property; classes with "Weapon Mastery" can use it.
+export const WEAPON_MASTERIES = {
+  Cleave:  { desc: 'If you hit a creature, you can make an attack roll against a second creature within 5 feet of it, using the same modifier. On a hit, the second creature takes the weapon\'s damage dice (no modifier).' },
+  Graze:   { desc: 'If you miss with a melee attack, the target still takes damage equal to your ability modifier (minimum 0) of the weapon\'s damage type.' },
+  Nick:    { desc: 'When you make the extra attack of the Light property, you can make it as part of the Attack action instead of a bonus action. You can only make this extra attack once per turn.' },
+  Push:    { desc: 'On a hit, you can push the target 10 feet straight away from you if it is Large or smaller.' },
+  Sap:     { desc: 'On a hit, the target has disadvantage on its next attack roll before the start of your next turn.' },
+  Slow:    { desc: 'On a hit, the target\'s speed is reduced by 10 feet until the start of your next turn. If hit more than once, the speed reduction doesn\'t exceed 10 feet.' },
+  Topple:  { desc: 'On a hit, you can force the target to make a Constitution saving throw (DC = 8 + your ability modifier + proficiency bonus). On a failure, it is knocked prone.' },
+  Vex:     { desc: 'On a hit, you have advantage on your next attack roll against that creature before the end of your next turn.' },
+};
+
+// Map each weapon to its mastery
+export const WEAPON_MASTERY_MAP = {
+  'Club': 'Slow', 'Dagger': 'Nick', 'Greatclub': 'Push', 'Handaxe': 'Vex',
+  'Javelin': 'Slow', 'Light Hammer': 'Nick', 'Mace': 'Sap', 'Quarterstaff': 'Topple',
+  'Sickle': 'Nick', 'Spear': 'Sap',
+  'Light Crossbow': 'Slow', 'Dart': 'Vex', 'Shortbow': 'Vex', 'Sling': 'Slow',
+  'Battleaxe': 'Topple', 'Flail': 'Sap', 'Glaive': 'Graze', 'Greataxe': 'Cleave',
+  'Greatsword': 'Graze', 'Halberd': 'Cleave', 'Lance': 'Topple', 'Longsword': 'Sap',
+  'Maul': 'Topple', 'Morningstar': 'Sap', 'Pike': 'Push', 'Rapier': 'Vex',
+  'Scimitar': 'Nick', 'Shortsword': 'Vex', 'Trident': 'Topple', 'War Pick': 'Sap',
+  'Warhammer': 'Push', 'Whip': 'Slow',
+  'Blowgun': 'Vex', 'Hand Crossbow': 'Vex', 'Heavy Crossbow': 'Push',
+  'Longbow': 'Slow', 'Net': 'Slow',
+};
+
+// Classes that get Weapon Mastery feature and at which levels they gain mastery slots
+export const WEAPON_MASTERY_CLASSES = {
+  Fighter:   { startLevel: 1, masterySlots: { 1: 3, 4: 4, 10: 5, 16: 6 } },
+  Barbarian: { startLevel: 1, masterySlots: { 1: 2, 4: 3, 10: 4 } },
+  Rogue:     { startLevel: 1, masterySlots: { 1: 2, 4: 3 } },
+  Paladin:   { startLevel: 1, masterySlots: { 1: 2, 4: 3 } },
+  Ranger:    { startLevel: 1, masterySlots: { 1: 2, 4: 3 } },
+  Monk:      { startLevel: 1, masterySlots: { 1: 2, 4: 3 } },
+};
