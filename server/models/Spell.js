@@ -24,6 +24,11 @@ const spellSchema = new mongoose.Schema(
     saveEffect: { type: String, default: '' },      // brief note on save effect
     source: { type: String, default: 'class' },    // 'class' | 'race' — where this ability comes from
     sourceRace: { type: String, default: '' },      // e.g. 'Dragonborn', 'Tiefling' — which race grants this
+    // Area of effect (mirrors client/src/data/spells.json so upload-data preserves these)
+    aoe: { type: Boolean, default: false },          // is this an area-of-effect spell?
+    aoeShape: { type: String, default: '' },         // Sphere, Cone, Cube, Cylinder, Line, Square, Wall
+    aoeSize: { type: Number, default: 0 },           // size in feet (e.g. 20 for a 20-ft-radius sphere)
+    aoeDetails: { type: String, default: '' },       // extra info (e.g. '30ft long, 5ft wide' for lines)
   },
   { timestamps: true }
 );

@@ -38,25 +38,23 @@ OND/
 ## Data Flow
 
 ### Local-First Architecture
-1. **Characters**: Saved to `localStorage` (browser) as primary, synced to `server/data/characters/` as backup
+1. **Characters**: Local only. The character list, sheet, and creation flow read/write `localStorage` and mirror to `server/data/characters/` JSON files when the server is reachable. There is **no MongoDB sync** for characters (see Sync Flow below).
 2. **Equipment & Spells**: Bundled as static JSON in `client/src/data/`, loaded at import time
 3. **Homebrew**: Saved to `localStorage` under `ond-homebrew` key
 4. **Settings/Preferences**: All in `localStorage` (themes, layouts, widget positions)
 
 ### Sync Flow (useCharacterSync hook)
-```
-User edits character
-    → Updates localStorage immediately
-    → Debounced (2s) POST to /api/characters/:id
-    → Server writes to data/characters/{id}.json
-    → If server unavailable, localStorage is still the source of truth
-```
+The `useCharacterSync` hook still contains debounced POST-to-server plumbing, but **it is effectively disabled in the shipped app**: the only call site is `CharacterSheet.jsx` (~line 74), which passes `{ syncEnabled: false }`. This matches the CLAUDE.md rule *"Characters are local only (no sync toggle)"* — the sync toggle was removed in v1.1.0. Treat the debounce diagram below as historical; it does not run.
+
+> **Quirk:** `updateHp()` inside the hook fires `PATCH /api/characters/:id/hp` unconditionally — it does *not* check `syncEnabled` — so an HP change still attempts a background server write even though sync is "off."
+
+> **`CharacterEdit.jsx` data flow:** it talks to the server (`fetch` on load, `PUT` on save against `/api/characters/:id`) but now also falls back to `localStorage` (`ond-char-{id}`). Load tries the server first, then the local copy if the server is unreachable or has no record; local-only characters (id prefixed `local-`) read straight from localStorage. Save always writes the merged local copy first (matching the server's `{...existing, ...body}` merge so unmanaged fields survive), then PUTs to the server for non-local ids, tolerating an offline server. This closes the earlier gap where local-only characters 404'd in the editor.
 
 ### Database Mode (Optional)
 When a MongoDB URI is configured:
-- Characters can sync to MongoDB Atlas
 - Equipment/Spells can be served from the database
 - Campaigns use MongoDB for multiplayer features
+- Characters are **not** synced to MongoDB (local files only)
 
 ## Versioning
 - Version is defined in `client/src/version.js` as `export const VERSION = 'vX.Y.Z'`

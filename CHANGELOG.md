@@ -28,6 +28,13 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+### Fixed
+- Spell AOE data (`aoe`, `aoeShape`, `aoeSize`, `aoeDetails`) is now part of the `Spell` Mongoose schema, so `POST /api/config/upload-data` no longer drops it when pushing `client/src/data/spells.json` into MongoDB.
+- `CharacterEdit` now falls back to `localStorage` (key `ond-char-{id}`) when the server has no copy of a character — local-only characters (id prefixed `local-`) can be edited and saved offline instead of failing to load. Saves always write the local copy first (merged like the server's update) and tolerate an unreachable server.
+
+### Changed
+- Docs: audited and corrected `Docs/` against the current code — fixed the Character/Campaign/Spell/Equipment/Homebrew model field names in `server.md`, corrected the campaigns and homebrew route tables, added `POST /api/upload` and spell `source`/`sourceRace` query params, documented that characters are local-only (sync plumbing disabled), flagged that `CharacterEdit` bypasses local-first with no offline fallback, fixed the localStorage key list, and documented the extra `localDataService` exports.
+
 ---
 
 ## v1.1.1 — 2026-07-14
@@ -90,7 +97,7 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 - **Progression System** — Level-up choices for ASI/feats, subclass selection, class features, and subclass features for all PHB subclasses
 - **Campaign System** — Create campaigns with join codes, session logs, shared roll log
 - **Widget Layout** — Draggable/reorderable character sheet sections with 2/3/4 column options
-- **Settings Page** — UI themes (16 presets + custom), dice themes, database connection config with setup guide
+- **Settings Page** — UI themes (17 presets + custom), dice themes, database connection config with setup guide
 - **Web Update Button** — Check for updates and pull latest from GitHub without using git CLI
 - **Local-First Architecture** — All data works offline; database is optional
 - **Homebrew in Character Sheet** — Custom items/spells appear in character sheet browsers

@@ -1,12 +1,14 @@
 # Client Pages Reference
 
-## Home.jsx (~100 lines)
+## Home.jsx (~185 lines)
 Landing page with navigation cards to Characters, Spells, Equipment, etc.
-- Shows app version from `client/src/version.js` (bottom right)
+- Shows app version from `client/src/version.js` (bottom right, styled as accent badge)
 - "Check Updates" button fetches from GitHub and offers to pull latest
+- "Changelog" button opens modal overlay with full version history (rendered from CHANGELOG.md via Vite `?raw` import, Unreleased section and HTML comments stripped)
 - Health check indicator for server connection status
+- Simple markdown-to-JSX renderer for changelog (headings, bullets, bold, dividers)
 
-## Characters.jsx (~128 lines)
+## Characters.jsx (~99 lines)
 Character list page showing all saved characters as cards.
 - Loads from localStorage (`ond-characters-*` keys)
 - Falls back to server API if localStorage is empty
@@ -28,7 +30,7 @@ Multi-step character creation wizard with 8 steps:
 - Feat selection with hover tooltips (Tip component)
 - Saves character to localStorage with `local-{uuid}` ID
 
-## CharacterSheet.jsx (~3577 lines)
+## CharacterSheet.jsx (~3593 lines)
 Full interactive character sheet — the main feature of the app.
 
 ### Key Components Inside:
@@ -67,7 +69,7 @@ Full interactive character sheet — the main feature of the app.
 - `upcastLevels` state for spell upcasting
 - `shortRestModal` state for hit dice spending UI
 
-## CharacterEdit.jsx (~1595 lines)
+## CharacterEdit.jsx (~1603 lines)
 Edit form for existing characters with tabbed sections:
 - **Basic Info** — Name, race, class, level, alignment, portrait
 - **Ability Scores** — Direct number editing
@@ -81,8 +83,9 @@ Edit form for existing characters with tabbed sections:
 - **Settings** — Level up, character-specific settings (ammo tracking)
 - Hover effect on tabs (cc-skill class)
 - ImageCropper for portrait editing
+- **Data flow:** CharacterEdit is server-oriented — it `fetch`es the character from `/api/characters/:id` on load and `PUT`s the object back on save — but falls back to `localStorage` (`ond-char-{id}`) when the server has no copy, so local-only characters (`local-` id) can be edited and saved offline. Saves write the merged local copy first, then hit the server for non-local ids. Portrait uploads go through `POST /api/upload`. See `known-patterns-and-gotchas.md` → "CharacterEdit Server + Local Fallback."
 
-## Spells.jsx (~598 lines)
+## Spells.jsx (~599 lines)
 Spell browser/reference page.
 - Filters: level, school, class, search text
 - Uses local JSON data from `client/src/data/spells.json`
@@ -101,7 +104,7 @@ Equipment browser/reference page.
 - Roll buttons for weapon damage
 - Rarity color coding (common→artifact)
 
-## Homebrew.jsx (~650 lines)
+## Homebrew.jsx (~788 lines)
 Custom content creator.
 - Create: spells, weapons, armor, items, ammo
 - **DiceFormulaBuilder** — Visual dice formula creator (choose die type + count + modifier) with "Test Roll" button that rolls the formula using 3D dice and shows the full equation inline
@@ -134,7 +137,7 @@ Single campaign detail page.
 
 ## Settings.jsx (~1084 lines)
 App settings with 3 tabs:
-- **UI Themes** — 16 presets + custom color overrides for all CSS variables
+- **UI Themes** — 17 presets + custom color overrides for all CSS variables
 - **Dice Themes** — Customize 3D dice appearance
 - **Database** — MongoDB URI configuration, connection test, data upload buttons
 - Setup guide for MongoDB Atlas

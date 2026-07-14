@@ -108,7 +108,14 @@ export default function CharacterEdit() {
   const [manualScores, setManualScores] = useState({ strength: 10, dexterity: 10, constitution: 10, intelligence: 10, wisdom: 10, charisma: 10 });
 
   useEffect(() => {
-    fetch(`/api/characters/${id}`).then(r => r.json()).then(data => {
+    const readLocal = () => {
+      try {
+        const raw = localStorage.getItem(`ond-char-${id}`);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    };
+
+    const applyData = (data) => {
       setChar(data);
       setForm({
         name: data.name || '',
@@ -161,7 +168,31 @@ export default function CharacterEdit() {
       const isStdArray = JSON.stringify(vals) === JSON.stringify([...STANDARD_ARRAY]);
       setAbilityMethod(isStdArray ? 'standard' : 'manual');
       setLoading(false);
-    });
+    };
+
+    const load = async () => {
+      // Local-only characters (id prefixed `local-`) have no server file —
+      // read straight from localStorage.
+      if (id?.startsWith('local-')) {
+        const local = readLocal();
+        if (local) return applyData(local);
+        return setLoading(false); // not found anywhere
+      }
+      // Server-backed characters: try the API, fall back to localStorage if the
+      // server is unreachable or has no copy (offline / local-first).
+      try {
+        const res = await fetch(`/api/characters/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && !data.error) return applyData(data);
+        }
+      } catch { /* offline — fall through to local copy */ }
+      const local = readLocal();
+      if (local) return applyData(local);
+      setLoading(false); // not found anywhere
+    };
+
+    load();
   }, [id]);
 
   const set = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
@@ -322,23 +353,36 @@ export default function CharacterEdit() {
   const save = async () => {
     setSaving(true);
     setSaved(false);
+    const body = {
+      ...form,
+      proficiencyBonus: computedProfBonus,
+      currentHp: Math.min(char.currentHp ?? form.maxHp, form.maxHp),
+    };
+    // Always write the local copy first (local-first — matches the server's
+    // {...existing, ...body} merge so fields the edit form doesn't manage survive).
+    const merged = { ...char, ...body, updatedAt: new Date().toISOString() };
     try {
-      const body = {
-        ...form,
-        proficiencyBonus: computedProfBonus,
-        currentHp: Math.min(char.currentHp ?? form.maxHp, form.maxHp),
-      };
-      const res = await fetch(`/api/characters/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2000);
+      localStorage.setItem(`ond-char-${id}`, JSON.stringify(merged));
+    } catch { /* quota exceeded — ignore */ }
+    try {
+      // Local-only characters have no server file; localStorage is authoritative.
+      if (!id?.startsWith('local-')) {
+        const res = await fetch(`/api/characters/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error('save failed');
       }
-    } catch { alert('Failed to save'); }
-    finally { setSaving(false); }
+      setChar(merged);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // Server unreachable, but the local copy is saved — treat as a soft success.
+      setChar(merged);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally { setSaving(false); }
   };
 
   if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;

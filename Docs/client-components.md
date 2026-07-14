@@ -3,7 +3,7 @@
 ## Navbar.jsx (~108 lines)
 Top navigation bar visible on all pages.
 - OND branding/logo link to home
-- Navigation links: Characters, Spells, Equipment, Homebrewer, Campaigns, Settings
+- Navigation links: Home, Characters, Campaigns, Spells, Equipment, Homebrewer (+ Settings gear icon)
 - Quick character access (last viewed character shortcut)
 - Responsive layout
 
@@ -33,7 +33,7 @@ Three.js 3D dice renderer with physics simulation.
 - `force` — Force level 1-4 (from DiceContext global setting)
 - `diceTheme` — Theme object for die appearance
 
-## DiceRoller.jsx (~260 lines)
+## DiceRoller.jsx (~293 lines)
 Manual dice roller UI panel.
 - Dice type buttons (d4, d6, d8, d10, d12, d20, d100)
 - Left-click to add die, right-click to remove, double-click to quick-roll
@@ -58,7 +58,7 @@ Canvas-based image cropper for character portraits.
 - `onCancel` — Cancel callback
 - `outputSize` — Output dimensions (default 256)
 
-## NumInput.jsx (~23 lines)
+## NumInput.jsx (~22 lines)
 Number input that prevents the deselection bug.
 - Stores raw text in local state while focused
 - Only parses/clamps value on blur
@@ -73,7 +73,7 @@ Number input that prevents the deselection bug.
 ### Why This Exists:
 Standard controlled number inputs with `parseInt(e.target.value)` in onChange cause the input to lose focus on every keystroke because the parsed value differs from the raw text, triggering a re-render that replaces the input value.
 
-## DebouncedTextarea.jsx (~16 lines)
+## DebouncedTextarea.jsx (~15 lines)
 Textarea that only fires onChange on blur.
 - Stores text in local state while focused
 - Syncs parent value when not focused
@@ -95,7 +95,7 @@ Hover tooltip wrapper component.
 - `text` — Tooltip content string
 - `children` — Elements to wrap
 
-## Field.jsx (~9 lines)
+## Field.jsx (~8 lines)
 Form field wrapper with consistent label styling.
 - Renders a label above the children
 - Used in CharacterCreate and CharacterEdit forms

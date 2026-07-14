@@ -20,6 +20,9 @@
 - When finalizing a version: rename `vX.X.X — Unreleased` with the version number + date, update `client/src/version.js`, then re-add a fresh `## vX.X.X — Unreleased` section
 - Don't bump version unless the user says to
 
+## Style
+- No emojis in Discord announcements (Discord.md)
+
 ## Key Rules
 - Characters are local only (no sync toggle)
 - Equipment and spells use local JSON data by default

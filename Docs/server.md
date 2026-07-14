@@ -22,12 +22,13 @@ Express entry point.
 - `/api/homebrew` → routes/homebrew.js
 
 **Special Endpoints:**
-- `GET /api/health` — Returns `{ status: 'ok' }` for connection testing
+- `POST /api/upload` — Multipart image upload (multer, field name `image`, 5MB limit, jpg/jpeg/png/gif/webp only). Returns `{ url: '/uploads/...' }`. Used by `CharacterEdit.jsx` for character portraits.
+- `GET /api/health` — Returns `{ status: 'ok'|'no-db', db: 'connected'|'disconnected'|... }` for connection testing
 - `GET /api/check-update` — Runs `git fetch origin main`, compares local/remote HEAD
-- `POST /api/apply-update` — Runs `git reset --hard origin/main && git pull` + `npm install`
-- `POST /api/upload-spells` — Bulk upload spells array to MongoDB
-- `POST /api/upload-equipment` — Bulk upload equipment array to MongoDB
-- `POST /api/update-env` — Write MongoDB URI to server/.env file
+- `POST /api/pull-update` — Runs `git reset --hard origin/main && git pull` + `npm install`
+- `POST /api/config/upload-data` — Bulk upload local JSON to MongoDB (body: `{ type: 'spells'|'equipment'|'both' }`); reads from `client/src/data/*.json` files
+- `POST /api/config/database` — Save MongoDB connection string to server/.env file
+- `GET /api/config/database` — Read current MongoDB URI from .env (masked)
 
 **MongoDB Connection:**
 - Reads `MONGODB_URI` from `.env` file
@@ -39,77 +40,91 @@ Express entry point.
 ## Models
 
 ### Character.js (~135 lines)
+> **Note:** `routes/characters.js` persists characters as raw JSON files (see Routes below) and does **not** `require` or validate against this Mongoose model — the model file is kept as the canonical reference for the character shape. The field names below match what `CharacterCreate.jsx`/`CharacterEdit.jsx` actually read and write.
 ```js
 {
-  name: String,
+  name: String (required),
   race: String,
   class: String,
   subclass: String,
-  level: Number (default: 1),
-  xp: Number (default: 0),
+  level: Number (default: 1, 1-30),
   background: String,
   alignment: String,
-  portrait: String,          // base64 data URI
+  experiencePoints: Number (default: 0),
+  levelingMethod: String,       // 'milestone' | 'xp' (default: 'milestone')
 
-  // Ability Scores
-  abilityScores: { STR, DEX, CON, INT, WIS, CHA },
+  // Multiclassing
+  classes: [{ class: String, subclass: String, level: Number }],
+
+  // Physical description
+  age: String, height: String, weight: String,
+  eyes: String, hair: String, skin: String,
+  faith: String,
+
+  // Ability Scores (full names)
+  abilityScores: { strength, dexterity, constitution, intelligence, wisdom, charisma },
 
   // Combat
-  maxHp: Number,
-  currentHp: Number,
-  tempHp: Number (default: 0),
-  ac: Number (default: 10),
+  maxHp: Number (default: 10),
+  currentHp: Number (default: 10),
+  temporaryHp: Number (default: 0),
+  armorClass: Number (default: 10),
   speed: Number (default: 30),
   initiative: Number (default: 0),
-  hitDiceTotal: Number,
-  hitDiceRemaining: Number,
-  deathSaves: { successes: 0, failures: 0 },
+  proficiencyBonus: Number (default: 2),
+  hitDice: String (default: 'd8'),
+  hitDiceRemaining: Number (default: 1),
+  deathSaveSuccesses: Number (default: 0),
+  deathSaveFailures: Number (default: 0),
 
   // Proficiencies
   skillProficiencies: [String],
   skillExpertise: [String],
   savingThrowProficiencies: [String],
-  armorProficiencies: [String],
-  weaponProficiencies: [String],
   toolProficiencies: [String],
   languages: [String],
 
-  // Equipment
-  equipment: [{ name, quantity, weight, cost, notes }],
+  // Equipment & inventory
+  equipment: [String],          // flat array of item names
   equippedItems: [String],
+  ammo: Map<String, Number>,    // { "Arrows": 20, ... }
+  gold: Number (default: 0),
   currency: { cp, sp, ep, gp, pp },
-  attunedItems: [String],
+  attunedItems: [String],       // max 3
 
   // Spells
   spellcastingAbility: String,
-  spellSlots: {},
-  usedSpellSlots: {},
-  knownSpells: [String],
+  spellSlots: Map<String, { total, used }>,
+  usedSpellSlots: Map<String, Number>,   // slots used per level
   preparedSpells: [String],
 
-  // Features
+  // Features & traits
   feats: [String],
-  classFeatures: [String],
-  racialTraits: [String],
-
-  // Details
-  personalityTraits: String,
+  features: [String],
+  traits: String,               // personality traits
   ideals: String,
   bonds: String,
   flaws: String,
-  backstory: String,
   notes: String,
 
+  // Homebrew levels 21+
+  homebrewLevels: Map<String, [String]>,
+
   // State
-  inspiration: Boolean (default: false),
-  conditions: [String],
-  resistances: [String],
-  immunities: [String],
-  vulnerabilities: [String],
+  inspiration: Boolean (default: false),   // Heroic Inspiration
+  activeConditions: [String],
+  customResistances: [String],
+  customImmunities: [String],
+  customVulnerabilities: [String],
+
+  // Progression / campaign
+  levelChoices: Map<String, Object>,       // choices made at each level
+  campaignId: ObjectId (ref: Campaign, default: null),
+  avatarUrl: String,            // '/uploads/...' path (not base64)
 
   // Settings
-  ammoTracking: Boolean (default: true),
-  progressionChoices: {},
+  trackAmmo: Boolean (default: true),
+  // timestamps: createdAt, updatedAt
 }
 ```
 
@@ -117,81 +132,116 @@ Express entry point.
 ```js
 {
   name: String (required),
-  description: String,
+  setting: String,
   dmName: String,
-  status: String (default: 'active'),
-  joinCode: String (auto-generated 6-char),
-  players: [{ name, odCharacterId, joinedAt }],
-  sessions: [{ date, title, notes }],
-  rollLog: [{ playerName, characterName, type, formula, result, total, timestamp }],
-  createdAt: Date,
-  updatedAt: Date
+  description: String,
+  status: String,             // 'active' | 'paused' | 'completed' (default: 'active')
+  notes: String,
+  imageUrl: String,
+  joinCode: String,           // auto-generated 6-char, unique
+  players: [{
+    playerName: String (required),
+    characterId: String,      // Character _id or local id
+    characterName: String,
+    role: String,             // 'dm' | 'player' (default: 'player')
+    joinedAt: Date
+  }],
+  sessions: [{ sessionNumber, date, summary, xpAwarded }],
+  rollLog: [{ playerName, characterName, avatarUrl, label, formula, total, tag, timestamp }],
+  // tag = '' | 'ADV' | 'DIS' | 'CRIT' | 'FAIL'
+  // timestamps: createdAt, updatedAt
 }
 ```
 
 ### Spell.js (~33 lines)
 ```js
 {
-  name: String (required, unique),
-  level: Number (0-9),
+  name: String (required),
+  level: Number (0-9, required),  // 0 = cantrip
   school: String,
-  castingTime: String,
-  range: String,
+  castingTime: String (default: '1 action'),
+  range: String (default: 'Self'),
   components: [String],       // ['V', 'S', 'M']
   materialComponent: String,
-  duration: String,
+  duration: String (default: 'Instantaneous'),
   concentration: Boolean,
   ritual: Boolean,
   description: String,
   higherLevels: String,
-  scaling: String,            // e.g., "1d6" per level above base
   classes: [String],
-  attackType: String,
-  damage: String,
+  attackType: String,         // 'melee' | 'ranged' | ''
+  damage: String,             // base dice e.g. '1d10'
   damageType: String,
+  scaling: String,            // 'cantrip' = auto-scale at 5/11/17
   savingThrow: String,
   saveEffect: String,
-  aoe: Boolean,                // Is this an area of effect spell?
-  aoeShape: String,            // Sphere, Cone, Cube, Cylinder, Line, Square, Wall
-  aoeSize: Number,             // Size in feet (e.g., 20 for "20-foot-radius sphere")
-  aoeDetails: String           // Extra info (e.g., "30ft long, 5ft wide" for lines)
+  source: String,             // 'class' | 'race' (default: 'class')
+  sourceRace: String,         // e.g. 'Dragonborn', 'Tiefling' — race granting a spell-like ability
+  // Area of effect (v1.1.0) — mirrors client/src/data/spells.json
+  aoe: Boolean,               // is this an area-of-effect spell?
+  aoeShape: String,           // Sphere, Cone, Cube, Cylinder, Line, Square, Wall
+  aoeSize: Number,            // size in feet (e.g. 20 for a 20-ft-radius sphere)
+  aoeDetails: String,         // extra info (e.g. '30ft long, 5ft wide' for lines)
+  // timestamps: createdAt, updatedAt
 }
 ```
+> The area-of-effect fields (`aoe`, `aoeShape`, `aoeSize`, `aoeDetails`) are part of the schema, so `POST /api/config/upload-data` preserves them when pushing `client/src/data/spells.json` into MongoDB.
 
 ### Equipment.js (~32 lines)
 ```js
 {
   name: String (required),
-  category: String,           // weapon, armor, adventuring-gear, tools
-  subcategory: String,        // Simple Melee, Heavy Armor, etc.
-  cost: String,               // "50 gp"
-  weight: String,             // "6 lb."
-  damage: String,             // "2d6"
-  damageType: String,         // slashing, piercing, etc.
-  properties: [String],       // ['Heavy', 'Two-Handed', 'Finesse']
-  ac: Number,
-  stealthDisadvantage: Boolean,
-  strRequirement: Number,
-  rarity: String,             // common→artifact
+  category: String (required), // 'armor', 'weapon', 'adventuring-gear', 'tool', 'pack'
+  subcategory: String,        // 'light armor', 'simple melee', 'artisan tools', etc.
+  cost: String,               // "10 gp"
+  weight: String,             // "3 lb."
+  description: String,
+  // Armor fields
+  ac: String,                 // e.g. '12 + Dex modifier', '16'
+  strReq: Number,             // Strength requirement (default: 0)
+  stealthDisadv: Boolean,
+  // Weapon fields
+  damage: String,             // "1d8"
+  damageType: String,         // 'slashing', 'piercing', 'bludgeoning'
+  properties: [String],       // ['finesse', 'light', 'thrown (20/60)']
+  // Rarity & magic
+  rarity: String,             // 'common'→'artifact' (default: 'common')
   magical: Boolean,
   attunement: Boolean,
-  description: String,
-  ammoType: String,           // "Arrows", "Crossbow Bolts"
-  stackSize: Number
+  bonus: Number,              // +1, +2, +3
+  // General
+  quantity: String,           // for packs/bundles
+  // timestamps: createdAt, updatedAt
 }
 ```
+> `ammoType` and `stackSize` are **not** on Equipment — they exist only on the Homebrew model (below).
 
 ### Homebrew.js (~63 lines)
 ```js
 {
+  type: String (required),    // 'spell' | 'weapon' | 'armor' | 'item' | 'ammo'
+  createdBy: String,          // player name
   name: String (required),
-  type: String,               // spell, weapon, armor, item, ammo
-  shareCode: String (auto-generated),
-  createdBy: String,
-  // ... includes all fields from Spell and Equipment schemas
-  // depending on the type
+  description: String,
+  rarity: String,             // common→artifact (default: 'common')
+  homebrew: Boolean (default: true),
+
+  // Equipment fields (weapon/armor/item/ammo)
+  category, subcategory, cost, weight, damage, damageType,
+  properties: [String], ac: String, magical: Boolean, bonus: Number,
+  ammoType: String, stackSize: Number,
+  requiresAttunement: Boolean,   // note: NOT `attunement` (that's the Equipment field)
+
+  // Spell fields
+  level, school, castingTime, range, components, materialComponent,
+  duration, concentration, ritual, classes, attackType, savingThrow,
+  saveEffect, higherLevels, scaling,
+
+  shareCode: String,          // auto-generated 12-char, unique
+  // timestamps: createdAt, updatedAt
 }
 ```
+> The in-app Homebrewer page (`Homebrew.jsx`) is **100% localStorage** (`ond-homebrew` key) and does not call any of the `/api/homebrew` routes below. Those routes back the DB-side share/import flow only.
 
 ---
 
@@ -221,23 +271,26 @@ Campaign CRUD with multiplayer features. Requires MongoDB.
 | POST | `/api/campaigns` | Create campaign (auto-generates join code) |
 | PUT | `/api/campaigns/:id` | Update campaign |
 | DELETE | `/api/campaigns/:id` | Delete campaign |
-| POST | `/api/campaigns/:id/join` | Join campaign with join code |
-| POST | `/api/campaigns/:id/sessions` | Add session log entry |
-| POST | `/api/campaigns/:id/rolls` | Add roll to shared roll log |
-| GET | `/api/campaigns/:id/rolls` | Get recent rolls (polling) |
+| POST | `/api/campaigns/join` | Join campaign (body: `joinCode`, `playerName`, `characterId?`, `characterName?`) — looked up by join code, no `:id` |
+| POST | `/api/campaigns/:id/leave` | Remove a player from the campaign (body: `playerName`) |
+| PATCH | `/api/campaigns/:id/player` | Update a player's linked character (body: `playerName`, `characterId?`, `characterName?`) |
+| POST | `/api/campaigns/:id/sessions` | Add session log entry (auto-numbers `sessionNumber`) |
+| POST | `/api/campaigns/:id/rolls` | Add roll to shared roll log (trims to last 200) |
+| GET | `/api/campaigns/:id/rolls` | Get rolls (`?since=` timestamp for polling, else last 50) |
+| GET | `/api/campaigns/:id/players` | Get player list + character summaries (polling) |
 
 ### routes/spells.js (~63 lines)
 Spell CRUD. Requires MongoDB.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/spells` | List/search spells (query: level, school, class, search) |
+| GET | `/api/spells` | List/search spells (query: `level`, `school`, `class`, `search`, `source`, `sourceRace`) |
 | GET | `/api/spells/:id` | Get single spell |
 | POST | `/api/spells` | Create spell |
 | PUT | `/api/spells/:id` | Update spell |
 | DELETE | `/api/spells/:id` | Delete spell |
 
-### routes/equipment.js (~62 lines)
+### routes/equipment.js (~61 lines)
 Equipment CRUD. Requires MongoDB.
 
 | Method | Path | Description |
@@ -248,17 +301,18 @@ Equipment CRUD. Requires MongoDB.
 | PUT | `/api/equipment/:id` | Update item |
 | DELETE | `/api/equipment/:id` | Delete item |
 
-### routes/homebrew.js (~100 lines)
+### routes/homebrew.js (~99 lines)
 Homebrew CRUD with share code system. Requires MongoDB.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/homebrew` | List homebrew (query: type) |
+| GET | `/api/homebrew` | List homebrew (query: `type`, `search`) |
 | GET | `/api/homebrew/:id` | Get single homebrew item |
 | POST | `/api/homebrew` | Create homebrew item |
 | PUT | `/api/homebrew/:id` | Update homebrew item |
 | DELETE | `/api/homebrew/:id` | Delete homebrew item |
-| GET | `/api/homebrew/share/:code` | Get homebrew by share code (for import) |
+| GET | `/api/homebrew/:id/export` | Get share payload for an item → `{ shareCode, shareString }` (base64 JSON) |
+| POST | `/api/homebrew/import` | Create a new item from a base64 `shareString` (body) |
 
 ---
 

@@ -5,22 +5,31 @@ Global styles with D&D dark fantasy theme.
 
 ### CSS Custom Properties (set by ThemeContext)
 ```css
---bg-primary       /* Main background */
---bg-secondary     /* Card/panel background */
---bg-tertiary      /* Input/nested element background */
+--bg-dark          /* Main background */
+--bg-gradient      /* Gradient top color */
+--bg-card          /* Card/panel background */
+--bg-card-hover    /* Card hover state */
 --border           /* Border color */
---border-glow      /* Glowing border accent */
 --gold             /* Primary accent color (headings, buttons) */
---gold-hover       /* Accent hover state */
---text-primary     /* Main text color */
---text-secondary   /* Subtitle/secondary text */
+--gold-light       /* Accent light variant */
+--gold-dim         /* Accent muted variant */
+--text             /* Main text color */
 --text-dim         /* Muted text */
 --accent           /* Secondary accent (links, badges) */
---accent-hover     /* Secondary accent hover */
---danger           /* Red for delete/damage/errors */
---success          /* Green for healing/success */
---hp-bar           /* HP bar fill color */
---hp-bar-bg        /* HP bar background */
+--surface          /* Surface background */
+--nav-bg           /* Navigation bar background */
+--input-bg         /* Input field background */
+```
+
+**Additional root variables (not themed, set in index.css):**
+```css
+--border-light     /* Lighter border variant */
+--red / --red-light /* Danger/error colors */
+--green / --green-light /* Success/healing colors */
+--text-dark        /* Dark text color */
+--hp-bar           /* HP bar fill color (green) */
+--hp-low           /* HP bar low health (orange) */
+--hp-crit          /* HP bar critical health (red) */
 ```
 
 ### Key CSS Classes
@@ -41,9 +50,10 @@ Global styles with D&D dark fantasy theme.
 }
 ```
 
-**Rarity Color System (in CharacterSheet.jsx):**
+**Rarity Color System (in dndConstants.js + dndHelpers.js):**
 ```js
-const RARITY_COLORS = {
+// dndConstants.js
+export const RARITY_COLORS = {
   common: 'var(--text-dim)',
   uncommon: '#1eff00',
   rare: '#0070ff',
@@ -52,13 +62,14 @@ const RARITY_COLORS = {
   artifact: '#e6cc80'
 };
 
-function rarityColor(r) { return RARITY_COLORS[r] || RARITY_COLORS.common; }
+// dndHelpers.js
+export function rarityColor(r) { return RARITY_COLORS[r] || RARITY_COLORS.common; }
 
-function rarityBg(r) {
+export function rarityBg(r) {
   // Returns tinted background for rarity
-  uncommon: '#1a2e1a', rare: '#1a1a3e',
-  'very-rare': '#2e1a3e', legendary: '#3e2e0a',
-  artifact: '#3e1a0a', default: 'transparent'
+  // uncommon: '#1a2e1a', rare: '#1a1a3e',
+  // 'very-rare': '#2e1a3e', legendary: '#3e2e0a',
+  // artifact: '#3e1a0a', default: 'transparent'
 }
 ```
 
@@ -71,13 +82,15 @@ Character sheet sections are wrapped in `wrapWidget()` which provides:
 
 **Important:** `wrapWidget` is a plain function, NOT a React component. This prevents the focus-loss bug where defining `Widget` as an inline component caused React to unmount/remount inputs on every render.
 
-### Theme Presets
-Each theme defines all CSS variables. Examples:
-- **Dark Fantasy** — Deep purple/brown, gold accents
+### Theme Presets (17 built-in)
+Each theme defines all CSS variables listed above. Examples:
+- **Dark Fantasy** (default) — Deep brown, gold accents
 - **Blood Moon** — Dark red/crimson tones
-- **Frost Giant** — Ice blue/silver
-- **Feywild** — Vibrant green/pink/purple
-- **Underdark** — Deep purple/blue, bioluminescent accents
+- **Frost** — Ice blue/silver
+- **Emerald** — Green nature tones
+- **Necromancer** — Dark with bioluminescent green accents
+- **Synthwave** / **Vaporwave** — Retro neon aesthetics
+- **Parchment** — Light theme with warm sepia tones
 
 ### Responsive Design
 - Character sheet uses configurable 2/3/4 column grid

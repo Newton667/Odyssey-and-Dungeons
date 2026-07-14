@@ -4,27 +4,33 @@
 
 ## Context Providers
 
-### ThemeContext.jsx (~281 lines)
+### ThemeContext.jsx (~280 lines)
 Provides app-wide theming with CSS custom properties.
 
-**16 Built-in Presets:**
-Dark Fantasy (default), Arcane Purple, Blood Moon, Forest Grove, Ocean Depths, Desert Sands, Frost Giant, Infernal, Celestial, Shadowfell, Feywild, Underdark, Dragon's Hoard, Storm King, Ethereal, Custom
+**17 Built-in Presets:**
+Dark Fantasy (default), Arcane, Emerald, Infernal, Frost, Necromancer, Parchment, Midnight, Blood Moon, Ocean Depths, Rose, Galaxy, Toxic, Autumn, Monochrome, Synthwave, Vaporwave
 
 **How it works:**
-- Each theme defines ~20 CSS variables (--bg-primary, --gold, --text-primary, etc.)
-- On theme change, applies CSS variables to document root
-- Custom theme allows individual color overrides
-- Theme preference saved to `localStorage('ond-theme')`
+- Each theme defines ~14 CSS variables (--bg-dark, --bg-card, --gold, --text, --text-dim, etc.)
+- On theme change, applies CSS variables to document root via `applyVars()`
+- Custom presets can be saved/loaded; individual variable overrides supported
+- Theme preference saved to `localStorage('ond-theme')` as `{ preset, overrides, activeCustomName }`
+- Custom presets saved separately to `localStorage('ond-custom-presets')`
+- Dice theme saved to `localStorage('ond-dice-theme')`
 
 **Exports:**
+- `PRESETS` — Object mapping preset names to CSS variable objects
+- `DICE_PRESETS` — Object mapping dice theme names to 3D material properties
 - `ThemeProvider` — Wrap app with this
-- `useTheme()` — Returns `{ theme, setTheme, themes, customOverrides, setCustomOverrides }`
+- `useTheme()` — Returns `{ preset, overrides, currentVars, customPresets, activeCustomName, applyPreset, applyCustomPreset, saveCustomPreset, deleteCustomPreset, setVar, resetVar, resetOverrides, diceTheme, setDiceTheme, setDiceThemeCustom, setDiceThemeVar, customDicePresets, saveCustomDicePreset, deleteCustomDicePreset }`
 
-### DiceContext.jsx (~130 lines)
+### DiceContext.jsx (~152 lines)
 Manages 3D dice rolling as an async operation with global force settings.
 
 **How it works:**
-- Provides `rollDice3D(formula)` function that returns a Promise
+- Provides `rollDice3D(dice, label?)` function that returns a Promise
+  - `dice`: Array of `{die, sides}` objects OR shorthand string like `'2d8'`, `'1d20+3'`, `'1d8 + 2d6'`
+  - `label`: Optional string shown while rolling (e.g., "Fire Bolt -- Damage")
 - Creates a Dice3D canvas overlay when rolling
 - Resolves with `{ results: [{die,sides,value},...], total: number }`
 - Handles roll queue (one roll at a time)
@@ -50,24 +56,25 @@ Each force level adjusts: linear damping, angular damping, restitution (bouncine
 
 ## Hooks
 
-### useCharacterSync.js (~276 lines)
+### useCharacterSync.js (~275 lines)
 Local-first character data management.
 
 **API:**
 ```js
-const { char, setChar, loading, error } = useCharacter(id, { syncEnabled: true });
+const { char, loading, syncing, syncError, setChar, updateField, updateHp, forceSync } = useCharacter(id, { syncEnabled: false });
 ```
+> **In the shipped app `syncEnabled` is `false`.** The only call site is `CharacterSheet.jsx` (~line 74), which passes `{ syncEnabled: false }` — characters are local-only (the sync toggle was removed in v1.1.0). The debounced server-sync flow below is retained plumbing that does not run. **Caveat:** `updateHp()` still fires `PATCH /api/characters/:id/hp` unconditionally (it never checks `syncEnabled`), so an HP change attempts a background server write even with sync off.
 
-**Flow:**
+**Flow (only when `syncEnabled: true`, which the app never sets):**
 1. Reads character from `localStorage` key `ond-char-{id}`
 2. If not found locally, fetches from server `/api/characters/{id}`
 3. On `setChar(newData)`, updates localStorage immediately
-4. Debounced (2 second) sync to server in background
+4. Debounced (1.5 second) sync to server in background
 5. If server unavailable, character still works from localStorage
 
 **Character List:**
 ```js
-const { characters, loading, refresh, deleteCharacter } = useCharacterList();
+const { characters, loading, deleteCharacter } = useCharacterList();
 ```
 - Reads all `ond-char-*` keys from localStorage
 - Falls back to server API with 3 second timeout
@@ -75,83 +82,122 @@ const { characters, loading, refresh, deleteCharacter } = useCharacterList();
 
 **Create Character:**
 ```js
-const id = await createCharacter(charData);
+const { ok, data } = await createCharacter(charData);
 ```
-- Generates `local-{uuid}` ID
+- Tries server first with 3 second timeout
+- Falls back to local-only: generates `local-{timestamp}-{random}` ID
 - Saves to localStorage
-- Attempts server sync with 3 second timeout
+- Returns `{ ok: true, data: createdCharacter }`
 
 ---
 
 ## Utilities
 
-### dndConstants.js (~500+ lines)
+### dndConstants.js (~268 lines)
 Static D&D 5e reference data.
 
 **Exports:**
-- `ABILITIES` — ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-- `SKILLS` — Array of {name, ability} for all 18 skills
+- `ABILITIES` — ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'] (lowercase)
+- `ABBR` — Maps lowercase ability names to abbreviations: `{ strength: 'STR', ... }`
 - `ALIGNMENTS` — 9 alignments from Lawful Good to Chaotic Evil
 - `XP_THRESHOLDS` — XP needed per level (0, 300, 900, ...)
+- `STANDARD_ARRAY` — [15, 14, 13, 12, 10, 8]
+- `ALL_SKILLS` — Array of 18 skill name strings
+- `SKILLS_WITH_ABILITY` — Array of {name, ability} for all 18 skills
+- `HIT_DICE` — Maps class name to hit die string (e.g., `{ Barbarian: 'd12', ... }`)
+- `RARITY_COLORS` — Maps rarity string to CSS color
+- `RARITY_ORDER` — Maps rarity string to sort order number
+- `TOOL_OPTIONS` — Array of all tool proficiency strings
 - `FEATS` — All PHB feats with name, prereq, desc
-- `LANGUAGES` — Standard and exotic languages
-- `BACKGROUNDS` — All 13 PHB backgrounds with proficiencies, equipment, features
-- `ARMOR_CATEGORIES` — Light, Medium, Heavy armor groupings
-- `RARITIES` — common, uncommon, rare, very-rare, legendary, artifact
-- `CONDITIONS` — All D&D conditions with descriptions and mechanical effects
-- `POINT_BUY_COSTS` — Ability score point buy cost table
+- `ALL_LANGUAGES` — Standard and exotic languages
+- `BACKGROUNDS` — All 13 PHB backgrounds with skills, tools, languages, feature, equipment
+- `CANTRIPS_KNOWN` — Per-class cantrip count by level (20-element arrays)
+- `SPELLS_KNOWN` — Per-class spells known by level (Bard, Sorcerer, Warlock, Ranger)
+- `MULTICLASS_REQS` — Ability score prerequisites for multiclassing
+- `RACIAL_SPELL_MAP` — Maps race to racial spell lookup key functions
+- `RACIAL_SKILL_CHOICES` — Races with skill choice options (Kenku, Lizardfolk, etc.)
+- `RACIAL_TOOL_CHOICES` — Races with tool choice options (Warforged)
+- `KOBOLD_LEGACY_OPTIONS` — Kobold legacy trait choices
+- `FIGHTING_STYLES` — All 6 fighting styles with descriptions
+- `FIGHTING_STYLE_CLASSES` — Which classes get fighting styles and at what level
+- `CLASS_RECOMMENDED_GEAR` — Default starting equipment per class
+- `ARMORS` — All armor types with category, base AC, stealth disadvantage, and STR requirement (only heavy armors carry a `strReq`; light/medium omit it, defaulting to 0)
+- `PB_COSTS` — Point buy cost table: `{ 8: 0, 9: 1, ..., 15: 9 }`
 - `WEAPON_MASTERIES` — All 8 weapon mastery types with descriptions (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex)
 - `WEAPON_MASTERY_MAP` — Maps each base weapon name to its mastery type (e.g., Greatsword → Graze, Dagger → Nick)
 - `WEAPON_MASTERY_CLASSES` — Classes with Weapon Mastery feature and mastery slot progression per level (Fighter, Barbarian, Rogue, Paladin, Ranger, Monk)
 
-### dndHelpers.js (~200+ lines)
+### dndHelpers.js (~106 lines)
 Calculation and formatting helpers.
 
 **Key Functions:**
-- `abilityMod(score)` — Returns ability modifier: `Math.floor((score - 10) / 2)`
-- `profBonus(level)` — Returns proficiency bonus: `Math.ceil(level / 4) + 1`
-- `spellSlots(className, level)` — Returns spell slot array by class and level
-- `hpColor(current, max)` — Returns CSS color: green→yellow→red based on HP %
-- `armorCategory(name)` — Returns 'light'/'medium'/'heavy' for armor name
-- `formatModifier(n)` — Returns "+2" or "-1" format
-- `calcPassivePerception(wis, proficient, level)` — 10 + WIS mod + prof bonus
-- `xpForLevel(level)` — XP threshold for given level
-- `levelForXP(xp)` — Current level for given XP total
+- `modVal(score)` — Returns ability modifier: `Math.floor((score - 10) / 2)`
+- `modStr(score)` — Returns formatted modifier string: "+2" or "-1"
+- `profBonus(lvl)` — Returns proficiency bonus: `Math.ceil(lvl / 4) + 1`
+- `xpForLevel(lvl)` — XP threshold for given level
+- `rarityColor(r)` — Returns CSS color for item rarity
+- `rarityBg(r)` — Returns tinted background color for item rarity
+- `hpColor(current, max)` — Returns CSS variable (`var(--hp-bar)`, `var(--hp-low)`, `var(--hp-crit)`) based on HP %
+- `maxSpellLevel(cls, lvl)` — Returns highest spell level available for a class at a given level
+- `getSpellInfo(cls, lvl, abilityMod, CLASSES)` — Returns full spell slot info (slots per level, DC, attack bonus, cantrips known)
+- `getArmorCategories(armorProfStr)` — Parses armor proficiency string into category array
+- `canUseShield(armorProfStr)` — Checks if proficiency string includes shields
+- `countLangExtras(langArray)` — Counts extra language slots from racial traits
 
-### classData.js (~300+ lines)
+### classData.js (~430 lines)
 Race and class definitions.
 
 **RACES Object:**
-Each race has: abilityBonuses, speed, size, traits, languages, subraces
+Each race has: desc, bonuses, speed, traits, languages, subraces
 ```js
 RACES['Dwarf'] = {
-  abilityBonuses: { CON: 2 },
+  desc: 'Stout and hardy folk...',
+  bonuses: { constitution: 2 },
   speed: 25,
-  traits: ['Darkvision', 'Dwarven Resilience', ...],
+  traits: ['Darkvision 60ft', 'Dwarven Resilience', ...],
+  languages: ['Common', 'Dwarvish'],
   subraces: {
-    'Hill Dwarf': { abilityBonuses: { WIS: 1 }, traits: ['Dwarven Toughness'] },
-    'Mountain Dwarf': { abilityBonuses: { STR: 2 }, traits: ['Dwarven Armor Training'] }
+    'Hill Dwarf': { bonuses: { wisdom: 1 }, traits: ['Dwarven Toughness (+1 HP/level)'] },
+    'Mountain Dwarf': { bonuses: { strength: 2 }, traits: ['Dwarven Armor Training (light & medium)'] }
   }
 }
 ```
 
-**CLASS_DATA Object:**
-Each class has: hitDie, savingThrows, skillChoices, numSkills, armor/weapon proficiencies, subclassLevel, subclasses
+**CLASSES Object:**
+Each class has: desc, hitDice, hpBase, primaryAbility, armorProf, weaponProf, savingThrows, skillChoices, numSkills, subclasses, subclassLevel, subclassDescs, spellcasting, spellcastingAbility, features, equipment (and toolProf for Artificer)
 ```js
-CLASS_DATA['Fighter'] = {
-  hitDie: 10,
-  savingThrows: ['STR', 'CON'],
+CLASSES['Fighter'] = {
+  desc: 'A master of martial combat...',
+  hitDice: 'd10', hpBase: 10,
+  primaryAbility: 'strength',
+  armorProf: 'All armor, shields',
+  weaponProf: 'Simple weapons, martial weapons',
+  savingThrows: ['strength', 'constitution'],
   numSkills: 2,
   skillChoices: ['Acrobatics', 'Athletics', ...],
   subclassLevel: 3,
-  subclasses: ['Champion', 'Battle Master', 'Eldritch Knight']
+  subclasses: ['Champion', 'Battle Master', 'Eldritch Knight'],
+  subclassDescs: { 'Champion': '...', ... },
+  spellcasting: false,
+  features: ['Fighting Style — ...', 'Second Wind — ...'],
+  equipment: ['(a) chain mail or (b) leather...'],
 }
 ```
 
-**CLASS_LEVELS Object:**
-Features gained at each level per class.
+**Additional classData.js exports:**
+- `getSpellSlots(className, level)` — Returns spell slot array or Warlock pact object
+- `getExtraAttacks(className, level)` — Returns number of extra attacks
+- `RACE_DEFENSES` — Racial resistances/immunities
+- `getClassDefenses(className, level, subclass)` — Returns class-based resistances
+- `SAVING_THROWS_BY_CLASS` — Maps class name to saving throw proficiency array
 
-### levelChoices.js (~200+ lines)
+**CLASS_LEVELS Object:**
+Features gained at each level per class. Values are arrays of strings.
+```js
+CLASS_LEVELS['Fighter'] = { 1: ['Fighting Style', 'Second Wind'], 2: ['Action Surge'], ... }
+```
+
+### levelChoices.js (~219 lines)
 Data for class progression choices.
 
 **Exports:**
@@ -159,23 +205,28 @@ Data for class progression choices.
 - `ELDRITCH_INVOCATIONS` — Warlock invocation options with prerequisites
 - `PACT_BOONS` — Pact of the Blade/Chain/Tome descriptions
 - `MANEUVERS` — Battle Master maneuver options with descriptions
-- `FIGHTING_STYLES` — Fighting style options for Fighter/Paladin/Ranger
-- `getLevelChoices(className, level, char)` — Returns available choices for a class at a given level
+- `TOTEM_SPIRITS` — Totem Warrior spirit choices by level (3, 6, 14)
+- `HUNTER_OPTIONS` — Hunter subclass feature choices by level (3, 7, 11, 15)
+- `LAND_TERRAINS` — Circle of the Land terrain options with bonus spells
+- `FAVORED_ENEMIES` — Ranger favored enemy options
+- `FAVORED_TERRAINS` — Ranger favored terrain options
+- `getLevelChoices(cls, level, subclass)` — Returns available choices for a class at a given level
 
-### subclassFeatures.js (~500+ lines)
+Note: `FIGHTING_STYLES` and `FIGHTING_STYLE_CLASSES` are in `dndConstants.js`, not here.
+
+### subclassFeatures.js (~299 lines)
 Detailed subclass feature descriptions per level.
 
 **Structure:**
 ```js
-SUBCLASS_FEATURES['Fighter']['Champion'] = {
-  3: [{ name: 'Improved Critical', desc: 'Your weapon attacks crit on 19-20' }],
-  7: [{ name: 'Remarkable Athlete', desc: '...' }],
-  10: [{ name: 'Additional Fighting Style', desc: '...' }],
+SUBCLASS_FEATURES['Champion'] = {
+  3: { name: 'Improved Critical', desc: 'Your weapon attacks crit on 19-20' },
+  7: { name: 'Remarkable Athlete', desc: '...' },
+  10: { name: 'Additional Fighting Style', desc: '...' },
   ...
 }
 ```
-
-Covers all PHB subclasses for all 12 classes.
+Keyed by subclass name directly (not nested under class). Each level maps to a single `{name, desc}` object (not an array). Covers all PHB subclasses for all 12 classes.
 
 ---
 
@@ -185,7 +236,10 @@ Covers all PHB subclasses for all 12 classes.
 Query functions for bundled JSON data.
 
 **Functions:**
-- `queryLocalEquipment({ category, search, rarity })` — Filter equipment.json
-- `queryLocalSpells({ level, school, search, cls })` — Filter spells.json
+- `queryLocalEquipment({ category, subcategory, search, rarity })` — Filter equipment.json (sorted by category → subcategory → name)
+- `queryLocalSpells({ level, school, cls, search, source, sourceRace })` — Filter spells.json (`sourceRace` accepts a string or array; used for racial spell-like abilities)
+- `getLocalEquipmentByName(name)` — Exact-name lookup, returns the item or `null`
+- `getAllLocalSpells()` — Full spells.json array
+- `getAllLocalEquipment()` — Full equipment.json array
 
-Both return filtered arrays matching the provided criteria. Used when data source is "Local" (default).
+The query functions return filtered arrays matching the provided criteria. Used by the Spells and Equipment pages for browsing, and by `CharacterSheet.jsx` (via `getLocalEquipmentByName` / `getAllLocalSpells`) for inventory and spell resolution.

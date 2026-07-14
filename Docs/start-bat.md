@@ -24,16 +24,15 @@ User double-clicks start.bat
 │  │  └─ Yes → git reset --hard origin/main, relaunch
 │  └─ Up to date → Continue
 │
-├─ Install dependencies if needed
-│  ├─ server/node_modules missing? → npm install in server/
-│  └─ client/node_modules missing? → npm install in client/
+├─ Install dependencies (always runs npm install in both server/ and client/)
 │
-├─ Start Express server (node server.js) in background
-├─ Wait 3 seconds for server startup
-├─ Start Vite dev server (npx vite) in foreground
+├─ Start Express server (node server.js) in new window
+├─ Wait 2 seconds for server startup
+├─ Start Vite dev server (npx vite) in new window
+├─ Wait 5 seconds, then open browser to http://localhost:5173
 │
-└─ Window stays open (never auto-closes)
-    Press Ctrl+C or close window to stop
+└─ Launcher window shows status and waits for keypress to exit
+    Server and client run in their own windows
 ```
 
 ## Key Features
@@ -41,7 +40,7 @@ User double-clicks start.bat
 - **Auto-updates**: Checks GitHub for new commits on every launch
 - **Safe directory**: Adds git safe.directory config to avoid Windows permission errors
 - **Never closes**: Wraps everything in error handling so the window stays open for debugging
-- **Relaunch pattern**: After installing Node/Git, uses `start "" "%~f0"` to relaunch itself
+- **Relaunch pattern**: After installing Node/Git, uses `goto START` loop to retry checks
 
 ## For Users
 1. Download `start.bat` from the repo (or receive from DM)

@@ -64,16 +64,17 @@ const data = queryLocalEquipment(filters);
 
 ### Character Data Updates
 ```js
-const { char, setChar } = useCharacter(id);
+const { char, setChar, updateField, updateHp } = useCharacter(id);
 // Always spread to create new object
 setChar({ ...char, currentHp: newHp });
+// Or use updateField/updateHp for specific updates
 // Never mutate char directly
 ```
 
 ### 3D Dice Rolls
 ```js
 const { rollDice3D, diceForce, setDiceForce } = useDice();
-const { results, total } = await rollDice3D('2d6+3');
+const { results, total } = await rollDice3D('2d6+3', 'Greatsword — Damage');
 // results = [{die:'d6',sides:6,value:4}, {die:'d6',sides:6,value:2}], total = 9
 // diceForce is global (1-4) and applies to ALL rolls automatically
 // Change force: setDiceForce(3) — persists to localStorage
@@ -97,6 +98,9 @@ style={{ color: rarityColor(item.rarity), background: rarityBg(item.rarity) }}
 
 ## Architecture Gotchas
 
+### CharacterEdit Server + Local Fallback
+`CharacterEdit.jsx` is server-oriented (`fetch` on load, `PUT` on save against `/api/characters/:id`) but falls back to `localStorage` (`ond-char-{id}`): load tries the server then the local copy; local-only characters (id prefixed `local-`) read straight from localStorage. Save always writes the merged local copy first — `{ ...char, ...body }`, mirroring the server's `{...existing, ...body}` merge so fields the edit form doesn't manage (spell slots, conditions, etc.) survive — then PUTs for non-local ids, tolerating an offline server. **Rule:** when a page can operate on `local-`prefixed characters, always provide a localStorage path; never assume a server file exists. (Earlier this page had no fallback and 404'd on local-only characters.) Separately, `useCharacterSync`'s server-sync is disabled app-wide (`CharacterSheet` calls it with `syncEnabled: false`), yet the hook's `updateHp()` still PATCHes `/api/characters/:id/hp` unconditionally.
+
 ### Express JSON Limit
 `express.json({ limit: '10mb' })` is required because character data includes base64 portrait images. Default 100KB limit causes `PayloadTooLargeError`.
 
@@ -108,14 +112,21 @@ In dev mode, the Vite dev server proxies `/api/*` requests to `localhost:3001`. 
 
 ### localStorage Keys
 - `ond-char-{id}` — Character data
-- `ond-characters-list` — Character ID index
+- `ond-char-index` — Character ID index. Written by `createCharacter`'s local fallback, but the character list is actually rebuilt by scanning `ond-char-` prefixed keys, so this index is effectively **write-only / dead** — don't rely on it.
 - `ond-homebrew` — Array of homebrew items
-- `ond-theme` — Theme preset name
-- `ond-data-source` — 'local' or 'db' (deprecated, always local now)
-- `ond-widget-layout-{charId}` — Widget positions per character
-- `ond-widget-cols` — Column count setting (2/3/4)
+- `ond-theme` — Theme state object `{ preset, overrides, activeCustomName }`
+- `ond-data-source` — 'local' or 'db' (defaults to local; controls spells/equipment data source)
+- `ond-custom-presets` — Custom UI theme presets
+- `ond-dice-theme` — Dice theme selection and settings
+- `ond-custom-dice-presets` — Custom dice theme presets
+- `ond-layout-{charId}` — Widget layout/positions, per character
+- `ond-columns-{charId}` — Column count, per character (default 2)
+- `ond-sidebar-{charId}` — Side-panel width in px, per character (default 340)
+- `ond-tab-{charId}` — Last active character-sheet tab, per character
 - `ond-last-character` — Last viewed character ID
 - `ond-dice-force` — Dice throw force level (1-4, default 2)
+- `ond-db-uri` — Cached MongoDB URI shown in the Settings UI
+- `ond-player-name` — Player display name used for campaign join / roll-log attribution
 
 ### Heavy Armor AC
 Heavy armor does NOT add DEX modifier. The `calcAC` useMemo must check subcategory. Subcategory strings are inconsistent — DB has "Heavy Armor" but local data may use "heavy". Always do case-insensitive matching with `.toLowerCase().includes('heavy')`.
