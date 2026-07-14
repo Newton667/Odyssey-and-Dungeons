@@ -30,6 +30,17 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ---
 
+## v1.1.1 — 2026-07-14
+
+### Added
+- **Changelog modal** — Changelog button on home page opens a modal showing all version history with themed markdown rendering
+- **Version number restyled** — Version badge now matches button styling, more visible
+
+### Fixed
+- **Changelog theming** — Modal and markdown renderer use CSS variables instead of hardcoded colors, follows active UI theme
+
+---
+
 ## v1.1.0 — 2026-07-14
 
 ### Added
