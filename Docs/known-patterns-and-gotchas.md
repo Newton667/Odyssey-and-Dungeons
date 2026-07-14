@@ -30,12 +30,19 @@
 
 **Fix:** Always extract the name: `typeof f === 'string' ? f : f.name`
 
-### 5. Feat Objects vs Strings in Progression Choices
-**Problem:** `char.levelChoices` can store full feat option objects `{name, desc, prereq}` instead of just name strings. When `selectedArr.join(', ')` renders these objects as React children, it crashes.
+### 5. Feat Objects vs Strings — Multiple Sources
+**Problem:** `{prereq, desc}` objects leak into React rendering from multiple sources:
+1. `Object.entries(FEATS)` returns `[name, {prereq, desc}]` — destructuring as `[name, desc]` gives the whole object
+2. `char.feats` array can contain objects from old saves instead of name strings
+3. `char.features` array can contain objects instead of strings
+4. `char.levelChoices` can store full option objects
 
-**Fix:** Normalize selections with `typeof s === 'object' ? s.name : s` before rendering. Applied in `getSelected()` normalization.
+**Fix:**
+- When iterating `FEATS`, destructure as `[name, featInfo]` and access `featInfo.desc`
+- Always check `typeof value === 'string'` before rendering feat data
+- Normalize arrays with `typeof f === 'object' ? f.name : f` before rendering
 
-**Rule:** Always normalize `levelChoices` values to strings before rendering. Use the `normalizeSelection` helper.
+**Rule:** Never render any value from feat/feature arrays without checking its type first. Always extract string fields explicitly.
 
 ### 6. Equipment Seed Script Wipes Everything
 **Problem:** `seed-equipment.js` had `deleteMany({})` which deleted ALL equipment including magic items from `seed-magic-items.js`.

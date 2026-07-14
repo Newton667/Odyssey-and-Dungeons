@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useDice } from '../context/DiceContext';
 
 const TYPES = [
   { key: 'weapon', label: 'Weapon' },
@@ -21,7 +22,15 @@ const DICE = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 const AMMO_TYPES = ['Arrow', 'Bolt', 'Bullet', 'Needle', 'Custom'];
 
 // Dice formula builder component
-function DiceFormulaBuilder({ value, onChange }) {
+function DiceFormulaBuilder({ value, onChange, label }) {
+  const { rollDice3D } = useDice();
+  const [lastRoll, setLastRoll] = useState(null);
+
+  const testRoll = async () => {
+    if (!value) return;
+    const { results, total } = await rollDice3D(value, label || 'Test Roll');
+    setLastRoll({ results, total });
+  };
   // Parse existing formula like "2d8+3" into parts
   const parseFormula = (str) => {
     const parts = [];
@@ -97,10 +106,43 @@ function DiceFormulaBuilder({ value, onChange }) {
   return (
     <div>
       <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Damage Formula</label>
-      {/* Preview */}
-      <div style={{ padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', marginBottom: '8px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: 'var(--gold)', minHeight: '32px' }}>
-        {value || <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '13px' }}>Click dice below to build formula</span>}
+      {/* Preview + Roll Test */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ flex: 1, padding: '8px 12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', fontFamily: 'monospace', fontSize: '16px', fontWeight: 700, color: 'var(--gold)', minHeight: '32px', display: 'flex', alignItems: 'center' }}>
+          {value || <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '13px' }}>Click dice below to build formula</span>}
+        </div>
+        {value && (
+          <button type="button" onClick={testRoll} style={{
+            padding: '8px 14px', borderRadius: '6px', cursor: 'pointer',
+            background: 'var(--gold)', border: 'none', color: 'var(--bg-dark)',
+            fontFamily: 'Cinzel, serif', fontWeight: 700, fontSize: '12px',
+            whiteSpace: 'nowrap',
+          }}>
+            Test Roll
+          </button>
+        )}
       </div>
+      {lastRoll && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', borderRadius: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-dim)', fontFamily: 'monospace' }}>
+            {lastRoll.results.map((r, i) => (
+              <span key={i}>
+                {i > 0 && ' + '}
+                <span style={{ color: r.value === r.sides ? 'var(--gold)' : r.value === 1 ? '#f87171' : 'var(--text)' }}>
+                  {r.value}
+                </span>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>({r.die})</span>
+              </span>
+            ))}
+            {lastRoll.bonus !== 0 && (
+              <span style={{ color: 'var(--text)' }}> {lastRoll.bonus >= 0 ? '+' : '−'} {Math.abs(lastRoll.bonus)}</span>
+            )}
+          </span>
+          <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>
+            = {lastRoll.total}
+          </span>
+        </div>
+      )}
       {/* Dice buttons */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
         {DICE.map(die => {
@@ -138,19 +180,27 @@ function DiceFormulaBuilder({ value, onChange }) {
         )}
       </div>
       {/* Manual override */}
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder="Or type manually: 2d8+1d6+3"
+      <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px', marginTop: '4px' }}>Or type manually:</div>
+      <input value={value} onChange={e => { onChange(e.target.value); setLastRoll(null); }} placeholder="2d8+1d6+3"
         style={{ width: '100%', padding: '6px 10px', fontSize: '12px', fontFamily: 'monospace', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '4px', color: 'var(--text)' }} />
     </div>
   );
 }
 
+const SAVE_ABILITIES = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
+const ATTACK_TYPES = ['melee', 'ranged'];
+const AOE_SHAPES = ['Sphere', 'Cone', 'Cube', 'Cylinder', 'Line', 'Square', 'Wall'];
+const GEAR_SUBS = ['Adventuring Gear', 'Ammunition', 'Holy Symbol', 'Arcane Focus', 'Druidic Focus', 'Potion', 'Scroll', 'Wondrous Item', 'Other'];
+
 const EMPTY_FORM = {
   type: 'weapon', name: '', description: '', rarity: 'common', category: 'weapon', subcategory: '',
   cost: '', weight: '', damage: '', damageType: '', properties: [], ac: '', magical: false, bonus: 0,
   ammoType: '', stackSize: 20, requiresAttunement: false,
+  stealthDisadvantage: false, strReq: '',
   level: 0, school: '', castingTime: '1 Action', range: '', components: [], materialComponent: '',
   duration: 'Instantaneous', concentration: false, ritual: false, classes: [],
   attackType: '', savingThrow: '', saveEffect: '', higherLevels: '', scaling: '',
+  aoe: false, aoeShape: '', aoeSize: '',
 };
 
 export default function Homebrew() {
@@ -374,7 +424,7 @@ export default function Homebrew() {
               </div>
               {/* Dice formula builder for weapon damage */}
               <div style={{ marginBottom: '14px' }}>
-                <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} />
+                <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} label={`${form.name || 'Homebrew'} — Damage`} />
               </div>
             </>
           )}
@@ -405,15 +455,26 @@ export default function Homebrew() {
                 </select>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>AC</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Base AC</label>
                 <input value={form.ac} onChange={e => f('ac', e.target.value)} placeholder="15" />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Bonus (+1/+2/+3)</label>
+                <input type="number" min={0} max={3} value={form.bonus} onChange={e => f('bonus', parseInt(e.target.value) || 0)} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>STR Requirement</label>
+                <input type="number" min={0} value={form.strReq} onChange={e => f('strReq', e.target.value)} placeholder="0" />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                   <input type="checkbox" checked={form.magical} onChange={e => f('magical', e.target.checked)} /> Magical
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                   <input type="checkbox" checked={form.requiresAttunement} onChange={e => f('requiresAttunement', e.target.checked)} /> Attunement
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                  <input type="checkbox" checked={form.stealthDisadvantage} onChange={e => f('stealthDisadvantage', e.target.checked)} /> Stealth Disadvantage
                 </label>
               </div>
             </div>
@@ -447,11 +508,32 @@ export default function Homebrew() {
               {/* Extra damage for magical ammo */}
               {form.damage !== undefined && (
                 <div style={{ marginBottom: '14px' }}>
-                  <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} />
+                  <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} label={`${form.name || 'Homebrew'} — Damage`} />
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Extra damage added when this ammo is used (e.g., +1d6 fire for flame arrows)</div>
                 </div>
               )}
             </>
+          )}
+
+          {/* Item / Gear fields */}
+          {form.type === 'item' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Subcategory</label>
+                <select value={form.subcategory} onChange={e => f('subcategory', e.target.value)}>
+                  <option value="">Select...</option>
+                  {GEAR_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                  <input type="checkbox" checked={form.magical} onChange={e => f('magical', e.target.checked)} /> Magical
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                  <input type="checkbox" checked={form.requiresAttunement} onChange={e => f('requiresAttunement', e.target.checked)} /> Attunement
+                </label>
+              </div>
+            </div>
           )}
 
           {/* Spell fields */}
@@ -491,15 +573,58 @@ export default function Homebrew() {
                     {DAMAGE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Attack Type</label>
+                  <select value={form.attackType} onChange={e => f('attackType', e.target.value)}>
+                    <option value="">None</option>
+                    {ATTACK_TYPES.map(a => <option key={a} value={a}>{a.charAt(0).toUpperCase() + a.slice(1)} Spell Attack</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Saving Throw</label>
+                  <select value={form.savingThrow} onChange={e => f('savingThrow', e.target.value)}>
+                    <option value="">None</option>
+                    {SAVE_ABILITIES.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                {form.savingThrow && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Save Effect</label>
+                    <input value={form.saveEffect} onChange={e => f('saveEffect', e.target.value)} placeholder="Half damage" />
+                  </div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingTop: '20px', flexWrap: 'wrap' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                     <input type="checkbox" checked={form.concentration} onChange={e => f('concentration', e.target.checked)} /> Conc.
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                     <input type="checkbox" checked={form.ritual} onChange={e => f('ritual', e.target.checked)} /> Ritual
                   </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                    <input type="checkbox" checked={form.aoe} onChange={e => { f('aoe', e.target.checked); if (!e.target.checked) { f('aoeShape', ''); f('aoeSize', ''); } }} /> AOE
+                  </label>
                 </div>
               </div>
+
+              {/* AOE Details */}
+              {form.aoe && (
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '14px', alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Shape</label>
+                    <select value={form.aoeShape} onChange={e => f('aoeShape', e.target.value)}>
+                      <option value="">Select...</option>
+                      {['Sphere', 'Cone', 'Cube', 'Cylinder', 'Line', 'Square', 'Wall'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Size (ft)</label>
+                    <input type="number" value={form.aoeSize} onChange={e => f('aoeSize', e.target.value)} placeholder="20" style={{ width: '80px' }} />
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-dim)', paddingBottom: '6px' }}>
+                    {form.aoeShape && form.aoeSize ? `${form.aoeSize}-foot ${form.aoeShape.toLowerCase()}` : ''}
+                  </div>
+                </div>
+              )}
 
               {/* Components */}
               <div style={{ marginBottom: '14px' }}>
@@ -531,7 +656,7 @@ export default function Homebrew() {
 
               {/* Dice formula builder for spell damage */}
               <div style={{ marginBottom: '14px' }}>
-                <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} />
+                <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} label={`${form.name || 'Homebrew'} — Damage`} />
               </div>
 
               {/* Upcast scaling */}
@@ -540,7 +665,7 @@ export default function Homebrew() {
                   <label style={{ fontSize: '12px', color: 'var(--gold)', textTransform: 'uppercase', display: 'block', marginBottom: '8px', fontWeight: 600 }}>Upcast Scaling (per level above base)</label>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Add</span>
-                    <DiceFormulaBuilder value={form.scaling} onChange={v => f('scaling', v)} />
+                    <DiceFormulaBuilder value={form.scaling} onChange={v => f('scaling', v)} label={`${form.name || 'Homebrew'} — Scaling`} />
                     <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>per slot level above {form.level}</span>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '6px' }}>
@@ -548,6 +673,19 @@ export default function Homebrew() {
                   </div>
                 </div>
               )}
+
+              {/* Classes */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Spell Lists (Classes)</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                  {CLASSES.map(c => (
+                    <button key={c} type="button" onClick={() => toggleArrayField('classes', c)}
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: (form.classes || []).includes(c) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${(form.classes || []).includes(c) ? 'var(--gold)' : 'var(--border)'}`, color: (form.classes || []).includes(c) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Higher Levels */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>

@@ -2,6 +2,57 @@
 
 All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
+<!-- NOTE FOR CLAUDE: Follow these rules after EVERY change:
+
+     1. CHANGELOG: After any bug fix or feature, add it to the "## vX.X.X — Unreleased"
+        section under the appropriate heading (### Added, ### Changed, ### Fixed, ### Removed).
+        When a version is finalized and pushed, rename the Unreleased section to the version
+        number + date, then re-add a fresh "## vX.X.X — Unreleased" section above it.
+        Also update client/src/version.js to match the new version number.
+
+     2. DOCS: After any bug fix or feature, update the relevant Docs/ files:
+        - architecture.md — If project structure, data flow, or design decisions change
+        - client-pages.md — If any page component gains new features, tabs, or systems
+        - client-components.md — If any component's props, behavior, or purpose changes
+        - client-context-hooks-utils.md — If context providers, hooks, or utility functions change
+        - server.md — If server endpoints, models, routes, or seed scripts change
+        - styles-and-theming.md — If CSS variables, theme system, or styling patterns change
+        - known-patterns-and-gotchas.md — If a new bug pattern is discovered and fixed, or a
+          new coding pattern should be followed. This is the most important doc to keep current.
+        - start-bat.md — If the launcher script changes
+
+     3. WHAT TO UPDATE: Only update docs that are directly affected by the change.
+        Don't update every doc for every change. Match the scope. -->
+
+---
+
+## vX.X.X — Unreleased
+
+---
+
+## v1.1.0 — 2026-07-14
+
+### Added
+- **Spell AOE data** — 158 spells tagged with area of effect info (shape, size); auto-extracted from descriptions (Sphere, Cone, Cube, Cylinder, Line, Square, Wall)
+- **AOE in Homebrew** — Spell creator has AOE checkbox with shape dropdown and size input
+- **AOE display** — Blue AOE badge on Spells page; AOE info panel in CharacterSheet spell side panel
+- **Homebrew test rolls** — DiceFormulaBuilder now has a "Test Roll" button that rolls the formula with 3D dice and shows full equation inline
+- **Multi-modifier formula parsing** — `1d20+5+3-2` now correctly sums all modifiers (= +6)
+- **Full homebrew spell customization** — Added attack type (melee/ranged), saving throw (STR-CHA), save effect, damage type, and class spell lists to spell creator
+- **Full homebrew armor customization** — Added bonus (+1/+2/+3), STR requirement, stealth disadvantage to armor creator
+- **Homebrew item/gear section** — Added subcategory (Adventuring Gear, Potion, Scroll, Wondrous Item, etc.), magical, and attunement fields
+- **All homebrew fields compatible with share codes** — Import/export automatically includes all new fields
+- **Weapon Masteries** — 2024 PHB weapon mastery system (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex) with purple badge on weapon attacks and full descriptions in side panel
+
+### Changed
+- **Characters are now local only** — Removed sync toggle from Characters page and Character Sheet; all character data stays in localStorage
+- **Dice physics revamp** — More tumbling, bounce, and spin across all force levels; relaxed settle detection for natural roll-out
+- **Global dice force** — Force setting (Gentle/Normal/Strong/Mighty) moved to DiceContext; applies to ALL rolls (saves, attacks, manual), persists to localStorage
+
+### Fixed
+- **Feat object crash (Features tab)** — `Object.entries(FEATS)` destructured as `[name, desc]` where `desc` was the whole `{prereq, desc}` object, not the description string. Fixed by extracting `featInfo.desc` properly. Also hardened all feat/feature rendering in CharacterSheet and CharacterEdit to normalize objects to strings.
+- **Null safety fixes** — Added guards for `toLowerCase()` calls on potentially null strings in CharacterCreate (language filter, tool proficiency) and CharacterSheet (weapon name access in actions and side panel)
+
 ---
 
 ## v1.0.0 — 2026-07-14

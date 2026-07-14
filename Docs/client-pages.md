@@ -90,6 +90,7 @@ Spell browser/reference page.
 - Expandable spell cards with full details
 - Roll buttons for damage/healing spells (3D dice)
 - Rarity coloring for magical spells
+- Blue AOE badge showing shape and size (e.g., "AOE: 20ft Sphere")
 
 ## Equipment.jsx (~621 lines)
 Equipment browser/reference page.
@@ -103,11 +104,20 @@ Equipment browser/reference page.
 ## Homebrew.jsx (~650 lines)
 Custom content creator.
 - Create: spells, weapons, armor, items, ammo
-- **DiceFormulaBuilder** — Visual dice formula creator (choose die type + count + modifier)
-- **Share System** — Export to base64 string, import from pasted string
-- Each type has appropriate fields (e.g., weapons have damage/properties, spells have level/school/components)
+- **DiceFormulaBuilder** — Visual dice formula creator (choose die type + count + modifier) with "Test Roll" button that rolls the formula using 3D dice and shows the full equation inline
+- **Share System** — Export to base64 string, import from pasted string. All fields included automatically.
 - All data saved to localStorage (`ond-homebrew` key)
 - Homebrew items appear in Spells/Equipment browsers and character sheet
+
+**Spell fields:** Level, school, casting time, range, duration, damage type, attack type (melee/ranged), saving throw (STR-CHA) + save effect, concentration, ritual, AOE (shape + size), components (V/S/M + material), classes (multi-select), damage formula + scaling, higher levels description
+
+**Weapon fields:** Subcategory (Simple/Martial Melee/Ranged), damage formula + type, bonus (+1/+2/+3), ammo type, properties (Finesse/Heavy/Light/etc.), magical, attunement
+
+**Armor fields:** Type (Light/Medium/Heavy/Shield), base AC, bonus (+1/+2/+3), STR requirement, stealth disadvantage, magical, attunement
+
+**Item/Gear fields:** Subcategory (Adventuring Gear/Potion/Scroll/Wondrous Item/etc.), magical, attunement
+
+**Ammo fields:** Ammo type, stack size, bonus, magical, extra damage formula
 
 ## Campaigns.jsx (~156 lines)
 Campaign list page.

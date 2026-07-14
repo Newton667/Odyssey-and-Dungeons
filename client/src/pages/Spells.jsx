@@ -323,6 +323,7 @@ export default function Spells() {
                       }}>{levelLabel(s.level)}</span>
                       {s.concentration && <span style={badgeStyle}>Concentration</span>}
                       {s.ritual && <span style={badgeStyle}>Ritual</span>}
+                      {s.aoe && <span style={{ ...badgeStyle, background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa' }}>AOE{s.aoeShape ? `: ${s.aoeSize || ''}ft ${s.aoeShape}` : ''}</span>}
                     </div>
                     <div style={{ display: 'flex', gap: '14px', fontSize: '13px', color: 'var(--text)', marginBottom: '4px', flexWrap: 'wrap' }}>
                       <span><span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '5px', color: 'var(--text-dim)' }}>Cast:</span>{s.castingTime}</span>

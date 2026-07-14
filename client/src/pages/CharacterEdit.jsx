@@ -1275,12 +1275,15 @@ export default function CharacterEdit() {
                 <label style={{ ...st.label, marginBottom: '8px' }}>Class Features</label>
                 {(form.features || []).length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: '13px' }}>No features.</div>}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {(form.features || []).map((feat, i) => (
+                  {(form.features || []).map((feat, i) => {
+                    const featStr = typeof feat === 'object' && feat !== null ? (feat.name || JSON.stringify(feat)) : String(feat || '');
+                    return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                      <span style={{ flex: 1, fontSize: '13px' }}>{feat}</span>
+                      <span style={{ flex: 1, fontSize: '13px' }}>{featStr}</span>
                       <span style={{ cursor: 'pointer', color: 'var(--text-dim)', fontSize: '14px' }} onClick={() => removeFromArr('features', i)}>✕</span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <input style={{ ...st.input, marginTop: '8px', width: '300px' }} placeholder="Add feature..." onKeyDown={e => {
                   if (e.key === 'Enter' && e.target.value.trim()) {
@@ -1319,20 +1322,25 @@ export default function CharacterEdit() {
                 {/* Current feats */}
                 {(form.feats || []).length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-                    {form.feats.map((f, i) => (
+                    {form.feats.map((f, i) => {
+                      const fName = typeof f === 'object' && f !== null ? (f.name || String(f)) : String(f || '');
+                      return (
                       <span key={i} style={{ padding: '6px 12px', background: 'var(--accent)', border: '1px solid var(--gold)', borderRadius: '6px', fontSize: '12px', color: 'var(--gold)', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                        {f}
+                        {fName}
                         <span style={{ cursor: 'pointer', opacity: 0.6 }} onClick={() => removeFromArr('feats', i)}>✕</span>
                       </span>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
                 {/* Feat list */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '400px', overflowY: 'auto' }}>
-                  {Object.entries(FEATS).map(([name, desc]) => {
-                    const selected = (form.feats || []).includes(name);
-                    const atLimit = !selected && (form.feats || []).length >= maxFeats;
+                  {Object.entries(FEATS).map(([name, featInfo]) => {
+                    const desc = typeof featInfo === 'object' ? featInfo.desc : featInfo;
+                    const normalizedFeats = (form.feats || []).map(f => typeof f === 'object' && f !== null ? (f.name || '') : f);
+                    const selected = normalizedFeats.includes(name);
+                    const atLimit = !selected && normalizedFeats.length >= maxFeats;
                     return (
                       <Tip key={name} text={desc}>
                         <div className="cc-skill" style={{

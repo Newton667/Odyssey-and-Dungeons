@@ -145,7 +145,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_5",
@@ -176,7 +179,10 @@
     "damageType": "fire",
     "savingThrow": "DEX",
     "saveEffect": "No damage on success",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_6",
@@ -208,7 +214,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_7",
@@ -507,7 +516,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_17",
@@ -723,7 +735,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_24",
@@ -752,7 +767,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_25",
@@ -868,7 +886,10 @@
     "damageType": "fire",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_29",
@@ -984,7 +1005,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_33",
@@ -1361,7 +1385,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_46",
@@ -1538,7 +1565,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage on success",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_52",
@@ -1687,7 +1717,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_57",
@@ -1804,7 +1837,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_61",
@@ -2105,7 +2141,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "Not restrained on success",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Square"
   },
   {
     "_id": "local_sp_71",
@@ -2164,7 +2203,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not outlined on success",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_73",
@@ -2286,7 +2328,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_77",
@@ -2346,7 +2391,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not prone on success",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Square"
   },
   {
     "_id": "local_sp_79",
@@ -2850,7 +2898,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_96",
@@ -3026,7 +3077,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_102",
@@ -3088,7 +3142,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not restrained on success",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_104",
@@ -3149,7 +3206,11 @@
     "savingThrow": "DEX",
     "saveEffect": "Not covered on success",
     "source": "class",
-    "scaling": "2d4"
+    "scaling": "2d4",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line",
+    "aoeDetails": "30ft long, 5ft wide"
   },
   {
     "_id": "local_sp_106",
@@ -3239,7 +3300,10 @@
     "savingThrow": "CON",
     "saveEffect": "Half damage, not pushed on success",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_109",
@@ -3650,7 +3714,10 @@
     "savingThrow": "",
     "saveEffect": "",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_123",
@@ -3679,7 +3746,10 @@
     "scaling": "",
     "savingThrow": "CHA",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_124",
@@ -3832,7 +3902,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_129",
@@ -3926,7 +3999,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_132",
@@ -3957,7 +4033,10 @@
     "savingThrow": "STR",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_133",
@@ -4167,7 +4246,10 @@
     "savingThrow": "",
     "saveEffect": "",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_140",
@@ -4197,7 +4279,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_141",
@@ -4258,7 +4343,11 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "Negates push",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Line",
+    "aoeDetails": "60ft long, 10ft wide"
   },
   {
     "_id": "local_sp_143",
@@ -4721,7 +4810,11 @@
     "savingThrow": "CON",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d10"
+    "scaling": "1d10",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "5ft radius, 40ft high"
   },
   {
     "_id": "local_sp_158",
@@ -4811,7 +4904,10 @@
     "scaling": "",
     "savingThrow": "INT",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_161",
@@ -4901,7 +4997,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "Not blinded",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_164",
@@ -5083,7 +5182,10 @@
     "savingThrow": "CON",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_170",
@@ -5113,7 +5215,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_171",
@@ -5174,7 +5279,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_173",
@@ -5236,7 +5344,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_175",
@@ -5354,7 +5465,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_179",
@@ -5385,7 +5499,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not restrained",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_180",
@@ -5415,7 +5532,10 @@
     "scaling": "",
     "savingThrow": "CHA",
     "saveEffect": "Can still lie",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_181",
@@ -5472,7 +5592,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_183",
@@ -5615,7 +5738,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d10"
+    "scaling": "1d10",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_188",
@@ -5735,7 +5861,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_192",
@@ -5821,7 +5950,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_195",
@@ -5853,7 +5985,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_196",
@@ -5980,7 +6115,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d12"
+    "scaling": "1d12",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_200",
@@ -6012,7 +6150,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_201",
@@ -6074,7 +6215,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_203",
@@ -6201,7 +6345,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_207",
@@ -6261,7 +6408,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "No acid damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_209",
@@ -6292,7 +6442,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_210",
@@ -6322,7 +6475,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_211",
@@ -6381,7 +6537,11 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 100,
+    "aoeShape": "Line",
+    "aoeDetails": "100ft long, 5ft wide"
   },
   {
     "_id": "local_sp_213",
@@ -6413,7 +6573,11 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "10ft radius, 20ft high"
   },
   {
     "_id": "local_sp_214",
@@ -6445,7 +6609,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_215",
@@ -6620,7 +6787,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 100,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_221",
@@ -6777,7 +6947,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not prone",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_226",
@@ -6807,7 +6980,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_227",
@@ -6927,7 +7103,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_231",
@@ -7109,7 +7288,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_237",
@@ -7205,7 +7387,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "Half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 50,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_240",
@@ -7262,7 +7447,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_242",
@@ -7289,7 +7477,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_243",
@@ -7445,7 +7636,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_248",
@@ -7711,7 +7905,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "Not restrained",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Square"
   },
   {
     "_id": "local_sp_257",
@@ -7740,7 +7937,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_258",
@@ -7769,7 +7969,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_259",
@@ -7948,7 +8151,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 150,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_265",
@@ -7979,7 +8185,11 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "20ft radius, 40ft high"
   },
   {
     "_id": "local_sp_266",
@@ -8251,7 +8461,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "Negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_275",
@@ -8372,7 +8585,10 @@
     "savingThrow": "STR",
     "saveEffect": "No bludgeoning",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_279",
@@ -8433,7 +8649,10 @@
     "savingThrow": "DEX",
     "saveEffect": "Half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_281",
@@ -8464,7 +8683,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "Ejected",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_282",
@@ -8523,7 +8745,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_284",
@@ -8637,7 +8862,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_288",
@@ -8666,7 +8894,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_289",
@@ -8696,7 +8927,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_290",
@@ -8726,7 +8960,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_291",
@@ -8755,7 +8992,11 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "40ft radius, 20ft high"
   },
   {
     "_id": "local_sp_292",
@@ -8813,7 +9054,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "no knockdown",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 100,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_294",
@@ -8844,7 +9088,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_295",
@@ -8874,7 +9121,11 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "30ft radius, 40ft high"
   },
   {
     "_id": "local_sp_296",
@@ -9020,7 +9271,11 @@
     "savingThrow": "DEX",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "10ft radius, 40ft high"
   },
   {
     "_id": "local_sp_301",
@@ -9113,7 +9368,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage, not blinded",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_304",
@@ -9144,7 +9402,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d10"
+    "scaling": "1d10",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_305",
@@ -9204,7 +9465,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_307",
@@ -9234,7 +9498,10 @@
     "savingThrow": "",
     "saveEffect": "",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_308",
@@ -9624,7 +9891,10 @@
     "scaling": "",
     "savingThrow": "INT",
     "saveEffect": "half damage, no muddled thoughts",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_321",
@@ -9714,7 +9984,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "not restrained",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_324",
@@ -9803,7 +10076,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage, not blinded",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_327",
@@ -9864,7 +10140,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "negates branch damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_329",
@@ -10041,7 +10320,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage, no ongoing",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_335",
@@ -10188,7 +10470,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 100,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_340",
@@ -10216,7 +10501,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "not lifted",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_341",
@@ -10277,7 +10565,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "2d6"
+    "scaling": "2d6",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_343",
@@ -10603,7 +10894,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_354",
@@ -10633,7 +10927,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Square"
   },
   {
     "_id": "local_sp_355",
@@ -10751,7 +11048,11 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Line",
+    "aoeDetails": "15ft long, 5ft wide"
   },
   {
     "_id": "local_sp_359",
@@ -10782,7 +11083,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_360",
@@ -10813,7 +11117,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "not knocked prone",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_361",
@@ -10844,7 +11151,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage, not pushed",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_362",
@@ -10964,7 +11274,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Square"
   },
   {
     "_id": "local_sp_366",
@@ -10993,7 +11306,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_367",
@@ -11107,7 +11423,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_371",
@@ -11197,7 +11516,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage, not blinded",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_374",
@@ -11376,7 +11698,10 @@
     "savingThrow": "DEX",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_380",
@@ -11490,7 +11815,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_384",
@@ -11520,7 +11848,10 @@
     "savingThrow": "DEX",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_385",
@@ -11671,7 +12002,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_390",
@@ -11883,7 +12217,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage or negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_397",
@@ -12005,7 +12342,11 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "grabs fixed object",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 50,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "50ft radius, 100ft high"
   },
   {
     "_id": "local_sp_401",
@@ -12094,7 +12435,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage (Death option)",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_404",
@@ -12182,7 +12526,11 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Cylinder",
+    "aoeDetails": "10ft radius, 30ft high"
   },
   {
     "_id": "local_sp_407",
@@ -12212,7 +12560,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_408",
@@ -12270,7 +12621,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_410",
@@ -12301,7 +12655,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 200,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_411",
@@ -12480,7 +12837,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "not knocked prone",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 100,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_417",
@@ -12569,7 +12929,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "not blinded",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_420",
@@ -12596,7 +12959,10 @@
     "scaling": "",
     "savingThrow": "INT",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_421",
@@ -12625,7 +12991,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_422",
@@ -12654,7 +13023,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_423",
@@ -12801,7 +13173,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage, not blinded",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_428",
@@ -12858,7 +13233,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 300,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_430",
@@ -13129,7 +13507,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 40,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_439",
@@ -13216,7 +13597,10 @@
     "scaling": "",
     "savingThrow": "DEX",
     "saveEffect": "half damage (varies by layer)",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 90,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_442",
@@ -13275,7 +13659,10 @@
     "scaling": "",
     "savingThrow": "STR",
     "saveEffect": "not pulled",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_444",
@@ -13333,7 +13720,10 @@
     "scaling": "",
     "savingThrow": "CON",
     "saveEffect": "half damage",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 360,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_446",
@@ -13479,7 +13869,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_451",
@@ -13525,7 +13918,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Black)"
+    "sourceRace": "Dragonborn (Black)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line"
   },
   {
     "_id": "local_sp_453",
@@ -13543,7 +13939,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Blue)"
+    "sourceRace": "Dragonborn (Blue)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line"
   },
   {
     "_id": "local_sp_454",
@@ -13561,7 +13960,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Brass)"
+    "sourceRace": "Dragonborn (Brass)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line"
   },
   {
     "_id": "local_sp_455",
@@ -13579,7 +13981,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Bronze)"
+    "sourceRace": "Dragonborn (Bronze)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line"
   },
   {
     "_id": "local_sp_456",
@@ -13597,7 +14002,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Copper)"
+    "sourceRace": "Dragonborn (Copper)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line"
   },
   {
     "_id": "local_sp_457",
@@ -13615,7 +14023,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Gold)"
+    "sourceRace": "Dragonborn (Gold)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_458",
@@ -13633,7 +14044,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Green)"
+    "sourceRace": "Dragonborn (Green)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_459",
@@ -13651,7 +14065,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Red)"
+    "sourceRace": "Dragonborn (Red)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_460",
@@ -13669,7 +14086,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (Silver)"
+    "sourceRace": "Dragonborn (Silver)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_461",
@@ -13687,7 +14107,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Dragonborn (White)"
+    "sourceRace": "Dragonborn (White)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_462",
@@ -13742,7 +14165,10 @@
     "description": "Racial ability available at 5th level (1/long rest). Magical darkness spreads from a point you choose within range to fill a 15-foot-radius sphere. Darkvision cannot see through it. Non-magical light cannot illuminate it. If overlapping with light from a spell of 2nd level or lower, the light spell is dispelled.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Tiefling"
+    "sourceRace": "Tiefling",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_465",
@@ -13761,7 +14187,10 @@
     "description": "Innate racial cantrip. You create up to four torch-sized lights within range, making them appear as torches, lanterns, or glowing orbs that hover in the air. Each light sheds dim light in a 10-foot radius. You can combine the four lights into one glowing humanoid form of Medium size.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Elf (Dark Elf/Drow)"
+    "sourceRace": "Elf (Dark Elf/Drow)",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_466",
@@ -13780,7 +14209,10 @@
     "saveEffect": "Negates outline",
     "classes": [],
     "source": "race",
-    "sourceRace": "Elf (Dark Elf/Drow)"
+    "sourceRace": "Elf (Dark Elf/Drow)",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_467",
@@ -13798,7 +14230,10 @@
     "description": "Racial ability available at 5th level (1/long rest). Magical darkness spreads from a point you choose within range to fill a 15-foot-radius sphere. Darkvision cannot see through it. Non-magical light cannot illuminate it.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Elf (Dark Elf/Drow)"
+    "sourceRace": "Elf (Dark Elf/Drow)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_468",
@@ -13815,7 +14250,10 @@
     "description": "Innate racial cantrip. You create a sound or an image of an object within range that lasts for the duration. The illusion ends if you dismiss it or cast the spell again. If you create a sound, its volume can range from a whisper to a scream. If you create an image of an object, it must be no larger than a 5-foot cube. The image can't create sound, light, smell, or any other sensory effect. Physical interaction reveals it as an illusion.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Gnome (Forest)"
+    "sourceRace": "Gnome (Forest)",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_469",
@@ -13832,7 +14270,10 @@
     "description": "Innate racial cantrip. You touch one object no larger than 10 feet in any dimension. The object sheds bright light in a 20-foot radius and dim light for an additional 20 feet. The light can be colored as you like. Covering the object blocks the light. The spell ends if you cast it again or dismiss it.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Aasimar"
+    "sourceRace": "Aasimar",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_470",
@@ -13955,7 +14396,10 @@
     "attackType": "ranged",
     "classes": [],
     "source": "race",
-    "sourceRace": "Genasi (Fire)"
+    "sourceRace": "Genasi (Fire)",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_477",
@@ -13976,7 +14420,10 @@
     "saveEffect": "Half damage",
     "classes": [],
     "source": "race",
-    "sourceRace": "Genasi (Fire)"
+    "sourceRace": "Genasi (Fire)",
+    "aoe": true,
+    "aoeSize": 15,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_478",
@@ -13992,7 +14439,10 @@
     "description": "Innate racial cantrip for Water Genasi. You choose an area of water that you can see within range and that fits within a 5-foot cube. You can instantaneously move or otherwise change the flow of the water, cause the water to form simple shapes, change the color or opacity, or freeze the water (for 1 hour).",
     "classes": [],
     "source": "race",
-    "sourceRace": "Genasi (Water)"
+    "sourceRace": "Genasi (Water)",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_479",
@@ -14010,7 +14460,10 @@
     "description": "Racial ability for Water Genasi available at 3rd level (1/long rest). You either create up to 10 gallons of clean water within range in an open container, or create rain in a 30-foot cube within range, extinguishing exposed flames. Alternatively, you can destroy up to 10 gallons of water in an open container, or destroy fog in a 30-foot cube.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Genasi (Water)"
+    "sourceRace": "Genasi (Water)",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_480",
@@ -14028,7 +14481,10 @@
     "description": "Racial ability for Triton (1/long rest). You create a 20-foot-radius sphere of fog centered on a point within range. The sphere spreads around corners, and its area is heavily obscured. It lasts for the duration or until a wind of moderate or greater speed disperses it.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Triton"
+    "sourceRace": "Triton",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_481",
@@ -14049,7 +14505,11 @@
     "saveEffect": "Negates push",
     "classes": [],
     "source": "race",
-    "sourceRace": "Triton"
+    "sourceRace": "Triton",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Line",
+    "aoeDetails": "60ft long, 10ft wide"
   },
   {
     "_id": "local_sp_482",
@@ -14068,7 +14528,10 @@
     "description": "Racial ability for Triton available at 5th level (1/long rest). You create a wall of water on the ground at a point you can see within range. The wall is up to 30 feet long, 10 feet high, and 1 foot thick. The wall grants three-quarters cover to creatures behind it. Ranged weapon attacks passing through take disadvantage. Fire damage is halved passing through.",
     "classes": [],
     "source": "race",
-    "sourceRace": "Triton"
+    "sourceRace": "Triton",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_483",
@@ -14150,7 +14613,11 @@
     "saveEffect": "Negates push",
     "classes": [],
     "source": "race",
-    "sourceRace": "Aarakocra"
+    "sourceRace": "Aarakocra",
+    "aoe": true,
+    "aoeSize": 60,
+    "aoeShape": "Line",
+    "aoeDetails": "60ft long, 10ft wide"
   },
   {
     "_id": "local_sp_487",
@@ -14361,7 +14828,11 @@
     "savingThrow": "DEX",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d8"
+    "scaling": "1d8",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Line",
+    "aoeDetails": "30ft long, 5ft wide"
   },
   {
     "_id": "local_sp_499",
@@ -14420,7 +14891,10 @@
     "savingThrow": "",
     "saveEffect": "",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 5,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_501",
@@ -14480,7 +14954,10 @@
     "scaling": "",
     "savingThrow": "WIS",
     "saveEffect": "negates",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Cube"
   },
   {
     "_id": "local_sp_503",
@@ -14539,7 +15016,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 10,
+    "aoeShape": "Sphere"
   },
   {
     "_id": "local_sp_505",
@@ -14688,7 +15168,10 @@
     "savingThrow": "CON",
     "saveEffect": "half damage, not moved",
     "source": "class",
-    "scaling": "1d6"
+    "scaling": "1d6",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Cone"
   },
   {
     "_id": "local_sp_510",
@@ -14869,7 +15352,10 @@
     "scaling": "",
     "savingThrow": "",
     "saveEffect": "",
-    "source": "class"
+    "source": "class",
+    "aoe": true,
+    "aoeSize": 30,
+    "aoeShape": "Wall"
   },
   {
     "_id": "local_sp_516",
@@ -15018,6 +15504,9 @@
     "savingThrow": "DEX",
     "saveEffect": "half initial, no ongoing",
     "source": "class",
-    "scaling": "2d4"
+    "scaling": "2d4",
+    "aoe": true,
+    "aoeSize": 20,
+    "aoeShape": "Sphere"
   }
 ]

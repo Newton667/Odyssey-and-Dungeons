@@ -150,7 +150,11 @@ Express entry point.
   damage: String,
   damageType: String,
   savingThrow: String,
-  saveEffect: String
+  saveEffect: String,
+  aoe: Boolean,                // Is this an area of effect spell?
+  aoeShape: String,            // Sphere, Cone, Cube, Cylinder, Line, Square, Wall
+  aoeSize: Number,             // Size in feet (e.g., 20 for "20-foot-radius sphere")
+  aoeDetails: String           // Extra info (e.g., "30ft long, 5ft wide" for lines)
 }
 ```
 

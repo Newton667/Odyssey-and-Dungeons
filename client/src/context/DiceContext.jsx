@@ -60,7 +60,6 @@ export function DiceProvider({ children }) {
     if (typeof dice === 'string') {
       // Try multiple dice groups: "1d8 + 2d6" or "1d8+2"
       const groups = dice.match(/(\d+)d(\d+)/g);
-      const bonusMatch = dice.match(/\+\s*(\d+)(?!\s*d)/); // +N that's not followed by 'd'
       if (groups && groups.length > 0) {
         diceArray = [];
         for (const g of groups) {
@@ -70,7 +69,12 @@ export function DiceProvider({ children }) {
           const die = `d${sides}`;
           for (let i = 0; i < count; i++) diceArray.push({ die, sides });
         }
-        if (bonusMatch) staticBonus = Number(bonusMatch[1]);
+        // Sum ALL static modifiers: +5+3-2 = +6. Match any +N or -N not followed by 'd'
+        const stripped = dice.replace(/\d+d\d+/g, ''); // remove dice groups
+        const modMatches = stripped.match(/[+-]\s*\d+/g);
+        if (modMatches) {
+          for (const mod of modMatches) staticBonus += parseInt(mod.replace(/\s/g, ''));
+        }
         // d1 dice are flat damage (always 1) — add to bonus instead of rendering
         const d1Count = diceArray.filter(d => d.sides === 1).length;
         if (d1Count > 0) {

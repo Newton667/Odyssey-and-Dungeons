@@ -71,11 +71,7 @@ export default function CharacterSheet() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { rollDice3D } = useDice();
-  const [syncEnabled, setSyncEnabled] = useState(() => {
-    const stored = localStorage.getItem(`ond-sync-${id}`);
-    return stored === 'true'; // default false (local only)
-  });
-  const { char, loading, syncing, syncError, setChar: updateChar, updateField, updateHp, forceSync } = useCharacter(id, { syncEnabled });
+  const { char, loading, setChar: updateChar, updateField, updateHp } = useCharacter(id, { syncEnabled: false });
 
   // Remember last viewed character
   useEffect(() => { if (id) localStorage.setItem('ond-last-character', id); }, [id]);
@@ -1590,7 +1586,7 @@ export default function CharacterSheet() {
               || (isRanged ? '80/320 ft.' : '5 ft.');
 
             // Find EQUIPPED ammo items compatible with this weapon
-            const wpnLow = wpn.name.toLowerCase();
+            const wpnLow = (wpn.name || '').toLowerCase();
             const equippedAmmo = needsAmmo ? (char.equippedItems || []).filter(name => {
               const low = name.toLowerCase();
               const isAmmoItem = low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('needle');
@@ -2315,7 +2311,8 @@ export default function CharacterSheet() {
         <div style={st.sideCard}>
           <div style={st.sideLabel}>Class Features</div>
           {char.features.map((f, i) => {
-            const [name, ...desc] = f.split(': ');
+            const fStr = typeof f === 'object' && f !== null ? (f.name || JSON.stringify(f)) : String(f || '');
+            const [name, ...desc] = fStr.split(': ');
             return (
               <div key={i} style={{ fontSize: '12px', marginBottom: '6px', padding: '4px 0', borderBottom: i < char.features.length - 1 ? '1px solid var(--surface)' : 'none' }}>
                 <strong style={{ color: 'var(--gold)' }}>{name}</strong>
@@ -2331,13 +2328,15 @@ export default function CharacterSheet() {
         <div style={st.sideCard}>
           <div style={st.sideLabel}>Feats</div>
           {char.feats.map((f, i) => {
-            const name = typeof f === 'string' ? f : f?.name || f?.desc || 'Unknown Feat';
-            const featData = FEATS[name] || (typeof f === 'object' ? f : null);
+            const name = typeof f === 'string' ? f : (typeof f?.name === 'string' ? f.name : String(f?.name || f || 'Unknown Feat'));
+            const featData = FEATS[name] || null;
+            const desc = featData?.desc || (typeof f === 'object' && typeof f?.desc === 'string' ? f.desc : null);
+            const prereq = featData?.prereq || (typeof f === 'object' && typeof f?.prereq === 'string' ? f.prereq : null);
             return (
               <div key={i} style={{ fontSize: '12px', marginBottom: '8px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 600, color: 'var(--gold)', fontSize: '13px', marginBottom: '3px' }}>{name}</div>
-                {featData?.prereq && <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', marginBottom: '2px' }}>Requires: {featData.prereq}</div>}
-                {featData?.desc && <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{featData.desc}</div>}
+                {prereq && <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', marginBottom: '2px' }}>Requires: {prereq}</div>}
+                {desc && <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{desc}</div>}
               </div>
             );
           })}
@@ -2830,31 +2829,6 @@ export default function CharacterSheet() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Link to="/characters" style={{ fontSize: '12px', color: 'var(--text-dim)' }}>← Back</Link>
-            <label
-              title={syncEnabled ? (syncing ? 'Syncing to server...' : syncError || 'Synced to server') : 'Sync disabled — local only'}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', userSelect: 'none' }}
-            >
-              <div
-                onClick={() => {
-                  const next = !syncEnabled;
-                  setSyncEnabled(next);
-                  localStorage.setItem(`ond-sync-${id}`, String(next));
-                  if (next) forceSync();
-                }}
-                style={{
-                  width: '32px', height: '16px', borderRadius: '8px', position: 'relative', cursor: 'pointer',
-                  background: syncEnabled ? '#4ade80' : 'var(--border)', transition: 'background 0.2s',
-                }}>
-                <div style={{
-                  position: 'absolute', top: '2px', left: syncEnabled ? '16px' : '2px',
-                  width: '12px', height: '12px', borderRadius: '50%',
-                  background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                }} />
-              </div>
-              <span style={{ color: !syncEnabled ? 'var(--text-dim)' : syncError ? '#f87171' : syncing ? 'var(--gold-dim)' : '#4ade80' }}>
-                {syncEnabled ? (syncing ? 'Syncing' : syncError ? 'Error' : 'Synced') : 'Local Only'}
-              </span>
-            </label>
           </div>
           <h1 style={{ fontSize: '24px', margin: '2px 0 4px', lineHeight: 1 }}>{char.name}</h1>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -3233,6 +3207,12 @@ export default function CharacterSheet() {
                   </div>
                 )}
 
+                {sidePanel.data.aoe && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '12px', padding: '6px 10px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '4px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                    <strong style={{ color: '#60a5fa' }}>Area of Effect:</strong> {sidePanel.data.aoeSize ? `${sidePanel.data.aoeSize}-foot ` : ''}{sidePanel.data.aoeShape?.toLowerCase() || 'area'}{sidePanel.data.aoeDetails ? ` (${sidePanel.data.aoeDetails})` : ''}
+                  </div>
+                )}
+
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Description</div>
                   <p style={{ fontSize: '13px', lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{sidePanel.data.description}</p>
@@ -3286,7 +3266,7 @@ export default function CharacterSheet() {
                 )}
 
                 {sidePanel.data.properties?.some(p => p.toLowerCase().includes('ammunition')) && (() => {
-                  const wpnName = sidePanel.data.name.toLowerCase();
+                  const wpnName = (sidePanel.data.name || '').toLowerCase();
                   // Find equipped ammo matching this weapon
                   const matchingAmmo = (char.equippedItems || []).filter(name => {
                     const low = name.toLowerCase();

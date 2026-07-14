@@ -170,7 +170,7 @@ export default function CharacterCreate() {
 
   const fixedRaceLangs = useMemo(() => {
     if (!race || !RACES[race]) return [];
-    return (RACES[race].languages || []).filter(l => !l.toLowerCase().includes('extra'));
+    return (RACES[race].languages || []).filter(l => l && !String(l).toLowerCase().includes('extra'));
   }, [race]);
 
   const totalLangExtras = useMemo(() => {
@@ -241,7 +241,7 @@ export default function CharacterCreate() {
       if (t === "Artisan's tools" || t === 'Gaming set' || t === 'Musical instrument') n += 1;
     });
     if (cls && CLASSES[cls]?.toolProf) {
-      const tp = CLASSES[cls].toolProf.toLowerCase();
+      const tp = String(CLASSES[cls].toolProf || '').toLowerCase();
       if (tp.includes('one type of artisan')) n += 1;
     }
     return n;

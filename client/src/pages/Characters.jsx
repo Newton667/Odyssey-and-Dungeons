@@ -79,37 +79,8 @@ export default function Characters() {
                   </div>
                 )}
 
-                {/* Bottom bar: sync toggle + delete */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
-                  {(() => {
-                    const syncOn = localStorage.getItem(`ond-sync-${c._id}`) === 'true';
-                    return (
-                      <div
-                        title={syncOn ? 'Synced to server — click to disable' : 'Local only — click to enable sync'}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (syncOn) localStorage.removeItem(`ond-sync-${c._id}`);
-                          else localStorage.setItem(`ond-sync-${c._id}`, 'true');
-                          window.location.reload();
-                        }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '4px 8px', borderRadius: '6px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                        <div style={{
-                          width: '30px', height: '16px', borderRadius: '8px', position: 'relative',
-                          background: syncOn ? '#4ade80' : 'var(--border)', transition: 'background 0.2s',
-                        }}>
-                          <div style={{
-                            position: 'absolute', top: '2px', left: syncOn ? '16px' : '2px',
-                            width: '12px', height: '12px', borderRadius: '50%',
-                            background: 'white', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                          }} />
-                        </div>
-                        <span style={{ fontSize: '11px', color: syncOn ? '#4ade80' : 'var(--text-dim)', fontWeight: 600 }}>
-                          {syncOn ? 'Synced' : 'Local Only'}
-                        </span>
-                      </div>
-                    );
-                  })()}
+                {/* Bottom bar: delete */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
                   <button
                     className="btn btn-danger"
                     style={{ padding: '4px 12px', fontSize: '12px' }}
