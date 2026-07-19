@@ -7,7 +7,7 @@ import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
 import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
 import { CLASS_LEVELS, CLASSES, NATURAL_WEAPONS, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
-import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses } from '../utils/multiclass';
+import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses, syncPrimaryFromClasses } from '../utils/multiclass';
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
@@ -1864,7 +1864,7 @@ export default function CharacterSheet() {
             const dmgFormula = wpn.damage ? `${wpn.damage}+${dmgBonus}${riderDamageSuffix}` : null;
             const activeStyles = [
               archeryBonus && 'Archery', duelingBonus && 'Dueling',
-              gwfApplies && 'Great Weapon', twfApplies && 'Two-Weapon',
+              (gwfStyle && (isTwoHanded || isVersatile)) && 'Great Weapon', twfApplies && 'Two-Weapon',
             ].filter(Boolean);
 
             const useAmmo = () => {
