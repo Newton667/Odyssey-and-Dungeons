@@ -30,6 +30,28 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ---
 
+## v1.3.0 — 2026-07-19
+
+### Added
+- **Active weapon-buff toggles.** Spells that add a die to your weapon attacks — Hunter's Mark, Hex, Divine Favor, Elemental Weapon — now have an **Activate** toggle on the Spells tab (activating spends a slot). While active, the die is added to your weapon damage rolls on the Actions tab and shown as a badge on each attack; active buffs end on a long rest.
+- **Ruleset toggle (2014 / 2024)** in creation and the editor, stored per character, now applied across **every class**:
+  - **Level-1 Weapon Mastery** for Barbarian, Fighter, Monk, Paladin, Ranger, Rogue.
+  - **Level-1 Spellcasting** for Paladin and Ranger (2 first-level slots; level 2+ matches the half-caster table).
+  - **Divine Order** (Cleric), **Primal Order** (Druid), **Innate Sorcery** (Sorcerer), **Eldritch Invocations at level 1** (Warlock), **Ritual Adept** (Wizard).
+  - **All classes choose their subclass at level 3** (the level-up prompt and progression respect this).
+  - 2014 characters and Artificer (not in the 2024 PHB) are unchanged. Feature text is written in the app's own words.
+- **Mythic Odysseys of Theros content.** New playable races **Leonin** (+2 CON/+1 STR, claws, Daunting Roar, Hunter's Instincts) and **Satyr** (+2 CHA/+1 DEX, ram, Magic Resistance, Mirthful Leaps, Reveler), plus subclasses **Oath of Glory** (Paladin) and **College of Eloquence** (Bard) with their features. Trait/feature text is summarized in the app's own words.
+- **Feat override in the character editor.** The Features & Feats tab now has an "Override — add any feat" toggle that lets you add feats beyond the ASI limit and type in a **custom feat name** (for homebrew feats or DM grants).
+
+### Fixed
+- **Character editor now stays in sync with the sheet.** The editor loaded server-first, but the sheet runs with sync disabled and writes edits (prepared spells, etc.) only to `localStorage` — so spells added on the sheet didn't appear in the editor (and saving from the editor could overwrite sheet-only changes). The editor is now **local-first**, reading the same master copy the sheet writes.
+- **Spell selection now respects limits and slots.** The Spells tab shows Cantrips X/Y and Spells X/Z counters (prepared casters use ability modifier + level; known casters use their class table; summed across multiclass) and blocks preparing beyond the limit. Each leveled spell now has a **Cast** button that spends a spell slot of its (upcast) level and is disabled when no slot is available.
+- **Features tab now lists all class features.** Its "Class Features" card previously only showed the sparse stored `char.features` array (empty for most classes), so features like Spellcasting and Arcane Recovery didn't appear. It now uses the same derived list as the Actions tab — every class feature for the character's level(s), with descriptions and unlock levels.
+- **Fighting styles now affect combat (all of them).** Applied on the character sheet and shown as a badge on affected weapons: Archery (+2 ranged attack), Dueling (+2 damage, one-handed melee), Defense (+1 AC in armor), Great Weapon Fighting (reroll 1s & 2s on two-handed/versatile melee damage), Two-Weapon Fighting (light melee). Previously the chosen style was stored but never used. Works for single- and multi-class characters.
+- **Automatic ammunition tracking works for homebrew weapons.** Ammo use is now detected when a weapon declares an `ammoType` (not only when it has the "Ammunition" property), and compatible ammo is matched by `ammoType` (including homebrew ammo, `category: 'ammo'`), so custom bows/crossbows consume their ammo correctly.
+
+---
+
 ## v1.2.0 — 2026-07-19
 
 ### Added

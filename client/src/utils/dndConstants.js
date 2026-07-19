@@ -139,6 +139,17 @@ export const SPELLS_KNOWN = {
   Ranger:   [0,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11],
 };
 
+// Spells that add an extra damage die to your WEAPON attacks while active
+// (persistent buffs, usually requiring concentration). The Spells tab shows an
+// Activate toggle for these; while active, the die is added to weapon damage
+// rolls on the Actions tab. Damage type is informational.
+export const SPELL_WEAPON_RIDERS = {
+  "Hunter's Mark": { die: '1d6', type: "weapon's type" },
+  'Hex': { die: '1d6', type: 'necrotic' },
+  'Divine Favor': { die: '1d4', type: 'radiant' },
+  'Elemental Weapon': { die: '1d4', type: 'elemental' },
+};
+
 export const MULTICLASS_REQS = {
   Barbarian: { strength: 13 },
   Bard: { charisma: 13 },

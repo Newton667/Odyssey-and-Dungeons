@@ -87,6 +87,8 @@ export default function CharacterEdit() {
   const [cropSrc, setCropSrc] = useState(null); // image source for cropper
 
   // Equipment search
+  const [featOverride, setFeatOverride] = useState(false);
+  const [customFeat, setCustomFeat] = useState('');
   const [equipSearch, setEquipSearch] = useState('');
   const [equipResults, setEquipResults] = useState([]);
   const [equipLoading, setEquipLoading] = useState(false);
@@ -123,6 +125,7 @@ export default function CharacterEdit() {
         race: data.race || '',
         class: data.class || '',
         subclass: data.subclass || '',
+        ruleset: data.ruleset || '2014',
         level: data.level || 1,
         background: data.background || '',
         alignment: data.alignment || '',
@@ -179,17 +182,19 @@ export default function CharacterEdit() {
         if (local) return applyData(local);
         return setLoading(false); // not found anywhere
       }
-      // Server-backed characters: try the API, fall back to localStorage if the
-      // server is unreachable or has no copy (offline / local-first).
+      // localStorage is the master copy: the character sheet runs with sync
+      // disabled and writes edits (prepared spells, etc.) only to localStorage.
+      // Prefer it so the editor stays in sync with the sheet; only hit the
+      // server when there is no local copy at all.
+      const local = readLocal();
+      if (local) return applyData(local);
       try {
         const res = await fetch(`/api/characters/${id}`);
         if (res.ok) {
           const data = await res.json();
           if (data && !data.error) return applyData(data);
         }
-      } catch { /* offline — fall through to local copy */ }
-      const local = readLocal();
-      if (local) return applyData(local);
+      } catch { /* offline — nothing local either */ }
       setLoading(false); // not found anywhere
     };
 
@@ -585,6 +590,22 @@ export default function CharacterEdit() {
                       {form.background && !BACKGROUNDS[form.background] && <option value={form.background}>{form.background}</option>}
                     </select>
                   </div>
+                </div>
+
+                <div>
+                  <label style={st.label}>Ruleset</label>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {['2014', '2024'].map(r => (
+                      <button key={r} type="button" onClick={() => set('ruleset', r)}
+                        style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700,
+                          background: (form.ruleset || '2014') === r ? 'var(--gold)' : 'var(--surface)',
+                          border: `1px solid ${(form.ruleset || '2014') === r ? 'var(--gold)' : 'var(--border)'}`,
+                          color: (form.ruleset || '2014') === r ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                        {r === '2014' ? '2014 (Classic)' : '2024 (Revised)'}
+                      </button>
+                    ))}
+                  </div>
+                  {(form.ruleset || '2014') === '2024' && <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Revised rules — e.g. Ranger gains Spellcasting at level 1.</div>}
                 </div>
 
                 <div style={st.grid2}>
@@ -1401,13 +1422,33 @@ export default function CharacterEdit() {
                   </div>
                 )}
 
+                {/* Override: add any feat regardless of ASI limit */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 12px', background: 'var(--surface)', border: `1px solid ${featOverride ? 'var(--gold-dim)' : 'var(--border)'}`, borderRadius: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, color: featOverride ? 'var(--gold)' : 'var(--text-dim)' }}>
+                    <input type="checkbox" checked={featOverride} onChange={e => setFeatOverride(e.target.checked)} />
+                    Override — add any feat (ignore ASI limit)
+                  </label>
+                  {featOverride && (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1, minWidth: '200px' }}>
+                      <input value={customFeat} onChange={e => setCustomFeat(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const n = customFeat.trim(); if (n && !(form.feats || []).some(f => (typeof f === 'object' ? f.name : f) === n)) { set('feats', [...(form.feats || []), n]); setCustomFeat(''); } } }}
+                        placeholder="Custom feat name…" style={{ ...st.input, flex: 1, minWidth: 0 }} />
+                      <button type="button" className="btn"
+                        style={{ padding: '6px 12px', fontSize: '12px', background: 'var(--accent)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', fontWeight: 700, whiteSpace: 'nowrap' }}
+                        onClick={() => { const n = customFeat.trim(); if (n && !(form.feats || []).some(f => (typeof f === 'object' ? f.name : f) === n)) { set('feats', [...(form.feats || []), n]); setCustomFeat(''); } }}>
+                        + Add
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Feat list */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '400px', overflowY: 'auto' }}>
                   {Object.entries(FEATS).map(([name, featInfo]) => {
                     const desc = typeof featInfo === 'object' ? featInfo.desc : featInfo;
                     const normalizedFeats = (form.feats || []).map(f => typeof f === 'object' && f !== null ? (f.name || '') : f);
                     const selected = normalizedFeats.includes(name);
-                    const atLimit = !selected && normalizedFeats.length >= maxFeats;
+                    const atLimit = !selected && !featOverride && normalizedFeats.length >= maxFeats;
                     return (
                       <Tip key={name} text={desc}>
                         <div className="cc-skill" style={{

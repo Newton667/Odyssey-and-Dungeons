@@ -13,6 +13,12 @@ export const FEATURE_DESCRIPTIONS = {
   'Timeless Body': 'You age far more slowly and can no longer be aged magically.',
   'Expertise': 'Double your proficiency bonus for chosen skill proficiencies.',
   'Channel Divinity': 'Channel divine energy to fuel magical effects (such as Turn Undead). Regain uses on a rest; the number of uses grows with level.',
+  // ── 2024 revised-ruleset features ──
+  'Weapon Mastery': "You can use the mastery property of a limited number of weapons you're proficient with (Cleave, Graze, Nick, Push, Sap, Slow, Topple, Vex, etc.). You can change your chosen weapons when you finish a long rest.",
+  'Divine Order': 'Choose a divine role: Protector (gain martial weapon and heavy armor training) or Thaumaturge (an extra cleric cantrip and a bonus to Arcana/Religion checks equal to your Wisdom modifier).',
+  'Primal Order': 'Choose a druidic role: Magician (an extra druid cantrip and a Wisdom-based bonus to Arcana/Nature checks) or Warden (training with martial weapons and medium armor).',
+  'Innate Sorcery': 'As a bonus action, unleash your innate magic for 1 minute: your spell save DC increases by 1 and you have advantage on the attack rolls of your sorcerer spells. Usable twice per long rest.',
+  'Ritual Adept': 'You can cast any spell in your spellbook as a ritual if that spell has the ritual tag.',
 
   // ── Barbarian ──
   'Rage': 'As a bonus action, enter a rage: advantage on Strength checks and saves, bonus melee damage, and resistance to bludgeoning, piercing, and slashing damage. Lasts up to 1 minute.',

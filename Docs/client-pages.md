@@ -40,7 +40,7 @@ Full interactive character sheet — the main feature of the app.
 
 ### Tabs:
 - **Actions** — Weapon attacks (equipped), unarmed strike, spell attacks with upcast support, and a **Class Features & Actions** list. The feature list is *derived by level* from `CLASS_LEVELS` + `CLASSES` (descriptions) + unlocked `SUBCLASS_FEATURES` (e.g. Lay on Hands / Rage / Channel Divinity / Sneak Attack), so it works for every class/level even when `char.features` is empty. Bookkeeping rows (ASI, generic subclass placeholders) are filtered; each row shows its unlock level and opens the full description in the side panel. Features descriptions fall back to `utils/featureDescriptions.js`. Limited-use features show a −/＋ **usage counter** (remaining/max from `utils/featureUses.js`) that resets on long rest (all) or short rest (short-recharge features). Unarmed Strike scales with Monk Martial Arts and the Tavern Brawler feat (1d4)
-- **Spells** — Spell list by level, preparation toggle, slot tracking with +/- buttons
+- **Spells** — Spell list by level, preparation toggle, slot tracking with +/- buttons. Cantrip/spell **limits** are enforced (prepared casters = ability mod + level; known casters use `SPELLS_KNOWN`; cantrips use `CANTRIPS_KNOWN`; summed across multiclass) with X/Y counters, and each leveled spell has a **Cast** button that spends a slot of its (upcast) level and disables when none remain
 - **Inventory** — Equipment list with equip toggle, weight, rarity colors, ammo tracking, browse/add
 - **Features** — Class features, racial traits, feats, background feature
 - **Background** — Personality, ideals, bonds, flaws
@@ -78,7 +78,7 @@ Edit form for existing characters with tabbed sections:
 - **Combat** — AC, speed, initiative, HP
 - **Equipment** — Manage inventory items
 - **Spells** — Add/remove known spells
-- **Features & Feats** — Edit class features and feats (with Tip tooltips)
+- **Features & Feats** — Edit class features and feats (with Tip tooltips). An "Override — add any feat" toggle bypasses the ASI limit and allows adding a custom (homebrew) feat name
 - **Details** — Background, personality, bonds, flaws
 - **Notes** — Free-text notes
 - **Settings** — Level up, character-specific settings (ammo tracking)

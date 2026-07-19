@@ -71,6 +71,9 @@ export default function CharacterCreate() {
   const [hpMethod, setHpMethod] = useState('average'); // 'average' | 'rolled'
   const [rolledHpPerLevel, setRolledHpPerLevel] = useState({});
 
+  // Ruleset: '2014' (classic) or '2024' (revised). Affects class features/progression.
+  const [ruleset, setRuleset] = useState('2014');
+
   // Multiclassing
   const [multiclassEnabled, setMulticlassEnabled] = useState(false);
   const [extraClasses, setExtraClasses] = useState([]); // [{class, subclass, level}]
@@ -394,6 +397,7 @@ export default function CharacterCreate() {
         name,
         race: subrace ? `${race} (${subrace})` : race,
         class: cls, subclass, level: multiclassEnabled ? totalLevel : level, background, alignment,
+        ruleset,
         faith,
         languages: allLanguages,
         abilityScores: finalScores,
@@ -1250,6 +1254,29 @@ export default function CharacterCreate() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* ── Ruleset ── */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div>
+                <h4 style={{ fontSize: '14px', margin: 0 }}>Ruleset</h4>
+                <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: '4px 0 0' }}>
+                  {ruleset === '2024' ? 'Revised (2024) — e.g. Ranger gains Spellcasting at level 1.' : 'Classic (2014) rules.'}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {['2014', '2024'].map(r => (
+                  <button key={r} type="button" onClick={() => setRuleset(r)}
+                    style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700,
+                      background: ruleset === r ? 'var(--gold)' : 'var(--surface)',
+                      border: `1px solid ${ruleset === r ? 'var(--gold)' : 'var(--border)'}`,
+                      color: ruleset === r ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                    {r === '2014' ? '2014 (Classic)' : '2024 (Revised)'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* ── Multiclassing ── */}

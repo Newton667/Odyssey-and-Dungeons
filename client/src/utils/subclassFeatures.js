@@ -24,6 +24,11 @@ export const SUBCLASS_FEATURES = {
     6: { name: 'Extra Attack', desc: 'You can attack twice, instead of once, whenever you take the Attack action on your turn.' },
     14: { name: 'Battle Magic', desc: 'When you use your action to cast a bard spell, you can make one weapon attack as a bonus action.' },
   },
+  'College of Eloquence': {
+    3: { name: 'Silver Tongue & Unsettling Words', desc: 'Silver Tongue: when you make a Persuasion or Deception check, treat a d20 roll of 9 or lower as a 10. Unsettling Words: as a bonus action, expend one Bardic Inspiration die and choose a creature within 60 feet; subtract the number rolled from the next saving throw it makes before the start of your next turn.' },
+    6: { name: 'Unfailing Inspiration & Universal Speech', desc: 'Unfailing Inspiration: when a creature adds one of your Bardic Inspiration dice to an ability check, attack, or save and still fails, it keeps the die. Universal Speech: as an action, choose creatures within 60 feet (up to your CHA modifier); for 1 hour they can understand you whatever language you speak. Usable CHA modifier times per long rest (or by expending a spell slot).' },
+    14: { name: 'Infectious Inspiration', desc: 'When a creature within 60 feet succeeds on a roll using one of your Bardic Inspiration dice, you can use your reaction to give a different creature within 60 feet a Bardic Inspiration die without spending one of your uses. Usable CHA modifier times per long rest.' },
+  },
 
   // ==================== CLERIC (1, 2, 6, 8, 17) ====================
   'Knowledge Domain': {
@@ -151,6 +156,12 @@ export const SUBCLASS_FEATURES = {
     7: { name: 'Relentless Avenger', desc: 'When you hit a creature with an opportunity attack, you can move up to half your speed immediately after as part of the same reaction. This movement doesn\'t provoke opportunity attacks.' },
     15: { name: 'Soul of Vengeance', desc: 'When a creature under your Vow of Enmity makes an attack, you can use your reaction to make a melee weapon attack against it if it\'s within range.' },
     20: { name: 'Avenging Angel', desc: 'As an action, you transform for 1 hour: you sprout wings (60-foot flying speed) and emanate a 30-foot aura of menace. Enemies that enter or start their turn in the aura must make a Wisdom save or be frightened for 1 minute. Usable once per long rest.' },
+  },
+  'Oath of Glory': {
+    3: { name: 'Peerless Athlete & Inspiring Smite', desc: 'Channel Divinity: Peerless Athlete — as a bonus action, gain advantage on Athletics and Acrobatics checks, increase carrying capacity, and add 10 feet to your jump distance for 10 minutes. Inspiring Smite — immediately after dealing Divine Smite damage, distribute temporary hit points totaling 2d8 + your paladin level among creatures of your choice within 30 feet.' },
+    7: { name: 'Aura of Alacrity', desc: 'Your walking speed increases by 10 feet. Allies that start their turn within 5 feet of you gain +10 feet of speed until the end of that turn. At 18th level, the aura range increases to 30 feet.' },
+    15: { name: 'Glorious Defense', desc: 'When you or a creature within 10 feet of you is hit by an attack, you can use your reaction to add your Charisma modifier to that target\'s AC against the attack, potentially causing it to miss. If it misses, you can make one weapon attack against the attacker as part of the reaction. Usable Charisma modifier times per long rest.' },
+    20: { name: 'Living Legend', desc: 'As a bonus action, become the stuff of legend for 1 minute: you have advantage on all Charisma checks; once per turn you can turn one of your missed weapon attacks into a hit; and once during the duration you can succeed on a saving throw you fail. Usable once per long rest, or by expending a 5th-level spell slot.' },
   },
 
   // ==================== RANGER (3, 7, 11, 15) ====================

@@ -5,8 +5,8 @@ import { useCharacter } from '../hooks/useCharacterSync';
 import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
-import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES } from '../utils/dndConstants';
-import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
+import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
+import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
 import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses } from '../utils/multiclass';
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
@@ -111,6 +111,34 @@ export default function CharacterSheet() {
   const defaultAmmoCount = (name) => {
     const m = name?.match(/\((\d+)\)/);
     return m ? parseInt(m[1]) : 20;
+  };
+
+  // ── Ammunition helpers (shared by weapon attacks + item panel; handle homebrew) ──
+  const isAmmoName = (name) => {
+    const cached = equipCache.current[name];
+    if (cached?.category === 'ammo') return true;                                   // homebrew ammo
+    if ((cached?.subcategory || '').toLowerCase().includes('ammunition')) return true; // standard ammo
+    const low = (name || '').toLowerCase();
+    return low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('needle');
+  };
+  // A weapon uses ammo if it has the Ammunition property OR declares an ammoType (homebrew)
+  const weaponNeedsAmmo = (wpn) => !!(wpn?.properties?.some(p => p.toLowerCase().includes('ammunition')) || wpn?.ammoType);
+  const ammoMatchesWeapon = (ammoName, wpn) => {
+    if (!isAmmoName(ammoName)) return false;
+    const cached = equipCache.current[ammoName];
+    const low = (ammoName || '').toLowerCase();
+    const wpnLow = (wpn?.name || '').toLowerCase();
+    const wt = (wpn?.ammoType || '').toLowerCase();
+    if (wt) {
+      // Weapon declares an ammo type (homebrew): match by the ammo's type or its name
+      if (cached?.ammoType && cached.ammoType.toLowerCase() === wt) return true;
+      return low.includes(wt);
+    }
+    // Standard weapons: infer compatible ammo from the weapon's name
+    if (wpnLow.includes('crossbow')) return low.includes('bolt');
+    if (wpnLow.includes('sling')) return low.includes('bullet');
+    if (wpnLow.includes('blowgun')) return low.includes('needle');
+    return low.includes('arrow');
   };
 
   // Widget layout
@@ -412,8 +440,8 @@ export default function CharacterSheet() {
     const maxDice = char.level || 1;
     const hpRestored = Math.max(0, (char.maxHp || 0) - (char.currentHp || 0));
     const diceRegained = Math.max(0, maxDice - (char.hitDiceRemaining ?? maxDice));
-    // Clearing featureUses returns every limited-use feature to full
-    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {}, featureUses: {} }));
+    // Clearing featureUses returns every limited-use feature to full; active buffs (concentration) end
+    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {}, featureUses: {}, activeBuffs: [] }));
     setLongRestToast({ hpRestored, maxHp: char.maxHp, diceRegained, maxDice });
     if (healTimer.current) clearTimeout(healTimer.current);
     healTimer.current = setTimeout(() => setLongRestToast(null), 4000);
@@ -471,16 +499,23 @@ export default function CharacterSheet() {
   }, [char, updateChar, rollDice3D, logRoll]);
 
   // Roll with result tracking
-  const doRollWithResult = useCallback(async (label, formula) => {
+  const doRollWithResult = useCallback(async (label, formula, opts = {}) => {
     const result = await rollDice3D(formula, label);
-    setRollResults(prev => ({ ...prev, [label]: { total: result.total, time: Date.now() } }));
+    let total = result.total;
+    // Great Weapon Fighting: reroll damage dice that landed on 1 or 2 (once, keep the new roll)
+    if (opts.rerollLow && Array.isArray(result.results)) {
+      for (const r of result.results) {
+        if (r.sides > 2 && r.value <= 2) total += (Math.floor(Math.random() * r.sides) + 1) - r.value;
+      }
+    }
+    setRollResults(prev => ({ ...prev, [label]: { total, time: Date.now() } }));
     setTimeout(() => setRollResults(prev => {
       const next = { ...prev };
       if (next[label]?.time && Date.now() - next[label].time >= 7500) delete next[label];
       return next;
     }), 8000);
-    logRoll(label, formula, result.total);
-    return result;
+    logRoll(label, formula, total);
+    return { ...result, total };
   }, [rollDice3D, logRoll]);
 
   const doAdvantage = useCallback(async (label, formula) => {
@@ -568,6 +603,17 @@ export default function CharacterSheet() {
     () => new Set((char?.feats || []).map(f => (typeof f === 'string' ? f : (f?.name || ''))).filter(Boolean)),
     [char?.feats]
   );
+  // Fighting styles the character has (single-class: char.fightingStyle; multiclass: stored in features as "Fighting Style (Cls): X")
+  const fightingStyles = useMemo(() => {
+    const s = new Set();
+    if (char?.fightingStyle) s.add(char.fightingStyle);
+    for (const f of (char?.features || [])) {
+      const str = typeof f === 'string' ? f : (f?.name || '');
+      const m = str.match(/^Fighting Style(?:\s*\([^)]*\))?:\s*(.+)$/);
+      if (m) s.add(m[1].trim());
+    }
+    return s;
+  }, [char?.fightingStyle, char?.features]);
   // Sum unconditional feat bonuses that feed into derived stats (e.g. Alert → +5 initiative)
   const featEffects = useMemo(() => {
     const totals = { initiative: 0, passivePerception: 0, passiveInvestigation: 0 };
@@ -616,8 +662,10 @@ export default function CharacterSheet() {
         if (ac > baseAC) { baseAC = ac + dexMod; hasArmor = true; }
       }
     }
+    // Defense fighting style: +1 AC while wearing armor
+    if (hasArmor && fightingStyles.has('Defense')) baseAC += 1;
     return baseAC + shieldBonus;
-  }, [char?.equippedItems, dexMod, equipDataLoaded, featSet]);
+  }, [char?.equippedItems, dexMod, equipDataLoaded, featSet, fightingStyles]);
 
   // Check if equipped armor gives stealth disadvantage
   const hasStealthDisadvantage = useMemo(() => {
@@ -643,13 +691,62 @@ export default function CharacterSheet() {
   const charIsMulticlass = isMulticlass(char);
 
   // Spell slots — standard slots (array) and Warlock Pact Magic (separate) can coexist
-  const mcSlots = getMulticlassSpellSlots(charClasses);
+  const mcSlots = getMulticlassSpellSlots(charClasses, char.ruleset);
   const spellSlotData = mcSlots.standard;
   const pactData = mcSlots.pact;
   const usedSlots = char.usedSpellSlots || {};
 
   // Extra Attack — best single class, does not stack across classes
   const extraAttacks = getMulticlassExtraAttacks(char);
+
+  // Aggregated class + subclass features across all classes/levels (with descriptions +
+  // usage info). Shared by the Actions tab and the Features tab so both stay in sync.
+  const parseFeatureStr = (f) => {
+    if (f && typeof f === 'object') return { name: f.name || 'Feature', desc: f.desc || '' };
+    const str = String(f || '');
+    const emDash = str.indexOf(' — ');
+    if (emDash !== -1) return { name: str.slice(0, emDash).trim(), desc: str.slice(emDash + 3).trim() };
+    const colon = str.indexOf(': ');
+    if (colon !== -1) return { name: str.slice(0, colon).trim(), desc: str.slice(colon + 2).trim() };
+    return { name: str.trim(), desc: '' };
+  };
+  const isFeatureNoise = (n) => n === 'ASI' || n === 'Fighting Style'
+    || /^(Path|Oath|Domain|Archetype|College|Circle|Tradition|Patron|Specialist|Origin) Feature$/.test(n);
+  const classFeatureList = (() => {
+    const raw = [];
+    for (const cc of charClasses) {
+      const subMap = cc.subclass ? (SUBCLASS_FEATURES[cc.subclass] || {}) : {};
+      const featureDesc = {};
+      (CLASSES[cc.class]?.features || []).forEach(f => { const p = parseFeatureStr(f); if (p.name) featureDesc[p.name] = p.desc; });
+      Object.values(subMap).forEach(f => { if (f?.name) featureDesc[f.name] = f.desc; });
+      const clsLevels = getClassLevels(cc.class, char.ruleset);
+      for (let lv = 1; lv <= cc.level; lv++) {
+        (clsLevels[lv] || []).forEach(name => {
+          if (isFeatureNoise(name)) return;
+          raw.push({
+            name, desc: featureDesc[name] || featureDescription(name), level: lv, source: cc.class,
+            uses: computeFeatureUses(name, cc.level, char, cc.class), useKey: baseFeatureName(name),
+          });
+        });
+      }
+      Object.entries(subMap)
+        .filter(([lvl]) => parseInt(lvl) <= cc.level)
+        .forEach(([lvl, f]) => { if (f?.name) raw.push({ name: f.name, desc: f.desc || '', level: parseInt(lvl), source: cc.subclass }); });
+    }
+    (char.features || []).map(parseFeatureStr).forEach(p => {
+      if (p.name && !raw.some(a => a.name === p.name)) raw.push({ ...p, desc: p.desc || featureDescription(p.name), source: char.class });
+    });
+    const seen = new Map();
+    for (const a of raw) {
+      const existing = seen.get(a.name);
+      if (!existing || (!existing.desc && a.desc)) seen.set(a.name, a);
+    }
+    return [...seen.values()].filter(f => f.name).sort((a, b) => (a.level || 0) - (b.level || 0));
+  })();
+
+  // Active weapon-rider buffs (Hunter's Mark, Hex, …) → extra dice added to weapon damage
+  const activeRiders = (char.activeBuffs || []).filter(name => SPELL_WEAPON_RIDERS[name]);
+  const riderDamageSuffix = activeRiders.map(name => `+${SPELL_WEAPON_RIDERS[name].die}`).join('');
 
   // Carrying capacity
   const carryCapacity = (scores.strength ?? 10) * 15;
@@ -750,7 +847,7 @@ export default function CharacterSheet() {
   };
 
   // ─── Reusable components ──────────────────────────────
-  const RollBtn = ({ label, formula, children, style: extraStyle, type = 'attack', onRoll }) => {
+  const RollBtn = ({ label, formula, children, style: extraStyle, type = 'attack', onRoll, rerollLow = false }) => {
     const result = rollResults[label];
     const isAttack = type === 'attack' || formula.includes('d20');
     const isDamage = type === 'damage' || !formula.includes('d20');
@@ -759,7 +856,7 @@ export default function CharacterSheet() {
       ? () => doDisadvantage(label, formula)
       : isAttack && hasAttackAdvantage && !hasAttackDisadvantage
       ? () => doAdvantage(label, formula)
-      : () => doRollWithResult(label, formula);
+      : () => doRollWithResult(label, formula, { rerollLow });
 
     return (
       <button
@@ -915,6 +1012,50 @@ export default function CharacterSheet() {
             {canUpcast && castLevel > spell.level && <span style={{ color: '#4ade80' }}>→ Lv{castLevel}</span>}
           </div>
         </div>
+        {(() => {
+          const rider = SPELL_WEAPON_RIDERS[spell.name];
+          if (rider) {
+            const isActive = (char.activeBuffs || []).includes(spell.name);
+            return (
+              <button onClick={(e) => {
+                e.stopPropagation();
+                updateChar(prev => {
+                  const cur = prev.activeBuffs || [];
+                  if (cur.includes(spell.name)) return { ...prev, activeBuffs: cur.filter(n => n !== spell.name) };
+                  // Activate = cast: spend a slot of the (upcast) level if one is available
+                  const us = prev.usedSpellSlots || {};
+                  let newUs = us;
+                  const stdTotal = spellSlotData ? (spellSlotData[castLevel - 1] || 0) : 0;
+                  if (stdTotal > 0 && (us[String(castLevel)] || 0) < stdTotal) newUs = { ...us, [String(castLevel)]: (us[String(castLevel)] || 0) + 1 };
+                  else if (pactData && castLevel <= pactData.level && (us['pact'] || 0) < pactData.slots) newUs = { ...us, pact: (us['pact'] || 0) + 1 };
+                  return { ...prev, usedSpellSlots: newUs, activeBuffs: [...cur, spell.name] };
+                });
+              }}
+                title={`${isActive ? 'Deactivate' : 'Activate (spends a slot)'} — adds ${rider.die} ${rider.type} to your weapon attacks`}
+                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: 'pointer', background: isActive ? 'rgba(176,126,224,0.25)' : 'var(--surface)', border: `1px solid ${isActive ? '#b07ee0' : 'var(--border)'}`, color: isActive ? '#d8b4f0' : 'var(--text-dim)' }}>
+                {isActive ? '◉ Active' : 'Activate'}
+              </button>
+            );
+          }
+          if (spell.level >= 1) {
+            const standardAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
+            const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
+            const canCast = standardAvail || pactAvail;
+            return (
+              <button onClick={(e) => {
+                e.stopPropagation();
+                if (standardAvail) updateField('usedSpellSlots', { ...usedSlots, [String(castLevel)]: (usedSlots[String(castLevel)] || 0) + 1 });
+                else if (pactAvail) updateField('usedSpellSlots', { ...usedSlots, pact: (usedSlots['pact'] || 0) + 1 });
+              }}
+                disabled={!canCast}
+                title={canCast ? `Cast — spends a level ${castLevel} slot` : 'No spell slot available at this level'}
+                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: canCast ? 'pointer' : 'not-allowed', background: canCast ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${canCast ? 'var(--gold-dim)' : 'var(--border)'}`, color: canCast ? 'var(--gold)' : 'var(--text-dim)', opacity: canCast ? 1 : 0.5 }}>
+                Cast
+              </button>
+            );
+          }
+          return null;
+        })()}
         {effectiveDamage && (
           <RollBtn label={`${spell.name} Damage${castLevel > spell.level ? ` (Lv${castLevel})` : ''}`} formula={effectiveDamage} type="damage">
             {effectiveDamage}
@@ -1636,54 +1777,8 @@ export default function CharacterSheet() {
     const unarmedDie = char?.class === 'Monk' ? monkUnarmedDie : (featSet.has('Tavern Brawler') ? '1d4' : '1');
     const unarmedRollFormula = `${unarmedDie === '1' ? '1d1' : unarmedDie}+${strMod}`;
 
-    // Class & subclass features surfaced here as usable actions/abilities (e.g. Lay on Hands).
-    // Derived from class data by level so it works for EVERY class/level, even for characters
-    // whose stored char.features array was never populated at creation.
-    const parseFeature = (f) => {
-      if (f && typeof f === 'object') return { name: f.name || 'Feature', desc: f.desc || '' };
-      const str = String(f || '');
-      const emDash = str.indexOf(' — ');
-      if (emDash !== -1) return { name: str.slice(0, emDash).trim(), desc: str.slice(emDash + 3).trim() };
-      const colon = str.indexOf(': ');
-      if (colon !== -1) return { name: str.slice(0, colon).trim(), desc: str.slice(colon + 2).trim() };
-      return { name: str.trim(), desc: '' };
-    };
-    // Skip pure bookkeeping / generic subclass placeholders (real subclass features are added below)
-    const isNoise = (n) => n === 'ASI' || n === 'Fighting Style'
-      || /^(Path|Oath|Domain|Archetype|College|Circle|Tradition|Patron|Specialist|Origin) Feature$/.test(n);
-    const classActionsRaw = [];
-    // Aggregate features from every class the character has, each at its own level
-    for (const cc of charClasses) {
-      const subMap = cc.subclass ? (SUBCLASS_FEATURES[cc.subclass] || {}) : {};
-      const featureDesc = {};
-      (CLASSES[cc.class]?.features || []).forEach(f => { const p = parseFeature(f); if (p.name) featureDesc[p.name] = p.desc; });
-      Object.values(subMap).forEach(f => { if (f?.name) featureDesc[f.name] = f.desc; });
-      const clsLevels = CLASS_LEVELS[cc.class] || {};
-      for (let lv = 1; lv <= cc.level; lv++) {
-        (clsLevels[lv] || []).forEach(name => {
-          if (isNoise(name)) return;
-          classActionsRaw.push({
-            name, desc: featureDesc[name] || featureDescription(name), level: lv, source: cc.class,
-            uses: computeFeatureUses(name, cc.level, char, cc.class), useKey: baseFeatureName(name),
-          });
-        });
-      }
-      // Real unlocked subclass features (with names + descriptions)
-      Object.entries(subMap)
-        .filter(([lvl]) => parseInt(lvl) <= cc.level)
-        .forEach(([lvl, f]) => { if (f?.name) classActionsRaw.push({ name: f.name, desc: f.desc || '', level: parseInt(lvl), source: cc.subclass }); });
-    }
-    // Extra stored features not already covered (e.g. "Fighting Style: Defense", metamagic, homebrew)
-    (char.features || []).map(parseFeature).forEach(p => {
-      if (p.name && !classActionsRaw.some(a => a.name === p.name)) classActionsRaw.push({ ...p, desc: p.desc || featureDescription(p.name), source: char.class });
-    });
-    // Dedupe by name, keeping the entry that has a description
-    const seenFeat = new Map();
-    for (const a of classActionsRaw) {
-      const existing = seenFeat.get(a.name);
-      if (!existing || (!existing.desc && a.desc)) seenFeat.set(a.name, a);
-    }
-    const classActions = [...seenFeat.values()].filter(f => f.name).sort((a, b) => (a.level || 0) - (b.level || 0));
+    // Class & subclass features surfaced here as usable actions/abilities (shared list)
+    const classActions = classFeatureList;
 
     // Equipped weapons from cache
     const equippedWeapons = (char.equippedItems || [])
@@ -1710,20 +1805,12 @@ export default function CharacterSheet() {
           {equippedWeapons.map((wpn, i) => {
             const isFinesse = wpn.properties?.some(p => p.toLowerCase().includes('finesse'));
             const isRanged = (wpn.subcategory || '').toLowerCase().includes('ranged');
-            const needsAmmo = wpn.properties?.some(p => p.toLowerCase().includes('ammunition'));
+            const needsAmmo = weaponNeedsAmmo(wpn);
             const rangeText = wpn.properties?.find(p => p.toLowerCase().includes('range') || p.toLowerCase().includes('thrown'))
               || (isRanged ? '80/320 ft.' : '5 ft.');
 
-            // Find EQUIPPED ammo items compatible with this weapon
-            const wpnLow = (wpn.name || '').toLowerCase();
-            const equippedAmmo = needsAmmo ? (char.equippedItems || []).filter(name => {
-              const low = name.toLowerCase();
-              const isAmmoItem = low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('needle');
-              if (!isAmmoItem) return false;
-              if (wpnLow.includes('crossbow')) return low.includes('bolt');
-              if (wpnLow.includes('sling')) return low.includes('bullet');
-              return low.includes('arrow');
-            }) : [];
+            // Find EQUIPPED ammo items compatible with this weapon (handles homebrew ammoType)
+            const equippedAmmo = needsAmmo ? (char.equippedItems || []).filter(name => ammoMatchesWeapon(name, wpn)) : [];
             // Selected ammo for this weapon (or first equipped)
             const selectedAmmo = (char.ammo?.selected?.[wpn.name]) || equippedAmmo[0] || null;
             const ammoCount = selectedAmmo ? (char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo)) : 0;
@@ -1731,11 +1818,23 @@ export default function CharacterSheet() {
             const ammoCached = selectedAmmo ? equipCache.current[selectedAmmo] : null;
             const ammoBonus = ammoCached?.bonus || 0;
 
-            // Calculate hit/damage with weapon + ammo bonuses
+            // Calculate hit/damage with weapon + ammo + fighting-style bonuses
             const abilityMod = isRanged ? dexMod : (isFinesse ? Math.max(strMod, dexMod) : strMod);
-            const hitBonus = abilityMod + profBonus + (wpn.bonus || 0) + ammoBonus;
-            const dmgBonus = abilityMod + (wpn.bonus || 0) + ammoBonus;
-            const dmgFormula = wpn.damage ? `${wpn.damage}+${dmgBonus}` : null;
+            const isTwoHanded = wpn.properties?.some(p => p.toLowerCase().includes('two-handed'));
+            const isVersatile = wpn.properties?.some(p => p.toLowerCase().includes('versatile'));
+            const isLight = wpn.properties?.some(p => p.toLowerCase().includes('light'));
+            const archeryBonus = (isRanged && fightingStyles.has('Archery')) ? 2 : 0;         // +2 ranged attack
+            const duelingBonus = (!isRanged && !isTwoHanded && fightingStyles.has('Dueling')) ? 2 : 0; // +2 one-handed melee damage
+            const gwfApplies = !isRanged && (isTwoHanded || isVersatile) && fightingStyles.has('Great Weapon Fighting'); // reroll 1s & 2s
+            const twfApplies = !isRanged && isLight && fightingStyles.has('Two-Weapon Fighting'); // off-hand adds ability mod (already in dmgBonus here)
+            const hitBonus = abilityMod + profBonus + (wpn.bonus || 0) + ammoBonus + archeryBonus;
+            const dmgBonus = abilityMod + (wpn.bonus || 0) + ammoBonus + duelingBonus;
+            // Active weapon-rider spell buffs add their die to weapon damage
+            const dmgFormula = wpn.damage ? `${wpn.damage}+${dmgBonus}${riderDamageSuffix}` : null;
+            const activeStyles = [
+              archeryBonus && 'Archery', duelingBonus && 'Dueling',
+              gwfApplies && 'Great Weapon', twfApplies && 'Two-Weapon',
+            ].filter(Boolean);
 
             const useAmmo = () => {
               if (!needsAmmo || char.trackAmmo === false || !selectedAmmo) return;
@@ -1781,6 +1880,16 @@ export default function CharacterSheet() {
                         </span>
                       );
                     })()}
+                    {activeStyles.map(s => (
+                      <span key={s} title={`${s} Fighting Style`} style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(74, 222, 128, 0.12)', border: '1px solid rgba(74, 222, 128, 0.4)', color: '#4ade80', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                        {s}
+                      </span>
+                    ))}
+                    {activeRiders.map(name => (
+                      <span key={name} title={`${name}: +${SPELL_WEAPON_RIDERS[name].die} ${SPELL_WEAPON_RIDERS[name].type} on hit`} style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(176, 126, 224, 0.15)', border: '1px solid rgba(176, 126, 224, 0.45)', color: '#b07ee0', fontWeight: 600, letterSpacing: '0.5px' }}>
+                        {name} +{SPELL_WEAPON_RIDERS[name].die}
+                      </span>
+                    ))}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     <span>{wpn.subcategory || 'Weapon'}</span>
@@ -1822,8 +1931,8 @@ export default function CharacterSheet() {
                 </span>
                 <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {dmgFormula && (
-                    <RollBtn label={`${wpn.name} Damage`} formula={dmgFormula} type="damage">
-                      {wpn.damage}+{dmgBonus}
+                    <RollBtn label={`${wpn.name} Damage`} formula={dmgFormula} type="damage" rerollLow={gwfApplies}>
+                      {wpn.damage}+{dmgBonus}{riderDamageSuffix}
                     </RollBtn>
                   )}
                   {wpn.damageType && <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{wpn.damageType}</span>}
@@ -1998,6 +2107,22 @@ export default function CharacterSheet() {
     }
     const multiCaster = dcEntries.length > 1;
 
+    // Spell preparation / known limits (summed across caster classes)
+    const PREPARED_FULL = ['Cleric', 'Druid', 'Wizard'];
+    const PREPARED_HALF = ['Paladin', 'Artificer'];
+    let cantripLimit = 0, leveledLimit = 0;
+    for (const c of casterClasses) {
+      cantripLimit += CANTRIPS_KNOWN[c.class]?.[c.level - 1] || 0;
+      if (SPELLS_KNOWN[c.class]) leveledLimit += SPELLS_KNOWN[c.class][c.level - 1] || 0;         // known casters
+      else if (PREPARED_FULL.includes(c.class)) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + c.level);
+      else if (PREPARED_HALF.includes(c.class)) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + Math.floor(c.level / 2));
+    }
+    // Count non-racial prepared spells by tier
+    const cantripCount = spellData.filter(s => s.level === 0 && s.source !== 'race').length;
+    const leveledCount = spellData.filter(s => (s.level || 0) >= 1 && s.source !== 'race').length;
+    const atCantripCap = cantripLimit > 0 && cantripCount >= cantripLimit;
+    const atLeveledCap = leveledLimit > 0 && leveledCount >= leveledLimit;
+
     return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
@@ -2119,8 +2244,13 @@ export default function CharacterSheet() {
       )}
 
       {/* ── Manage Prepared Spells ── */}
-      <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{(char.preparedSpells || []).length} spells prepared</span>
+      <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', gap: '12px' }}>
+          {cantripLimit > 0 && <span>Cantrips <strong style={{ color: atCantripCap ? '#fbbf24' : 'var(--gold)' }}>{cantripCount}/{cantripLimit}</strong></span>}
+          {leveledLimit > 0
+            ? <span>Spells <strong style={{ color: atLeveledCap ? '#fbbf24' : 'var(--gold)' }}>{leveledCount}/{leveledLimit}</strong></span>
+            : <span>{(char.preparedSpells || []).length} spells prepared</span>}
+        </span>
         <button onClick={() => setShowSpellBrowser(!showSpellBrowser)}
           className="cc-skill"
           style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '6px', background: showSpellBrowser ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${showSpellBrowser ? 'var(--gold)' : 'var(--border)'}`, color: showSpellBrowser ? 'var(--bg-dark)' : 'var(--text)', cursor: 'pointer', fontWeight: 600 }}>
@@ -2149,15 +2279,19 @@ export default function CharacterSheet() {
             <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {spellBrowserResults.map(sp => {
                 const isPrepared = (char.preparedSpells || []).includes(sp.name);
+                const capped = !isPrepared && ((sp.level === 0 && atCantripCap) || ((sp.level || 0) >= 1 && atLeveledCap));
                 return (
-                  <div key={sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}` }}>
+                  <div key={sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}`, opacity: capped ? 0.45 : 1 }}>
                     <button
+                      disabled={capped}
+                      title={capped ? `At your ${sp.level === 0 ? 'cantrip' : 'spell'} limit — remove one first` : undefined}
                       onClick={() => {
+                        if (capped) return;
                         const current = char.preparedSpells || [];
                         if (isPrepared) updateField('preparedSpells', current.filter(n => n !== sp.name));
                         else updateField('preparedSpells', [...current, sp.name]);
                       }}
-                      style={{ width: '22px', height: '22px', borderRadius: '4px', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, background: isPrepared ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${isPrepared ? 'var(--gold)' : 'var(--border)'}`, color: isPrepared ? 'var(--bg-dark)' : 'var(--text-dim)', padding: 0 }}>
+                      style={{ width: '22px', height: '22px', borderRadius: '4px', cursor: capped ? 'not-allowed' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, background: isPrepared ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${isPrepared ? 'var(--gold)' : 'var(--border)'}`, color: isPrepared ? 'var(--bg-dark)' : 'var(--text-dim)', padding: 0 }}>
                       {isPrepared ? '✓' : '+'}
                     </button>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2274,7 +2408,7 @@ export default function CharacterSheet() {
               const itemColor = hasRarity ? rarityColor(cached.rarity) : null;
               // Detect ammo items
               const low = item.toLowerCase();
-              const isAmmoItem = low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('dart') || low.includes('needle');
+              const isAmmoItem = isAmmoName(item) || low.includes('dart');
               const ammoLeft = isAmmoItem ? (char.ammo?.[item] ?? defaultAmmoCount(item)) : null;
               return (
                 <div key={i} className="cc-skill" style={{
@@ -2494,21 +2628,19 @@ export default function CharacterSheet() {
         </div>
       ))}
 
-      {/* Class Features */}
-      {char.features?.length > 0 && (
+      {/* Class Features — full derived list (all classes/levels), not just stored ones */}
+      {classFeatureList.length > 0 && (
         <div style={st.sideCard}>
           <div style={st.sideLabel}>Class Features</div>
-          {char.features.map((f, i) => {
-            const fStr = typeof f === 'object' && f !== null ? (f.name || JSON.stringify(f)) : String(f || '');
-            const [name, ...descParts] = fStr.split(': ');
-            const desc = descParts.length > 0 ? descParts.join(': ') : featureDescription(name);
-            return (
-              <div key={i} style={{ fontSize: '12px', marginBottom: '6px', padding: '4px 0', borderBottom: i < char.features.length - 1 ? '1px solid var(--surface)' : 'none' }}>
-                <strong style={{ color: 'var(--gold)' }}>{name}</strong>
-                {desc && <span style={{ color: 'var(--text-dim)' }}> — {desc}</span>}
+          {classFeatureList.map((f, i) => (
+            <div key={i} style={{ fontSize: '12px', marginBottom: '6px', padding: '4px 0', borderBottom: i < classFeatureList.length - 1 ? '1px solid var(--surface)' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
+                <strong style={{ color: 'var(--gold)' }}>{f.name}</strong>
+                {f.level != null && <span style={{ fontSize: '10px', color: 'var(--text-dim)', flexShrink: 0 }}>{f.source ? `${f.source} · ` : ''}Lv {f.level}</span>}
               </div>
-            );
-          })}
+              {f.desc && <span style={{ color: 'var(--text-dim)' }}>{f.desc}</span>}
+            </div>
+          ))}
         </div>
       )}
 
@@ -2590,7 +2722,7 @@ export default function CharacterSheet() {
       const cls = ctx.class;
       const lvl = ctx.level;
       const subclass = ctx.subclass || '';
-      const levels = CLASS_LEVELS[cls] || {};
+      const levels = getClassLevels(cls, char.ruleset);
       const classInfo = CLASSES[cls] || {};
       const nextLvl = lvl < 20 ? lvl + 1 : null;
       const nextFeatures = nextLvl ? (levels[nextLvl] || []) : [];
@@ -2930,7 +3062,7 @@ export default function CharacterSheet() {
           <div style={st.sideLabel}>{cls} — Level {lvl}</div>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-dim)', marginBottom: '8px' }}>
             <span>Hit Die: <strong style={{ color: 'var(--text)' }}>{classInfo.hitDice || HIT_DICE[cls] || 'd8'}</strong></span>
-            {classInfo.subclassLevel && <span>Subclass at Level: <strong style={{ color: 'var(--text)' }}>{classInfo.subclassLevel}</strong></span>}
+            <span>Subclass at Level: <strong style={{ color: 'var(--text)' }}>{getSubclassLevel(cls, char.ruleset)}</strong></span>
             {classInfo.spellcasting && <span>Spellcasting: <strong style={{ color: 'var(--text)' }}>{classInfo.spellcastingAbility}</strong></span>}
             {subclass && <span>Subclass: <strong style={{ color: 'var(--gold)' }}>{subclass}</strong></span>}
           </div>
@@ -3498,18 +3630,11 @@ export default function CharacterSheet() {
                   </div>
                 )}
 
-                {sidePanel.data.properties?.some(p => p.toLowerCase().includes('ammunition')) && (() => {
+                {weaponNeedsAmmo(sidePanel.data) && (() => {
                   const wpnName = (sidePanel.data.name || '').toLowerCase();
-                  // Find equipped ammo matching this weapon
-                  const matchingAmmo = (char.equippedItems || []).filter(name => {
-                    const low = name.toLowerCase();
-                    const isAmmo = low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('needle');
-                    if (!isAmmo) return false;
-                    if (wpnName.includes('crossbow')) return low.includes('bolt');
-                    if (wpnName.includes('sling')) return low.includes('bullet');
-                    return low.includes('arrow');
-                  });
-                  const ammoLabel = wpnName.includes('crossbow') ? 'Bolts' : wpnName.includes('sling') ? 'Bullets' : 'Arrows';
+                  // Find equipped ammo matching this weapon (handles homebrew ammoType)
+                  const matchingAmmo = (char.equippedItems || []).filter(name => ammoMatchesWeapon(name, sidePanel.data));
+                  const ammoLabel = sidePanel.data.ammoType || (wpnName.includes('crossbow') ? 'Bolts' : wpnName.includes('sling') ? 'Bullets' : wpnName.includes('blowgun') ? 'Needles' : 'Arrows');
                   return (
                     <div style={{ fontSize: '12px', marginBottom: '12px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
                       <div style={{ marginBottom: matchingAmmo.length > 0 ? '6px' : 0 }}>
@@ -3892,7 +4017,7 @@ export default function CharacterSheet() {
         const existingSubclass = lu.isNew ? '' : (targetCurrent?.subclass || '');
         // Prompt for subclass whenever the class reaches its unlock level without one set
         const needsSubclass = (targetInfo.subclasses || []).length > 0 && !existingSubclass
-          && resultingLevel >= (targetInfo.subclassLevel || 99);
+          && resultingLevel >= getSubclassLevel(lu.targetClass, char.ruleset);
         const eligible = !lu.isNew || meetsReq(lu.targetClass);
         const canConfirm = eligible && (!needsSubclass || lu.subclass);
         const hd = targetInfo.hitDice || HIT_DICE[lu.targetClass] || 'd8';
@@ -3947,7 +4072,7 @@ export default function CharacterSheet() {
               {/* Subclass prompt — when this class hits its unlock level without one */}
               {needsSubclass && (
                 <div style={{ marginBottom: '10px' }}>
-                  <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Choose {lu.targetClass} subclass (unlocks at level {targetInfo.subclassLevel})</div>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Choose {lu.targetClass} subclass (unlocks at level {getSubclassLevel(lu.targetClass, char.ruleset)})</div>
                   <select value={lu.subclass || ''} onChange={e => setLevelUpModal(prev => ({ ...prev, subclass: e.target.value }))}
                     style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}>
                     <option value="">— Choose subclass —</option>
