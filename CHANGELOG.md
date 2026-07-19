@@ -28,6 +28,8 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.4.0 — 2026-07-19
+
 ### Added
 - **Skilled feat now grants its 3 proficiencies.** Selecting the Skilled feat in the creator shows a picker to choose any combination of 3 skills or tools; the chosen skills are added to the character's skill proficiencies and the chosen tools to tool proficiencies. In the editor, the skill/tool limits are raised to make room for the picks (add them in the Skills and Tools sections). Data-driven via `FEAT_PROFICIENCY_GRANTS` so other proficiency-granting feats can be added later.
 - **Half-feat ability score increases now actually apply.** Feats that grant a `+1` (Actor, Durable, Keen Mind, Linguist, Heavily/Heavy Armor/Armored — fixed; Athlete, Lightly/Moderately Armored, Observant, Tavern Brawler, Weapon Master, Resilient — player's choice) now raise the chosen ability at creation (capped at 20), flowing into HP, AC, save DCs, and checks. Choice feats show an ability picker; fixed feats apply automatically with a confirmation line. Driven by `FEAT_ABILITY_BONUSES`.

@@ -18,7 +18,8 @@
 
 ## Versioning
 - When finalizing a version: rename `vX.X.X — Unreleased` with the version number + date, update `client/src/version.js`, then re-add a fresh `## vX.X.X — Unreleased` section
-- Don't bump version unless the user says to
+- **When the user says to push, always finalize the version number as part of that push**: bump to the next version (rename the Unreleased section with version + date, update `client/src/version.js`, re-add a fresh `## vX.X.X — Unreleased`), then commit and push. Pick the bump from the Unreleased content — new features → minor (x.Y.0), fixes only → patch (x.y.Z)
+- Otherwise, don't bump version unless the user says to
 
 ## Style
 - No emojis in Discord announcements (Discord.md)
