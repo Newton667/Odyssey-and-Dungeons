@@ -6,10 +6,11 @@ import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
 import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
-import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
+import { CLASS_LEVELS, CLASSES, NATURAL_WEAPONS, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
 import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses } from '../utils/multiclass';
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
+import { featureRoll } from '../utils/featureRolls';
 import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
 import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor } from '../utils/dndHelpers';
@@ -597,7 +598,11 @@ export default function CharacterSheet() {
 
 
   const profBonus = char?.proficiencyBonus || 2;
-  const scores = char?.abilityScores || {};
+  // Effective ability scores = base + per-ability misc bonuses (items/homebrew, set in the editor).
+  const scores = ABILITIES.reduce((o, ab) => {
+    o[ab] = (char?.abilityScores?.[ab] ?? 10) + (char?.abilityBonuses?.[ab] || 0);
+    return o;
+  }, {});
   // Normalized set of the character's feat names (handles string | {name} entries from old saves)
   const featSet = useMemo(
     () => new Set((char?.feats || []).map(f => (typeof f === 'string' ? f : (f?.name || ''))).filter(Boolean)),
@@ -614,24 +619,28 @@ export default function CharacterSheet() {
     }
     return s;
   }, [char?.fightingStyle, char?.features]);
-  // Sum unconditional feat bonuses that feed into derived stats (e.g. Alert → +5 initiative)
+  // Sum unconditional feat bonuses that feed into derived stats (e.g. Alert → initiative)
   const featEffects = useMemo(() => {
     const totals = { initiative: 0, passivePerception: 0, passiveInvestigation: 0 };
     for (const name of featSet) {
       const eff = FEAT_EFFECTS[name];
       if (eff) for (const k in eff) totals[k] = (totals[k] || 0) + eff[k];
     }
+    // Alert changed between editions: 2014 = flat +5 initiative (from FEAT_EFFECTS); 2024 = +proficiency bonus.
+    if (featSet.has('Alert') && char?.ruleset === '2024') totals.initiative = totals.initiative - 5 + profBonus;
     return totals;
-  }, [featSet]);
+  }, [featSet, char?.ruleset, profBonus]);
   const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Perception') ? profBonus : 0) + featEffects.passivePerception;
   const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char?.skillProficiencies?.includes('Investigation') ? profBonus : 0) + featEffects.passiveInvestigation;
   const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Insight') ? profBonus : 0);
-  const initiative = modVal(scores.dexterity ?? 10) + featEffects.initiative;
+  const initiative = modVal(scores.dexterity ?? 10) + featEffects.initiative + (char?.initiativeBonus || 0);
   const dexMod = modVal(scores.dexterity ?? 10);
 
   // Auto-calculate AC from equipped armor
   const calcAC = useMemo(() => {
     if (!char) return 10;
+    // Manual AC override wins outright (natural armor, homebrew, magic items the calc can't model).
+    if (char.acOverride != null && char.acOverride !== '') return Number(char.acOverride);
     const equipped = char.equippedItems || [];
     const cache = equipCache.current;
     let baseAC = 10 + dexMod; // unarmored default
@@ -664,8 +673,8 @@ export default function CharacterSheet() {
     }
     // Defense fighting style: +1 AC while wearing armor
     if (hasArmor && fightingStyles.has('Defense')) baseAC += 1;
-    return baseAC + shieldBonus;
-  }, [char?.equippedItems, dexMod, equipDataLoaded, featSet, fightingStyles]);
+    return baseAC + shieldBonus + (char.acBonus || 0);
+  }, [char?.equippedItems, char?.acBonus, char?.acOverride, dexMod, equipDataLoaded, featSet, fightingStyles]);
 
   // Check if equipped armor gives stealth disadvantage
   const hasStealthDisadvantage = useMemo(() => {
@@ -1785,6 +1794,12 @@ export default function CharacterSheet() {
 
     // Class & subclass features surfaced here as usable actions/abilities (shared list)
     const classActions = classFeatureList;
+    // Level in each class, so rollable features (Second Wind, Sneak Attack, …) scale correctly.
+    const classLevelByName = {};
+    charClasses.forEach(c => { classLevelByName[c.class] = c.level; });
+    // Racial natural weapons (Aarakocra Talons, Lizardfolk Bite, …) as rollable attacks.
+    const baseRace = (char.race || '').split(' (')[0];
+    const naturalWeapons = NATURAL_WEAPONS[baseRace] || [];
 
     // Equipped weapons from cache
     const equippedWeapons = (char.equippedItems || [])
@@ -1829,12 +1844,22 @@ export default function CharacterSheet() {
             const isTwoHanded = wpn.properties?.some(p => p.toLowerCase().includes('two-handed'));
             const isVersatile = wpn.properties?.some(p => p.toLowerCase().includes('versatile'));
             const isLight = wpn.properties?.some(p => p.toLowerCase().includes('light'));
+            // Versatile weapons carry their two-handed die in the property, e.g. "versatile (1d10)".
+            // Strip any "+N" (that magic bonus is already counted in wpn.bonus/dmgBonus).
+            const versatileDie = (() => {
+              if (!isVersatile) return null;
+              const prop = wpn.properties.find(p => p.toLowerCase().includes('versatile'));
+              return prop?.match(/(\d+d\d+)/)?.[1] || null;
+            })();
             const archeryBonus = (isRanged && fightingStyles.has('Archery')) ? 2 : 0;         // +2 ranged attack
             const duelingBonus = (!isRanged && !isTwoHanded && fightingStyles.has('Dueling')) ? 2 : 0; // +2 one-handed melee damage
-            const gwfApplies = !isRanged && (isTwoHanded || isVersatile) && fightingStyles.has('Great Weapon Fighting'); // reroll 1s & 2s
+            const gwfStyle = !isRanged && fightingStyles.has('Great Weapon Fighting');          // reroll 1s & 2s (two-handed grip only)
+            const gwf1H = gwfStyle && isTwoHanded;   // a pure two-handed weapon's only roll
+            const gwf2H = gwfStyle;                  // the versatile two-handed roll
             const twfApplies = !isRanged && isLight && fightingStyles.has('Two-Weapon Fighting'); // off-hand adds ability mod (already in dmgBonus here)
             const hitBonus = abilityMod + profBonus + (wpn.bonus || 0) + ammoBonus + archeryBonus;
             const dmgBonus = abilityMod + (wpn.bonus || 0) + ammoBonus + duelingBonus;
+            const dmgBonus2H = dmgBonus - duelingBonus; // two-handed grip forfeits the Dueling style
             // Active weapon-rider spell buffs add their die to weapon damage
             const dmgFormula = wpn.damage ? `${wpn.damage}+${dmgBonus}${riderDamageSuffix}` : null;
             const activeStyles = [
@@ -1935,10 +1960,15 @@ export default function CharacterSheet() {
                     +{hitBonus}
                   </RollBtn>
                 </span>
-                <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                   {dmgFormula && (
-                    <RollBtn label={`${wpn.name} Damage`} formula={dmgFormula} type="damage" rerollLow={gwfApplies}>
-                      {wpn.damage}+{dmgBonus}{riderDamageSuffix}
+                    <RollBtn label={`${wpn.name} Damage${versatileDie ? ' (1H)' : ''}`} formula={dmgFormula} type="damage" rerollLow={gwf1H}>
+                      {versatileDie ? '1H: ' : ''}{wpn.damage}+{dmgBonus}{riderDamageSuffix}
+                    </RollBtn>
+                  )}
+                  {versatileDie && (
+                    <RollBtn label={`${wpn.name} Damage (2H)`} formula={`${versatileDie}+${dmgBonus2H}${riderDamageSuffix}`} type="damage" rerollLow={gwf2H}>
+                      2H: {versatileDie}+{dmgBonus2H}{riderDamageSuffix}
                     </RollBtn>
                   )}
                   {wpn.damageType && <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{wpn.damageType}</span>}
@@ -1984,7 +2014,49 @@ export default function CharacterSheet() {
             </span>
           </div>
 
-          {equippedWeapons.length === 0 && (
+          {/* Racial natural weapons (Aarakocra Talons, Lizardfolk Bite, …) */}
+          {naturalWeapons.map((nw) => {
+            const nwMod = modVal(scores[nw.ability] ?? 10);
+            return (
+              <div key={`nat-${nw.name}`} className="cc-skill" style={{
+                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0',
+                padding: '8px 10px', borderBottom: '1px solid var(--surface)',
+                fontSize: '13px', alignItems: 'center', cursor: 'pointer',
+              }}
+                onClick={() => setSidePanel({ type: 'action', data: {
+                  name: nw.name,
+                  actionType: '1 Action',
+                  attackType: 'Melee Attack',
+                  toHit: nwMod + profBonus,
+                  damage: `${nw.damage}+${nwMod}`,
+                  damageType: nw.damageType,
+                  stat: ABBR[nw.ability],
+                  range: '5ft. Reach',
+                  proficient: true,
+                  description: `${nw.name} — a natural melee weapon attack from your ${baseRace} heritage. On a hit it deals ${nw.damage} + your ${ABBR[nw.ability]} modifier ${nw.damageType} damage.`,
+                }})}
+              >
+                <div>
+                  <div style={{ fontWeight: 500 }}>{nw.name}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Natural Weapon · {baseRace}</div>
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>5 ft.</span>
+                <span style={{ fontSize: '12px' }}>
+                  <RollBtn label={`${nw.name} Attack`} formula={`1d20+${nwMod + profBonus}`}>
+                    +{nwMod + profBonus}
+                  </RollBtn>
+                </span>
+                <span style={{ fontSize: '12px' }}>
+                  <RollBtn label={`${nw.name} Damage`} formula={`${nw.damage}+${nwMod}`} type="damage">
+                    {nw.damage}+{nwMod}
+                  </RollBtn>
+                  {' '}<span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{nw.damageType}</span>
+                </span>
+              </div>
+            );
+          })}
+
+          {equippedWeapons.length === 0 && naturalWeapons.length === 0 && (
             <div style={{ padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)', fontStyle: 'italic' }}>
               Equip weapons in the Inventory tab to see them here.
             </div>
@@ -2076,6 +2148,17 @@ export default function CharacterSheet() {
                   )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {(() => {
+                    const roll = featureRoll(f.name, { classLevel: classLevelByName[f.source] ?? f.level });
+                    if (!roll) return null;
+                    return (
+                      <span onClick={e => e.stopPropagation()} title={roll.note || ''}>
+                        <RollBtn label={roll.label} formula={roll.formula} type="damage">
+                          {roll.formula}
+                        </RollBtn>
+                      </span>
+                    );
+                  })()}
                   {f.uses && (() => {
                     const remaining = char.featureUses?.[f.useKey] ?? f.uses.max;
                     const setUse = (v) => updateField('featureUses', { ...(char.featureUses || {}), [f.useKey]: Math.max(0, Math.min(f.uses.max, v)) });
@@ -2125,6 +2208,8 @@ export default function CharacterSheet() {
       else if (PREPARED_FULL.includes(c.class)) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + c.level);
       else if (PREPARED_HALF.includes(c.class) || rangerPrepared2024) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + Math.floor(c.level / 2));
     }
+    // Magic Initiate grants 2 cantrips + 1 first-level spell on top of any class allowance.
+    if (featSet.has('Magic Initiate')) { cantripLimit += 2; leveledLimit += 1; }
     // Count non-racial prepared spells by tier
     const cantripCount = spellData.filter(s => s.level === 0 && s.source !== 'race').length;
     const leveledCount = spellData.filter(s => (s.level || 0) >= 1 && s.source !== 'race').length;

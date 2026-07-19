@@ -5,7 +5,7 @@ import NumInput from '../components/NumInput';
 import Tip from '../components/Tip';
 import {
   ABILITIES, ABBR, ALIGNMENTS, ALL_SKILLS, SKILLS_WITH_ABILITY, STANDARD_ARRAY, PB_COSTS,
-  TOOL_OPTIONS, FEATS, RARITY_COLORS, RARITY_ORDER, HIT_DICE,
+  TOOL_OPTIONS, FEATS, FEAT_EFFECTS, FEAT_PROFICIENCY_GRANTS, FEAT_ABILITY_BONUSES, FEAT_HP_PER_LEVEL, RARITY_COLORS, RARITY_ORDER, HIT_DICE,
   CANTRIPS_KNOWN, SPELLS_KNOWN, BACKGROUNDS,
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel } from '../utils/dndHelpers';
@@ -45,20 +45,24 @@ const CLASS_SPELL_ABILITY = {
   Ranger: 'wisdom', Sorcerer: 'charisma', Warlock: 'charisma', Wizard: 'intelligence', Artificer: 'intelligence',
 };
 
-function getSpellLimits(cls, lvl, abilityMod) {
+function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014') {
   if (!SPELLCASTING_CLASSES.includes(cls)) return null;
-  if (['Paladin','Ranger'].includes(cls) && lvl < 2) return null;
+  // 2024 Paladin/Ranger gain Spellcasting at level 1; in 2014 they start at level 2.
+  const halfCasterStart = ruleset === '2024' ? 1 : 2;
+  if (['Paladin','Ranger'].includes(cls) && lvl < halfCasterStart) return null;
   const idx = Math.min(lvl, 20) - 1;
   const cantrips = CANTRIPS_KNOWN[cls]?.[idx] || 0;
-  const maxLvl = maxSpellLevel(cls, lvl);
+  const maxLvl = maxSpellLevel(cls, lvl, ruleset);
 
-  if (SPELLS_KNOWN[cls]) {
+  // 2024 Ranger prepares spells (WIS mod + half level) instead of knowing a fixed number.
+  const rangerPrepared2024 = ruleset === '2024' && cls === 'Ranger';
+  if (SPELLS_KNOWN[cls] && !rangerPrepared2024) {
     return { cantrips, maxSpells: SPELLS_KNOWN[cls][idx] || 0, type: 'known', maxLevel: maxLvl };
   }
   if (['Cleric','Druid'].includes(cls)) {
     return { cantrips, maxSpells: Math.max(1, abilityMod + lvl), type: 'prepared', maxLevel: maxLvl };
   }
-  if (cls === 'Paladin') {
+  if (cls === 'Paladin' || rangerPrepared2024) {
     return { cantrips: 0, maxSpells: Math.max(1, abilityMod + Math.floor(lvl / 2)), type: 'prepared', maxLevel: maxLvl };
   }
   if (cls === 'Wizard') {
@@ -71,7 +75,7 @@ function getSpellLimits(cls, lvl, abilityMod) {
   return { cantrips, maxSpells: 0, type: 'known', maxLevel: maxLvl };
 }
 
-const SECTIONS = ['Basic Info', 'Ability Scores', 'Skills', 'Combat', 'Equipment', 'Spells', 'Features & Feats', 'Details', 'Notes', 'Settings'];
+const SECTIONS = ['Basic Info', 'Ability Scores', 'Skills', 'Combat', 'Equipment', 'Spells', 'Features & Feats', 'Details', 'Notes', 'Settings', 'Stat Breakdown'];
 
 export default function CharacterEdit() {
   const { id } = useParams();
@@ -89,6 +93,11 @@ export default function CharacterEdit() {
   // Equipment search
   const [featOverride, setFeatOverride] = useState(false);
   const [customFeat, setCustomFeat] = useState('');
+  const [spellOverride, setSpellOverride] = useState(false);
+  const [customSpell, setCustomSpell] = useState('');
+  const [overrideSpellSearch, setOverrideSpellSearch] = useState('');
+  const [skillOverride, setSkillOverride] = useState(false);
+  const [saveOverride, setSaveOverride] = useState(false);
   const [equipSearch, setEquipSearch] = useState('');
   const [equipResults, setEquipResults] = useState([]);
   const [equipLoading, setEquipLoading] = useState(false);
@@ -137,6 +146,10 @@ export default function CharacterEdit() {
         savingThrowProficiencies: [...(data.savingThrowProficiencies || [])],
         maxHp: data.maxHp || 10,
         armorClass: data.armorClass || 10,
+        acBonus: data.acBonus || 0,
+        acOverride: data.acOverride ?? null,
+        initiativeBonus: data.initiativeBonus || 0,
+        abilityBonuses: { ...(data.abilityBonuses || {}) },
         speed: data.speed || 30,
         hitDice: data.hitDice || '1d8',
         proficiencyBonus: data.proficiencyBonus || 2,
@@ -243,7 +256,13 @@ export default function CharacterEdit() {
 
   // Auto-calculate proficiency bonus from level
   const computedProfBonus = useMemo(() => profBonus(form.level || 1), [form.level]);
-  const scores = form.abilityScores || {};
+  // Effective scores = base (form.abilityScores) + per-ability misc bonuses. Modifiers/preview use this;
+  // saving/loading keeps base and bonuses separate so they don't compound.
+  const scores = useMemo(() => {
+    const base = form.abilityScores || {};
+    const bonus = form.abilityBonuses || {};
+    return ABILITIES.reduce((o, ab) => { o[ab] = (base[ab] ?? 10) + (bonus[ab] || 0); return o; }, {});
+  }, [form.abilityScores, form.abilityBonuses]);
 
   // Point buy points remaining
   const pbPointsLeft = useMemo(() => {
@@ -251,11 +270,18 @@ export default function CharacterEdit() {
   }, [pbScores]);
 
   // Max skill proficiencies = class skills + background (2) + racial bonuses
+  // Extra skill slots allowed by proficiency-granting feats (e.g. Skilled → +3). The feat may spend
+  // picks on tools instead, so this is an upper bound that just keeps the limit from blocking valid picks.
+  const featSkillSlots = useMemo(() => (form.feats || []).reduce((n, f) => {
+    const name = typeof f === 'object' && f !== null ? f.name : f;
+    return n + (FEAT_PROFICIENCY_GRANTS[name]?.count || 0);
+  }, 0), [form.feats]);
+
   const maxSkills = useMemo(() => {
     const classSkills = CLASS_NUM_SKILLS[form.class] || 2;
     const racialSkills = RACIAL_BONUS_SKILLS[form.race] || 0;
-    return classSkills + BG_SKILL_COUNT + racialSkills;
-  }, [form.class, form.race]);
+    return classSkills + BG_SKILL_COUNT + racialSkills + featSkillSlots;
+  }, [form.class, form.race, featSkillSlots]);
 
   // Max feats from ASI count (+ 1 for variant human)
   const asiCount = useMemo(() => {
@@ -274,8 +300,8 @@ export default function CharacterEdit() {
   }, [form.spellcastingAbility, scores]);
 
   const spellLimits = useMemo(() => {
-    return getSpellLimits(form.class, form.level || 1, spellcastingMod);
-  }, [form.class, form.level, spellcastingMod]);
+    return getSpellLimits(form.class, form.level || 1, spellcastingMod, form.ruleset || '2014');
+  }, [form.class, form.level, spellcastingMod, form.ruleset]);
 
   // Class change handler — shows confirmation dialog
   const handleClassChange = async (newClass) => {
@@ -811,8 +837,24 @@ export default function CharacterEdit() {
                 </div>
               )}
 
-              {/* Final Scores Preview */}
+              {/* Misc ability bonuses — items (Belt of Giant Strength), homebrew, etc. Kept separate from the
+                  base score so switching entry method doesn't wipe them; added into every derived stat. */}
               <div style={{ marginTop: '20px', padding: '12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '4px' }}>Misc Bonuses (items / homebrew)</div>
+                <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: '0 0 10px' }}>Added on top of the base score above and applied everywhere (checks, saves, DCs).</p>
+                <div style={st.grid3}>
+                  {ABILITIES.map(ab => (
+                    <div key={ab} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{ABBR[ab]}</label>
+                      <NumInput style={st.input} min={-10} value={form.abilityBonuses?.[ab] || 0}
+                        onChange={v => set('abilityBonuses', { ...(form.abilityBonuses || {}), [ab]: v })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Final Scores Preview */}
+              <div style={{ marginTop: '14px', padding: '12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '10px' }}>Final Scores</div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                   {ABILITIES.map(ab => (
@@ -826,11 +868,19 @@ export default function CharacterEdit() {
               </div>
 
               {/* Saving Throws */}
-              <h4 style={{ fontSize: '14px', marginTop: '24px', marginBottom: '8px', color: 'var(--gold)' }}>Saving Throw Proficiencies</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '8px' }}>
+                <h4 style={{ fontSize: '14px', margin: 0, color: 'var(--gold)' }}>Saving Throw Proficiencies</h4>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: saveOverride ? 'var(--gold)' : 'var(--text-dim)' }}>
+                  <input type="checkbox" checked={saveOverride} onChange={e => setSaveOverride(e.target.checked)} />
+                  Override — edit any save
+                </label>
+              </div>
               <p style={{ color: 'var(--text-dim)', fontSize: '11px', marginBottom: '12px' }}>
-                Determined by class. {form.class && SAVING_THROWS_BY_CLASS[form.class]
-                  ? `${form.class}: ${SAVING_THROWS_BY_CLASS[form.class].map(a => ABBR[a]).join(', ')}`
-                  : 'Select a class to auto-set.'}
+                {saveOverride
+                  ? 'Click any ability to toggle its saving-throw proficiency (multiclass, Resilient, homebrew).'
+                  : <>Determined by class. {form.class && SAVING_THROWS_BY_CLASS[form.class]
+                      ? `${form.class}: ${SAVING_THROWS_BY_CLASS[form.class].map(a => ABBR[a]).join(', ')}`
+                      : 'Select a class to auto-set.'} Enable Override to edit.</>}
               </p>
               <div style={st.grid3}>
                 {ABILITIES.map(ab => {
@@ -838,7 +888,9 @@ export default function CharacterEdit() {
                   const prof = (form.savingThrowProficiencies || []).includes(ab);
                   const isClassSave = classSaves.includes(ab);
                   return (
-                    <div key={ab} style={{ ...st.skillRow(prof), opacity: !isClassSave && !prof ? 0.5 : 1, cursor: 'default' }}>
+                    <div key={ab}
+                      onClick={() => { if (saveOverride) toggleArr('savingThrowProficiencies', ab); }}
+                      style={{ ...st.skillRow(prof), opacity: !isClassSave && !prof && !saveOverride ? 0.5 : 1, cursor: saveOverride ? 'pointer' : 'default' }}>
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--gold-dim)', background: prof ? 'var(--gold)' : 'transparent' }} />
                       <span style={{ fontSize: '12px', textTransform: 'uppercase' }}>{ABBR[ab]}</span>
                       <span style={{ marginLeft: 'auto', fontSize: '13px', color: 'var(--gold)', fontWeight: 700 }}>
@@ -854,21 +906,27 @@ export default function CharacterEdit() {
           {/* ═══ SKILLS ═══ */}
           {section === 2 && (
             <div style={st.card}>
-              <h3 style={st.sectionTitle}>Skill Proficiencies</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ ...st.sectionTitle, margin: 0 }}>Skill Proficiencies</h3>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: 600, color: skillOverride ? 'var(--gold)' : 'var(--text-dim)' }}>
+                  <input type="checkbox" checked={skillOverride} onChange={e => setSkillOverride(e.target.checked)} />
+                  Override — ignore skill limit
+                </label>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p style={{ color: 'var(--text-dim)', fontSize: '12px', margin: 0 }}>Click to toggle proficiency. Right-click to toggle expertise.</p>
                 <span style={{
                   fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '4px',
-                  background: (form.skillProficiencies || []).length > maxSkills ? '#3e1a1a' : 'var(--accent)',
-                  border: `1px solid ${(form.skillProficiencies || []).length > maxSkills ? '#ff4444' : 'var(--gold-dim)'}`,
-                  color: (form.skillProficiencies || []).length > maxSkills ? '#ff6666' : 'var(--gold)',
+                  background: !skillOverride && (form.skillProficiencies || []).length > maxSkills ? '#3e1a1a' : 'var(--accent)',
+                  border: `1px solid ${!skillOverride && (form.skillProficiencies || []).length > maxSkills ? '#ff4444' : 'var(--gold-dim)'}`,
+                  color: !skillOverride && (form.skillProficiencies || []).length > maxSkills ? '#ff6666' : 'var(--gold)',
                 }}>
-                  {(form.skillProficiencies || []).length}/{maxSkills} skills
+                  {(form.skillProficiencies || []).length}{skillOverride ? '' : `/${maxSkills}`} skills
                 </span>
               </div>
-              {(form.skillProficiencies || []).length > maxSkills && (
+              {!skillOverride && (form.skillProficiencies || []).length > maxSkills && (
                 <div style={{ padding: '8px 12px', background: '#3e1a1a', border: '1px solid #ff4444', borderRadius: '6px', marginBottom: '12px', fontSize: '12px', color: '#ff6666' }}>
-                  Too many skill proficiencies! Your {form.class || 'class'} gets {CLASS_NUM_SKILLS[form.class] || 2} class skills + {BG_SKILL_COUNT} background skills{RACIAL_BONUS_SKILLS[form.race] ? ` + ${RACIAL_BONUS_SKILLS[form.race]} racial` : ''} = {maxSkills} max.
+                  Too many skill proficiencies! Your {form.class || 'class'} gets {CLASS_NUM_SKILLS[form.class] || 2} class skills + {BG_SKILL_COUNT} background skills{RACIAL_BONUS_SKILLS[form.race] ? ` + ${RACIAL_BONUS_SKILLS[form.race]} racial` : ''}{featSkillSlots ? ` + ${featSkillSlots} from feats` : ''} = {maxSkills} max. Enable Override to add more.
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -876,7 +934,7 @@ export default function CharacterEdit() {
                   const prof = (form.skillProficiencies || []).includes(sk.name);
                   const expert = (form.skillExpertise || []).includes(sk.name);
                   const mod = modVal(scores[sk.ability] ?? 10) + (prof ? computedProfBonus : 0) + (expert ? computedProfBonus : 0);
-                  const atLimit = !prof && (form.skillProficiencies || []).length >= maxSkills;
+                  const atLimit = !skillOverride && !prof && (form.skillProficiencies || []).length >= maxSkills;
                   return (
                     <div
                       key={sk.name}
@@ -914,12 +972,37 @@ export default function CharacterEdit() {
                   <NumInput style={st.input} min={1} value={form.maxHp} onChange={v => set('maxHp', v)} />
                 </div>
                 <div>
-                  <label style={st.label}>Armor Class</label>
-                  <NumInput style={st.input} min={0} value={form.armorClass} onChange={v => set('armorClass', v)} />
-                </div>
-                <div>
                   <label style={st.label}>Speed (ft)</label>
                   <NumInput style={st.input} min={0} value={form.speed} onChange={v => set('speed', v)} />
+                </div>
+                <div>
+                  <label style={st.label}>Initiative Bonus</label>
+                  <NumInput style={st.input} min={-20} value={form.initiativeBonus || 0} onChange={v => set('initiativeBonus', v)} />
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Added to DEX + feat init on the sheet.</div>
+                </div>
+              </div>
+
+              {/* Armor Class — the sheet auto-calculates AC from equipped armor + DEX, so a plain number
+                  can't stick. Use a misc bonus (rings, natural armor) or a full override instead. */}
+              <div style={{ marginTop: '14px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <label style={st.label}>Armor Class</label>
+                <p style={{ fontSize: '11px', color: 'var(--text-dim)', margin: '0 0 10px' }}>
+                  AC is auto-calculated from equipped armor + DEX on the sheet {form.armorClass ? `(currently ${form.armorClass})` : ''}. Add a misc bonus or override it below.
+                </p>
+                <div style={st.grid2}>
+                  <div>
+                    <label style={st.label}>Misc AC Bonus</label>
+                    <NumInput style={st.input} min={-20} value={form.acBonus || 0} onChange={v => set('acBonus', v)} />
+                  </div>
+                  <div>
+                    <label style={{ ...st.label, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={form.acOverride != null} onChange={e => set('acOverride', e.target.checked ? (form.armorClass || 10) : null)} />
+                      Override AC (fixed)
+                    </label>
+                    {form.acOverride != null && (
+                      <NumInput style={st.input} min={0} value={form.acOverride} onChange={v => set('acOverride', v)} />
+                    )}
+                  </div>
                 </div>
               </div>
               <div style={{ ...st.grid2, marginTop: '14px' }}>
@@ -1215,6 +1298,62 @@ export default function CharacterEdit() {
             <div style={st.card}>
               <h3 style={st.sectionTitle}>Spells</h3>
 
+              {/* Spell override — add ANY spell regardless of class list or limits (homebrew, cross-class,
+                  item/feat-granted spells, or spells on a non-caster). Mirrors the feat override. */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '14px', padding: '10px 12px', background: 'var(--surface)', border: `1px solid ${spellOverride ? 'var(--gold-dim)' : 'var(--border)'}`, borderRadius: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, color: spellOverride ? 'var(--gold)' : 'var(--text-dim)' }}>
+                  <input type="checkbox" checked={spellOverride} onChange={e => setSpellOverride(e.target.checked)} />
+                  Override — add any spell (ignore class list &amp; limits)
+                </label>
+              </div>
+              {spellOverride && (() => {
+                const current = form.preparedSpells || [];
+                const addSpell = (n) => { const name = (n || '').trim(); if (name && !current.includes(name)) set('preparedSpells', [...current, name]); };
+                const results = overrideSpellSearch.trim() ? queryLocalSpells({ search: overrideSpellSearch.trim() }).slice(0, 40) : [];
+                return (
+                  <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--gold-dim)', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+                      <input value={customSpell} onChange={e => setCustomSpell(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSpell(customSpell); setCustomSpell(''); } }}
+                        placeholder="Custom spell name…" style={{ ...st.input, flex: 1, minWidth: 0 }} />
+                      <button type="button" className="btn btn-ghost" style={{ padding: '4px 12px', fontSize: '12px' }}
+                        onClick={() => { addSpell(customSpell); setCustomSpell(''); }}>Add</button>
+                    </div>
+                    <input value={overrideSpellSearch} onChange={e => setOverrideSpellSearch(e.target.value)}
+                      placeholder="Search all spells (any class)…" style={{ ...st.input, width: '100%', marginBottom: '8px' }} />
+                    {results.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '6px', maxHeight: '260px', overflowY: 'auto' }}>
+                        {results.map(spell => {
+                          const sel = current.includes(spell.name);
+                          return (
+                            <div key={spell._id} className="cc-skill" onClick={() => sel ? set('preparedSpells', current.filter(n => n !== spell.name)) : addSpell(spell.name)}
+                              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer',
+                                background: sel ? 'var(--accent)' : 'var(--surface)', border: sel ? '1px solid var(--gold)' : '1px solid var(--border)', fontSize: '12px' }}>
+                              <span style={{ width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0, background: sel ? 'var(--gold)' : 'transparent', border: `2px solid ${sel ? 'var(--gold)' : 'var(--border)'}` }} />
+                              <div style={{ minWidth: 0 }}>
+                                <div>{spell.name}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>{spell.level === 0 ? 'Cantrip' : `Lv ${spell.level}`} · {spell.school}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {current.length > 0 && (
+                      <div style={{ marginTop: '10px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '4px' }}>On this character</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {current.map(s => (
+                            <span key={s} style={{ fontSize: '11px', padding: '3px 8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '4px', cursor: 'pointer' }}
+                              onClick={() => set('preparedSpells', current.filter(n => n !== s))}>{s} ✕</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {!isCaster ? (
                 <div style={{ padding: '16px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '13px', color: 'var(--text-dim)', textAlign: 'center' }}>
                   {form.class || 'This class'} is not a spellcaster.
@@ -1422,6 +1561,24 @@ export default function CharacterEdit() {
                   </div>
                 )}
 
+                {/* Feats with mechanical effects: remind the user to apply them (editor stats are manual, so we
+                    don't auto-apply — a saved character already has creation-time bonuses baked in). */}
+                {(() => {
+                  const featNames = (form.feats || []).map(f => (typeof f === 'object' && f !== null ? f.name : f)).filter(Boolean);
+                  const notes = [];
+                  featNames.forEach(n => {
+                    if (FEAT_PROFICIENCY_GRANTS[n]) notes.push(<div key={`p-${n}`}><strong style={{ color: 'var(--gold)' }}>{n}</strong> grants {FEAT_PROFICIENCY_GRANTS[n].count} proficiencies — add them in the <strong>Skills</strong> and <strong>Tools</strong> sections (limits are already raised for it).</div>);
+                    const ab = FEAT_ABILITY_BONUSES[n];
+                    if (ab) notes.push(<div key={`a-${n}`}><strong style={{ color: 'var(--gold)' }}>{n}</strong> grants +1 to {ab.fixed ? ABBR[ab.fixed] : `one of ${ab.choice.map(x => ABBR[x]).join('/')}`}{ab.save ? ' and that ability\'s save proficiency' : ''} — set it in the <strong>Ability Scores</strong>{ab.save ? ' and Saving Throws' : ''} section.</div>);
+                    if (FEAT_HP_PER_LEVEL[n]) notes.push(<div key={`h-${n}`}><strong style={{ color: 'var(--gold)' }}>{n}</strong> adds +{FEAT_HP_PER_LEVEL[n]} max HP per level — set your <strong>Max HP</strong> in the Combat section.</div>);
+                  });
+                  return notes.length > 0 ? (
+                    <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', borderRadius: '6px', marginBottom: '12px', fontSize: '12px', color: 'var(--text-dim)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {notes}
+                    </div>
+                  ) : null;
+                })()}
+
                 {/* Override: add any feat regardless of ASI limit */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px 12px', background: 'var(--surface)', border: `1px solid ${featOverride ? 'var(--gold-dim)' : 'var(--border)'}`, borderRadius: '6px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600, color: featOverride ? 'var(--gold)' : 'var(--text-dim)' }}>
@@ -1536,6 +1693,100 @@ export default function CharacterEdit() {
               </div>
             </div>
           )}
+
+          {/* ═══ STAT BREAKDOWN (read-only provenance) ═══ */}
+          {section === 10 && (() => {
+            const pb = computedProfBonus;
+            const ruleset = form.ruleset || '2014';
+            const featNames = (form.feats || []).map(f => (typeof f === 'object' && f !== null ? f.name : f)).filter(Boolean);
+            const hasFeat = (n) => featNames.includes(n);
+            const eff = { initiative: 0, passivePerception: 0, passiveInvestigation: 0 };
+            featNames.forEach(n => { const e = FEAT_EFFECTS[n]; if (e) for (const k in e) eff[k] = (eff[k] || 0) + e[k]; });
+            const dexMod = modVal(scores.dexterity ?? 10);
+            const alertInit = hasFeat('Alert') ? (ruleset === '2024' ? pb : 5) : 0;
+            const initTotal = dexMod + alertInit + (form.initiativeBonus || 0);
+            const wisMod = modVal(scores.wisdom ?? 10);
+            const perceptionProf = (form.skillProficiencies || []).includes('Perception');
+            const passivePerc = 10 + wisMod + (perceptionProf ? pb : 0) + (eff.passivePerception || 0);
+            const spellAb = form.spellcastingAbility;
+            const spellMod = spellAb ? modVal(scores[spellAb] ?? 10) : null;
+
+            // Read-only breakdown row: label, computed total, and the parts that make it up.
+            const brow = (key, label, total, parts, note) => (
+              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', padding: '8px 0', borderBottom: '1px solid var(--surface)' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 500 }}>{label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{parts}</div>
+                  {note && <div style={{ fontSize: '10px', color: 'var(--text-dark)', fontStyle: 'italic', marginTop: '2px' }}>{note}</div>}
+                </div>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--gold)', whiteSpace: 'nowrap' }}>{total}</div>
+              </div>
+            );
+
+            return (
+              <div>
+                <h3 style={st.sectionTitle}>Stat Breakdown</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '12px', marginTop: '-8px', marginBottom: '16px' }}>
+                  Read-only view of how each number is built, so you can spot what to fix if a stat looks too high or low. Base ability scores include race/feat bonuses that were folded in at creation.
+                </p>
+
+                {/* Ability Scores */}
+                <div style={st.card}>
+                  <h4 style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--gold)' }}>Ability Scores</h4>
+                  {ABILITIES.map(ab => {
+                    const base = form.abilityScores?.[ab] ?? 10;
+                    const misc = form.abilityBonuses?.[ab] || 0;
+                    const total = base + misc;
+                    const parts = `${base} base${misc ? ` ${misc >= 0 ? '+' : '−'} ${Math.abs(misc)} misc bonus` : ''}`;
+                    return brow(ab, `${ab.charAt(0).toUpperCase() + ab.slice(1)} (${ABBR[ab]})`, `${total} (${modStr(total)})`, parts, misc ? null : 'Includes any race/feat bonus baked in at creation');
+                  })}
+                </div>
+
+                {/* Derived combat / core stats */}
+                <div style={st.card}>
+                  <h4 style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--gold)' }}>Derived Stats</h4>
+                  {brow('pb', 'Proficiency Bonus', `+${pb}`, `From total level ${form.level || 1} → +${pb}`)}
+                  {brow('init', 'Initiative', modStr(initTotal),
+                    `DEX mod ${modStr(dexMod)}${alertInit ? ` + Alert ${ruleset === '2024' ? `+${pb} (PB, 2024)` : '+5 (2014)'}` : ''}${form.initiativeBonus ? ` + ${form.initiativeBonus} misc` : ''}`,
+                    hasFeat('Alert') ? `Alert scales with ruleset — this character is ${ruleset === '2024' ? '5.5e (2024): + proficiency bonus' : '5e (2014): flat +5'}` : null)}
+                  {brow('ac', 'Armor Class',
+                    form.acOverride != null ? `${form.acOverride}` : `${form.armorClass ?? 10}`,
+                    form.acOverride != null
+                      ? `Override (fixed) — replaces the armor calc`
+                      : `Auto-calculated on the sheet from equipped armor + DEX${form.acBonus ? `, + ${form.acBonus} misc bonus` : ''}`,
+                    form.acOverride == null ? 'A plain AC edit won\'t stick — use Misc AC Bonus or Override in the Combat tab' : null)}
+                  {brow('hp', 'Max HP', `${form.maxHp ?? 0}`, `Class hit die + CON mod per level${hasFeat('Tough') ? ' + Tough (+2/level)' : ''}, set at creation & editable in Combat`)}
+                  {brow('pp', 'Passive Perception', `${passivePerc}`, `10 + WIS mod ${modStr(wisMod)}${perceptionProf ? ` + ${pb} proficiency` : ''}${eff.passivePerception ? ` + ${eff.passivePerception} (Observant)` : ''}`)}
+                  {spellAb && brow('dc', 'Spell Save DC', `${8 + pb + spellMod}`, `8 + ${pb} PB + ${ABBR[spellAb]} mod ${modStr(spellMod)}`)}
+                  {spellAb && brow('sa', 'Spell Attack Bonus', `${modStr(pb + spellMod)}`, `${pb} PB + ${ABBR[spellAb]} mod ${modStr(spellMod)}`)}
+                </div>
+
+                {/* Saving Throws */}
+                <div style={st.card}>
+                  <h4 style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--gold)' }}>Saving Throws</h4>
+                  {ABILITIES.map(ab => {
+                    const prof = (form.savingThrowProficiencies || []).includes(ab);
+                    const m = modVal(scores[ab] ?? 10);
+                    const total = m + (prof ? pb : 0);
+                    return brow(`sv-${ab}`, `${ABBR[ab]} Save`, modStr(total), `${ABBR[ab]} mod ${modStr(m)}${prof ? ` + ${pb} proficiency` : ' (not proficient)'}`);
+                  })}
+                </div>
+
+                {/* Skills */}
+                <div style={st.card}>
+                  <h4 style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--gold)' }}>Skills</h4>
+                  {SKILLS_WITH_ABILITY.map(sk => {
+                    const prof = (form.skillProficiencies || []).includes(sk.name);
+                    const expert = (form.skillExpertise || []).includes(sk.name);
+                    const m = modVal(scores[sk.ability] ?? 10);
+                    const total = m + (prof ? pb : 0) + (expert ? pb : 0);
+                    const tag = expert ? ` + ${pb * 2} expertise` : prof ? ` + ${pb} proficiency` : '';
+                    return brow(`sk-${sk.name}`, sk.name, modStr(total), `${ABBR[sk.ability]} mod ${modStr(m)}${tag || ' (not proficient)'}`);
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Bottom save bar */}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '16px 0' }}>

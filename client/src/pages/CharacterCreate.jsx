@@ -5,7 +5,8 @@ import ImageCropper from '../components/ImageCropper';
 import Tip from '../components/Tip';
 import Field from '../components/Field';
 import {
-  ABILITIES, ABBR, ALIGNMENTS, STANDARD_ARRAY, ALL_SKILLS, TOOL_OPTIONS, FEATS,
+  ABILITIES, ABBR, ALIGNMENTS, STANDARD_ARRAY, ALL_SKILLS, TOOL_OPTIONS, FEATS, FEAT_PROFICIENCY_GRANTS,
+  FEAT_ABILITY_BONUSES, FEAT_HP_PER_LEVEL,
   MULTICLASS_REQS, RACIAL_SPELL_MAP, RACIAL_SKILL_CHOICES, RACIAL_TOOL_CHOICES,
   KOBOLD_LEGACY_OPTIONS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, CANTRIPS_KNOWN,
   SPELLS_KNOWN, CLASS_RECOMMENDED_GEAR, ALL_LANGUAGES, ARMORS, BACKGROUNDS, RARITY_COLORS,
@@ -63,6 +64,16 @@ export default function CharacterCreate() {
 
   // Feats
   const [selectedFeats, setSelectedFeats] = useState([]);
+  // Proficiencies chosen for feats that grant them (e.g. Skilled → 3 skills/tools). Keyed by feat name.
+  const [featProfChoices, setFeatProfChoices] = useState({});
+  // Ability chosen for half-feats that grant a +1 to one of several abilities (e.g. Resilient). Keyed by feat name.
+  const [featAbilityChoices, setFeatAbilityChoices] = useState({});
+  // Magic Initiate feat: pick a class → 2 cantrips + 1 first-level spell from its list.
+  const [miClass, setMiClass] = useState('');
+  const [miCantrips, setMiCantrips] = useState([]);
+  const [miSpell, setMiSpell] = useState('');
+  const [miCantripOpts, setMiCantripOpts] = useState([]);
+  const [miSpellOpts, setMiSpellOpts] = useState([]);
 
   // Tool proficiencies
   const [toolProfs, setToolProfs] = useState([]);
@@ -146,11 +157,30 @@ export default function CharacterCreate() {
     return manualScores;
   }, [abilityMethod, stdAssign, pbScores, manualScores]);
 
+  // +1 ability bonuses from half-feats (Actor, Resilient, etc.), plus any save proficiencies they grant.
+  const featAbilityBonuses = useMemo(() => {
+    const bonus = {}, saves = [];
+    for (const feat of selectedFeats) {
+      const cfg = FEAT_ABILITY_BONUSES[feat];
+      if (!cfg) continue;
+      const ability = cfg.fixed || featAbilityChoices[feat] || cfg.choice[0];
+      if (!ability) continue;
+      bonus[ability] = (bonus[ability] || 0) + 1;
+      if (cfg.save && !saves.includes(ability)) saves.push(ability);
+    }
+    return { bonus, saves };
+  }, [selectedFeats, featAbilityChoices]);
+
   const finalScores = useMemo(() => {
     const s = {};
-    ABILITIES.forEach(ab => { s[ab] = (baseScores[ab] || 10) + (racialBonuses[ab] || 0); });
+    ABILITIES.forEach(ab => {
+      const pre = (baseScores[ab] || 10) + (racialBonuses[ab] || 0);
+      const fb = featAbilityBonuses.bonus[ab] || 0;
+      // Half-feats can't raise a score above 20; never reduce an already-high score.
+      s[ab] = pre + Math.min(fb, Math.max(0, 20 - pre));
+    });
     return s;
-  }, [baseScores, racialBonuses]);
+  }, [baseScores, racialBonuses, featAbilityBonuses]);
 
   const pbPointsLeft = useMemo(() => {
     const COSTS = { 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 };
@@ -161,14 +191,28 @@ export default function CharacterCreate() {
   const classData = useMemo(() => cls ? CLASSES[cls] : null, [cls]);
   const numClassSkills = classData?.numSkills || 0;
   const classSkillChoices = classData?.skillChoices || [];
+  // Proficiencies chosen for feats like Skilled — split into skills vs tools by whether they're in ALL_SKILLS.
+  const featGrantedProfs = useMemo(() => {
+    const skills = [], tools = [];
+    for (const feat of selectedFeats) {
+      if (!FEAT_PROFICIENCY_GRANTS[feat]) continue;
+      for (const pick of (featProfChoices[feat] || [])) {
+        if (!pick) continue;
+        if (ALL_SKILLS.includes(pick)) skills.push(pick);
+        else tools.push(pick);
+      }
+    }
+    return { skills, tools };
+  }, [selectedFeats, featProfChoices]);
   const allSkills = useMemo(() => {
     const skills = [...bgSkills, ...selectedSkills];
     if (halfElfSkills.length) skills.push(...halfElfSkills);
     if (variantHumanSkill) skills.push(variantHumanSkill);
     if (racialSkills.length) skills.push(...racialSkills);
     if (koboldCraftSkill) skills.push(koboldCraftSkill);
+    if (featGrantedProfs.skills.length) skills.push(...featGrantedProfs.skills);
     return [...new Set(skills)];
-  }, [bgSkills, selectedSkills, halfElfSkills, variantHumanSkill, racialSkills, koboldCraftSkill]);
+  }, [bgSkills, selectedSkills, halfElfSkills, variantHumanSkill, racialSkills, koboldCraftSkill, featGrantedProfs]);
   const savingThrows = classData?.savingThrows || [];
 
   const fixedRaceLangs = useMemo(() => {
@@ -298,16 +342,21 @@ export default function CharacterCreate() {
         }
       });
     }
+    // Flat max-HP feats (Tough: +2 per character level)
+    const totalLvl = multiclassEnabled ? (level + extraClasses.reduce((n, ec) => n + (ec.level || 0), 0)) : level;
+    for (const feat of selectedFeats) {
+      if (FEAT_HP_PER_LEVEL[feat]) hp += FEAT_HP_PER_LEVEL[feat] * totalLvl;
+    }
     return Math.max(1, hp);
-  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, multiclassEnabled, extraClasses]);
+  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, multiclassEnabled, extraClasses, selectedFeats]);
 
   // Spell info for current class/level
   const spellInfo = useMemo(() => {
     if (!cls) return null;
     const ability = CLASSES[cls]?.spellcastingAbility;
     const abilityMod = ability ? modVal(finalScores[ability] || 10) : 0;
-    return getSpellInfo(cls, level, abilityMod, CLASSES);
-  }, [cls, level, finalScores]);
+    return getSpellInfo(cls, level, abilityMod, CLASSES, ruleset);
+  }, [cls, level, finalScores, ruleset]);
 
   // Fetch spells when class changes
   useEffect(() => {
@@ -338,6 +387,13 @@ export default function CharacterCreate() {
       setSorcererCantrips([]);
     }
   }, [race, koboldLegacy]);
+
+  // Fetch Magic Initiate cantrip/spell options for the chosen class
+  useEffect(() => {
+    if (!selectedFeats.includes('Magic Initiate') || !miClass) { setMiCantripOpts([]); setMiSpellOpts([]); return; }
+    setMiCantripOpts(queryLocalSpells({ cls: miClass, level: 0 }));
+    setMiSpellOpts(queryLocalSpells({ cls: miClass, level: 1 }));
+  }, [selectedFeats, miClass]);
 
   // Fetch racial ability names for auto-assignment
   useEffect(() => {
@@ -402,7 +458,7 @@ export default function CharacterCreate() {
         languages: allLanguages,
         abilityScores: finalScores,
         skillProficiencies: allSkills,
-        savingThrowProficiencies: savingThrows,
+        savingThrowProficiencies: [...new Set([...savingThrows, ...featAbilityBonuses.saves])],
         maxHp: hp, currentHp: hp,
         armorClass, speed,
         hitDice: `${level}${classData?.hitDice || 'd8'}`,
@@ -413,13 +469,13 @@ export default function CharacterCreate() {
         traits: personalityTraits, ideals, bonds, flaws,
         age, height, weight, eyes, hair, skin,
         feats: selectedFeats,
-        toolProficiencies: [...allToolProfs, ...(warforgedTool ? [warforgedTool] : [])],
+        toolProficiencies: [...new Set([...allToolProfs, ...(warforgedTool ? [warforgedTool] : []), ...featGrantedProfs.tools])],
         avatarUrl: portrait,
         ...(multiclassEnabled && extraClasses.length > 0 && {
           classes: [{ class: cls, subclass, level }, ...extraClasses],
         }),
         equipment: selectedEquipmentList,
-        preparedSpells: [...racialSpellNames, ...(highElfCantrip ? [highElfCantrip] : []), ...(koboldCantrip ? [koboldCantrip] : []), ...selectedCantrips, ...selectedSpells],
+        preparedSpells: [...new Set([...racialSpellNames, ...(highElfCantrip ? [highElfCantrip] : []), ...(koboldCantrip ? [koboldCantrip] : []), ...selectedCantrips, ...selectedSpells, ...(selectedFeats.includes('Magic Initiate') ? [...miCantrips, miSpell].filter(Boolean) : [])])],
         ...(fightingStyle && { features: [...(classData?.features?.map(f => f.split(' — ')[0]) || []), `Fighting Style: ${fightingStyle}`] }),
         ...(Object.keys(homebrewLevels).length > 0 && { homebrewLevels }),
       });
@@ -1914,6 +1970,116 @@ export default function CharacterCreate() {
                     ))}
                   </div>
                 )}
+                {/* Proficiency pickers for feats that grant them (e.g. Skilled → 3 skills/tools) */}
+                {selectedFeats.filter(ft => FEAT_PROFICIENCY_GRANTS[ft]).map(ft => {
+                  const grant = FEAT_PROFICIENCY_GRANTS[ft];
+                  const picks = featProfChoices[ft] || [];
+                  const filledCount = picks.filter(Boolean).length;
+                  const setPick = (i, val) => setFeatProfChoices(prev => {
+                    const next = [...(prev[ft] || [])];
+                    next[i] = val;
+                    return { ...prev, [ft]: next };
+                  });
+                  return (
+                    <div key={`grant-${ft}`} className="card" style={{ marginTop: '12px', background: 'var(--surface)' }}>
+                      <h4 style={{ fontSize: '13px', marginBottom: '4px' }}>{ft} — Choose {grant.count} Proficiencies</h4>
+                      <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '10px' }}>Any combination of {grant.count} skills or tools.</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {Array.from({ length: grant.count }).map((_, i) => (
+                          <select key={i} value={picks[i] || ''} onChange={e => setPick(i, e.target.value)} style={{ minWidth: '180px' }}>
+                            <option value="">— Choose skill or tool —</option>
+                            <optgroup label="Skills">
+                              {ALL_SKILLS.filter(s => (!allSkills.includes(s) || picks[i] === s) && !picks.some((p, j) => p === s && j !== i)).map(s => <option key={s} value={s}>{s}</option>)}
+                            </optgroup>
+                            <optgroup label="Tools">
+                              {TOOL_OPTIONS.filter(t => !picks.some((p, j) => p === t && j !== i)).map(t => <option key={t} value={t}>{t}</option>)}
+                            </optgroup>
+                          </select>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: '11px', color: filledCount >= grant.count ? 'var(--green-light, #4caf50)' : 'var(--gold)', marginTop: '8px' }}>{filledCount}/{grant.count} selected</div>
+                    </div>
+                  );
+                })}
+                {/* Ability-score choice for half-feats that let you pick which ability gets +1 */}
+                {selectedFeats.filter(ft => FEAT_ABILITY_BONUSES[ft]?.choice).map(ft => {
+                  const cfg = FEAT_ABILITY_BONUSES[ft];
+                  const chosen = featAbilityChoices[ft] || cfg.choice[0];
+                  return (
+                    <div key={`abil-${ft}`} className="card" style={{ marginTop: '12px', background: 'var(--surface)' }}>
+                      <h4 style={{ fontSize: '13px', marginBottom: '4px' }}>{ft} — +1 Ability Score{cfg.save ? ' & Save Proficiency' : ''}</h4>
+                      <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '10px' }}>Choose which ability gets +1{cfg.save ? ' (and saving-throw proficiency)' : ''}.</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {cfg.choice.map(ab => {
+                          const sel = chosen === ab;
+                          return (
+                            <div key={ab} className="cc-skill" onClick={() => setFeatAbilityChoices(prev => ({ ...prev, [ft]: ab }))} style={{
+                              display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer',
+                              background: sel ? 'var(--accent)' : 'var(--input-bg)',
+                              border: sel ? '1px solid var(--gold-dim)' : '1px solid var(--border)', fontSize: '12px',
+                            }}>
+                              <span style={{ width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0, background: sel ? 'var(--gold)' : 'transparent', border: `2px solid ${sel ? 'var(--gold)' : 'var(--border)'}` }} />
+                              {ABBR[ab]}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Summary of auto-applied half-feat bonuses (fixed abilities + Tough HP) */}
+                {(selectedFeats.some(ft => FEAT_ABILITY_BONUSES[ft]?.fixed) || selectedFeats.some(ft => FEAT_HP_PER_LEVEL[ft])) && (
+                  <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-dim)' }}>
+                    {selectedFeats.filter(ft => FEAT_ABILITY_BONUSES[ft]?.fixed).map(ft => (
+                      <div key={`fx-${ft}`}>✓ <strong style={{ color: 'var(--gold)' }}>{ft}</strong> applies +1 {ABBR[FEAT_ABILITY_BONUSES[ft].fixed]} automatically.</div>
+                    ))}
+                    {selectedFeats.filter(ft => FEAT_HP_PER_LEVEL[ft]).map(ft => (
+                      <div key={`hp-${ft}`}>✓ <strong style={{ color: 'var(--gold)' }}>{ft}</strong> adds +{FEAT_HP_PER_LEVEL[ft]} max HP per level.</div>
+                    ))}
+                  </div>
+                )}
+                {/* Magic Initiate — pick a class, then 2 cantrips + 1 first-level spell from its list */}
+                {selectedFeats.includes('Magic Initiate') && (
+                  <div className="card" style={{ marginTop: '12px', background: 'var(--surface)' }}>
+                    <h4 style={{ fontSize: '13px', marginBottom: '4px' }}>Magic Initiate — 2 Cantrips + 1 First-Level Spell</h4>
+                    <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '10px' }}>Choose a class's spell list, then learn 2 cantrips and one 1st-level spell (cast it once per long rest, or with a slot you have).</p>
+                    <select value={miClass} onChange={e => { setMiClass(e.target.value); setMiCantrips([]); setMiSpell(''); }} style={{ minWidth: '200px', marginBottom: '10px' }}>
+                      <option value="">— Choose a class —</option>
+                      {['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard'].map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {miClass && (
+                      <>
+                        <div style={{ fontSize: '11px', color: miCantrips.length >= 2 ? 'var(--green-light, #4caf50)' : 'var(--gold)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>Cantrips {miCantrips.length}/2</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '6px', marginBottom: '12px' }}>
+                          {miCantripOpts.map(sp => {
+                            const sel = miCantrips.includes(sp.name);
+                            const full = miCantrips.length >= 2;
+                            return (
+                              <div key={sp._id} className="cc-skill" onClick={() => setMiCantrips(prev => sel ? prev.filter(n => n !== sp.name) : (full ? prev : [...prev, sp.name]))}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '4px', cursor: sel || !full ? 'pointer' : 'default', background: sel ? 'var(--accent)' : 'var(--input-bg)', border: sel ? '1px solid var(--gold-dim)' : '1px solid var(--border)', opacity: !sel && full ? 0.4 : 1, fontSize: '12px' }}>
+                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0, background: sel ? 'var(--gold)' : 'transparent', border: `2px solid ${sel ? 'var(--gold)' : 'var(--border)'}` }} />
+                                {sp.name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ fontSize: '11px', color: miSpell ? 'var(--green-light, #4caf50)' : 'var(--gold)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '6px' }}>1st-Level Spell {miSpell ? '1' : '0'}/1</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '6px' }}>
+                          {miSpellOpts.map(sp => {
+                            const sel = miSpell === sp.name;
+                            return (
+                              <div key={sp._id} className="cc-skill" onClick={() => setMiSpell(sel ? '' : sp.name)}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', background: sel ? 'var(--accent)' : 'var(--input-bg)', border: sel ? '1px solid var(--gold-dim)' : '1px solid var(--border)', fontSize: '12px' }}>
+                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', flexShrink: 0, background: sel ? 'var(--gold)' : 'transparent', border: `2px solid ${sel ? 'var(--gold)' : 'var(--border)'}` }} />
+                                {sp.name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -2024,16 +2190,16 @@ export default function CharacterCreate() {
             <div className="card">
               <h4 style={{ fontSize: '12px', marginBottom: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Proficiencies</h4>
               <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '8px' }}>
-                Saving Throws: <strong>{savingThrows.map(s => ABBR[s]).join(', ')}</strong>
+                Saving Throws: <strong>{[...new Set([...savingThrows, ...featAbilityBonuses.saves])].map(s => ABBR[s]).join(', ')}</strong>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                 {allSkills.map(s => <span key={s} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--green-light, #27ae60)', color: 'var(--green-light, #27ae60)', borderRadius: '4px' }}>{s}</span>)}
               </div>
-              {[...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.filter(Boolean)].length > 0 && (
+              {[...new Set([...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.filter(Boolean), ...featGrantedProfs.tools])].length > 0 && (
                 <div style={{ marginTop: '8px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Tools:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                    {[...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.filter(Boolean)].map(t => (
+                    {[...new Set([...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.filter(Boolean), ...featGrantedProfs.tools])].map(t => (
                       <span key={t} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: '4px' }}>{t}</span>
                     ))}
                   </div>

@@ -109,7 +109,10 @@ Static D&D 5e reference data.
 - `RARITY_ORDER` — Maps rarity string to sort order number
 - `TOOL_OPTIONS` — Array of all tool proficiency strings
 - `FEATS` — All PHB feats with name, prereq, desc
-- `FEAT_EFFECTS` — Unconditional numeric feat bonuses applied to derived character-sheet stats (e.g. `Alert: { initiative: 5 }`, `Observant: { passivePerception: 5, passiveInvestigation: 5 }`). Consumed by `CharacterSheet`'s `featEffects` memo. Excludes ability-score bumps (applied at creation) and stored stats like speed/max HP (would double-count).
+- `FEAT_EFFECTS` — Unconditional numeric feat bonuses applied to derived character-sheet stats (e.g. `Alert: { initiative: 5 }`, `Observant: { passivePerception: 5, passiveInvestigation: 5 }`). Consumed by `CharacterSheet`'s `featEffects` memo. Excludes ability-score bumps (applied at creation) and stored stats like speed/max HP (would double-count). **Alert is the 2014 baseline (+5); under the 2024 ruleset `featEffects` swaps it for +proficiency bonus** — the one ruleset-dependent initiative difference.
+- `FEAT_PROFICIENCY_GRANTS` — Feats that grant player-chosen skill/tool proficiencies (`{ Skilled: { count: 3, type: 'skillsOrTools' } }`). The creator renders a `count`-slot picker (each slot = any skill OR tool) when the feat is selected; chosen skills merge into `skillProficiencies`, chosen tools into `toolProficiencies`. The editor raises the Skills/Tools limits by `count` so the picks can be added in those sections without tripping the "too many" guard.
+- `FEAT_ABILITY_BONUSES` — Half-feats that grant `+1` to an ability. `{ fixed: 'charisma' }` applies always; `{ choice: ['strength','dexterity'] }` shows a picker in the creator (defaults to the first option); `save: true` (Resilient) also grants saving-throw proficiency in the chosen ability. The creator applies these to `abilityScores` at creation (capped at 20, never lowering an already-high score), so they flow into every derived stat. The editor does **not** auto-apply (stats are manual there and a saved character already has the bonus baked in) — it shows a reminder note instead.
+- `FEAT_HP_PER_LEVEL` — Flat max-HP feats (`{ Tough: 2 }`). The creator adds `value × total level` to `computedHp`. Editor is manual (reminder note only).
 - `ALL_LANGUAGES` — Standard and exotic languages
 - `BACKGROUNDS` — All 13 PHB backgrounds with skills, tools, languages, feature, equipment
 - `CANTRIPS_KNOWN` — Per-class cantrip count by level (20-element arrays)
@@ -140,8 +143,8 @@ Calculation and formatting helpers.
 - `rarityColor(r)` — Returns CSS color for item rarity
 - `rarityBg(r)` — Returns tinted background color for item rarity
 - `hpColor(current, max)` — Returns CSS variable (`var(--hp-bar)`, `var(--hp-low)`, `var(--hp-crit)`) based on HP %
-- `maxSpellLevel(cls, lvl)` — Returns highest spell level available for a class at a given level
-- `getSpellInfo(cls, lvl, abilityMod, CLASSES)` — Returns full spell slot info (slots per level, DC, attack bonus, cantrips known)
+- `maxSpellLevel(cls, lvl, ruleset='2014')` — Returns highest spell level available for a class at a given level. Ruleset-aware: 2024 Paladin/Ranger reach 1st-level spells at level 1 (2014 half-casters return 0 until level 2).
+- `getSpellInfo(cls, lvl, abilityMod, CLASSES, ruleset='2014')` — Returns full spell info (cantrips, prepare/known count, max level, caster type). Ruleset-aware: 2024 Paladin/Ranger cast from level 1, and a 2024 Ranger is a prepared caster (WIS + half level) rather than a known caster. Paladins/Rangers have **no cantrips** in either ruleset. The editor has a parallel `getSpellLimits` (local to `CharacterEdit.jsx`) with the same ruleset logic.
 - `getArmorCategories(armorProfStr)` — Parses armor proficiency string into category array
 - `canUseShield(armorProfStr)` — Checks if proficiency string includes shields
 - `countLangExtras(langArray)` — Counts extra language slots from racial traits
@@ -197,6 +200,9 @@ CLASSES['Fighter'] = {
 
 ### featureUses.js (~55 lines)
 `FEATURE_USES` — limited-use class features keyed by base name → `{ max(classLevel, char, className), recharge: 'short'|'long'|fn, unit? }`. `computeFeatureUses(name, classLevel, char, className)` returns `{max, recharge, unit}` or null (0 = unlimited, e.g. Rage 20). `baseFeatureName(name)` strips `(x/day)` etc. for a stable storage key. Remaining uses persist in `char.featureUses[baseName]`; long rest clears the whole object, short rest deletes short-recharge keys.
+
+### featureRolls.js (~35 lines)
+`featureRoll(name, { classLevel })` → `{ formula, type: 'healing'|'damage'|'utility', label, note? }` or null. Convenience dice for rollable class features so the Actions tab can show a roll button next to them: Second Wind (`1d10 + level` heal), Sneak Attack (`ceil(level/2)d6`), Divine Smite (`2d8`), Bardic Inspiration and Song of Rest (die scales with level). Keyed by `baseFeatureName`, so `(x/day)`-style qualifiers don't matter. `NATURAL_WEAPONS` (in `classData.js`) is the parallel racial-attack data (Aarakocra Talons, Lizardfolk Bite, Tabaxi/Tortle/Leonin Claws, Satyr Ram) rendered as rollable attacks near Unarmed Strike.
 
 ### featureDescriptions.js (~140 lines)
 `FEATURE_DESCRIPTIONS` — concise text for every class feature name in `CLASS_LEVELS` (all 13 classes, levels 1-20). `featureDescription(name)` looks up a description, stripping `(x/day)` / level qualifiers and `improvement(s)` suffixes. Used by `CharacterSheet` as the fallback description for features that lack their own text (the level-1 `CLASSES[class].features` and `SUBCLASS_FEATURES` provide the rest).

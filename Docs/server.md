@@ -63,14 +63,18 @@ Express entry point.
 
   // Ability Scores (full names)
   abilityScores: { strength, dexterity, constitution, intelligence, wisdom, charisma },
+  abilityBonuses: { strength, …, charisma } (misc per-ability bonuses, default 0; layered on top of abilityScores),
 
   // Combat
   maxHp: Number (default: 10),
   currentHp: Number (default: 10),
   temporaryHp: Number (default: 0),
-  armorClass: Number (default: 10),
+  armorClass: Number (default: 10),        // auto-recomputed by the sheet from equipped armor
+  acBonus: Number (default: 0),            // misc AC modifier added to the calc
+  acOverride: Number (default: null),      // fixed AC that replaces the calc when set
   speed: Number (default: 30),
   initiative: Number (default: 0),
+  initiativeBonus: Number (default: 0),    // misc initiative modifier
   proficiencyBonus: Number (default: 2),
   hitDice: String (default: 'd8'),
   hitDiceRemaining: Number (default: 1),

@@ -9,6 +9,16 @@ const abilityScoreSchema = new mongoose.Schema({
   charisma: { type: Number, default: 10 },
 });
 
+// Per-ability misc bonuses (items/homebrew), layered on top of abilityScores. Defaults 0, not 10.
+const abilityBonusSchema = new mongoose.Schema({
+  strength: { type: Number, default: 0 },
+  dexterity: { type: Number, default: 0 },
+  constitution: { type: Number, default: 0 },
+  intelligence: { type: Number, default: 0 },
+  wisdom: { type: Number, default: 0 },
+  charisma: { type: Number, default: 0 },
+}, { _id: false });
+
 const characterSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -54,11 +64,15 @@ const characterSchema = new mongoose.Schema(
 
     // Core stats
     armorClass: { type: Number, default: 10 },
+    acBonus: { type: Number, default: 0 },        // misc AC modifier added to the sheet's armor calc
+    acOverride: { type: Number, default: null },  // fixed AC that replaces the calc when set
     initiative: { type: Number, default: 0 },
+    initiativeBonus: { type: Number, default: 0 }, // misc initiative modifier
     speed: { type: Number, default: 30 },
     proficiencyBonus: { type: Number, default: 2 },
 
     abilityScores: { type: abilityScoreSchema, default: () => ({}) },
+    abilityBonuses: { type: abilityBonusSchema, default: () => ({}) },
 
     // Saving throws (proficiency flags)
     savingThrowProficiencies: {

@@ -44,7 +44,7 @@ export const TOOL_OPTIONS = [
 ];
 
 export const FEATS = {
-  'Alert': { prereq: null, desc: '+5 initiative, can\'t be surprised while conscious, hidden creatures don\'t gain advantage on attacks against you.' },
+  'Alert': { prereq: null, desc: 'Initiative bonus (2014: +5; 2024: +proficiency bonus). 2014 also: can\'t be surprised while conscious, hidden creatures don\'t gain advantage on you. 2024 also: swap initiative with a willing ally.' },
   'Athlete': { prereq: null, desc: '+1 STR or DEX. Standing from prone costs 5ft. Climbing doesn\'t halve speed. Running long/high jumps need only 5ft move.' },
   'Actor': { prereq: null, desc: '+1 CHA. Advantage on Deception and Performance checks when pretending to be someone else. Mimic speech/sounds.' },
   'Charger': { prereq: null, desc: 'When you Dash, you can make one melee attack or shove as a bonus action with +5 damage.' },
@@ -88,6 +88,38 @@ export const FEATS = {
   'Weapon Master': { prereq: null, desc: '+1 STR or DEX. Gain proficiency with 4 weapons of your choice.' },
 };
 
+// Feats that grant player-chosen skill/tool proficiencies. `count` = number of picks.
+// Each pick may be any skill OR any tool ("skillsOrTools"). Wired up in the creator/editor
+// feat pickers; chosen skills merge into skillProficiencies, chosen tools into toolProficiencies.
+export const FEAT_PROFICIENCY_GRANTS = {
+  Skilled: { count: 3, type: 'skillsOrTools' },
+};
+
+// Feats that grant a +1 ability score increase (the "half-feats"). Applied to abilityScores at
+// creation so they flow into every derived stat (HP, AC, save DCs, checks). `fixed` = always that
+// ability; `choice` = player picks one of the listed abilities (creator shows a picker, defaulting
+// to the first). `save: true` (Resilient) also grants saving-throw proficiency in the chosen ability.
+export const FEAT_ABILITY_BONUSES = {
+  Actor: { fixed: 'charisma' },
+  Athlete: { choice: ['strength', 'dexterity'] },
+  Durable: { fixed: 'constitution' },
+  'Heavily Armored': { fixed: 'strength' },
+  'Heavy Armor Master': { fixed: 'strength' },
+  'Keen Mind': { fixed: 'intelligence' },
+  'Lightly Armored': { choice: ['strength', 'dexterity'] },
+  Linguist: { fixed: 'intelligence' },
+  'Moderately Armored': { choice: ['strength', 'dexterity'] },
+  Observant: { choice: ['intelligence', 'wisdom'] },
+  Resilient: { choice: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], save: true },
+  'Tavern Brawler': { choice: ['strength', 'constitution'] },
+  'Weapon Master': { choice: ['strength', 'dexterity'] },
+};
+
+// Feats that add flat max-HP. Tough: +2 per character level, applied at creation and on level-up.
+export const FEAT_HP_PER_LEVEL = {
+  Tough: 2,
+};
+
 // Unconditional, always-on ADDITIVE numeric bonuses that feats apply to DERIVED character-sheet
 // stats (initiative, passive scores). Summed by CharacterSheet's `featEffects` memo.
 // - Ability-score increases from feats (+1 STR, etc.) are applied to abilityScores at creation,
@@ -95,6 +127,8 @@ export const FEATS = {
 // - Stored/editable stats (speed, max HP — Mobile, Tough) are excluded to avoid double-counting.
 // - Context-conditional feats are handled inline in CharacterSheet, not here:
 //   Medium Armor Master (medium-armor DEX cap 2→3 in calcAC), Tavern Brawler (unarmed die 1d4).
+// - Alert's value here is the 2014 flat +5; under the 2024 ruleset CharacterSheet swaps it for
+//   +proficiency bonus (the 2024 Alert change), so this stays the 2014 baseline.
 export const FEAT_EFFECTS = {
   Alert: { initiative: 5 },
   Observant: { passivePerception: 5, passiveInvestigation: 5 },

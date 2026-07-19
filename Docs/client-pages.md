@@ -27,7 +27,7 @@ Multi-step character creation wizard with 8 steps:
 7. **Equipment** — Browse/add equipment, class-recommended gear
 8. **Spells** — Select known/prepared spells if spellcaster
 - Back/forward navigation between steps
-- Feat selection with hover tooltips (Tip component)
+- Feat selection with hover tooltips (Tip component). Feats in `FEAT_PROFICIENCY_GRANTS` (Skilled) render a picker to choose their granted skills/tools; picks merge into skill/tool proficiencies on save. Half-feats in `FEAT_ABILITY_BONUSES` apply their `+1` to `abilityScores` (choice feats show an ability picker, fixed feats apply automatically with a confirmation line); Resilient also adds the save proficiency; `FEAT_HP_PER_LEVEL` (Tough) adds bonus max HP. **Magic Initiate** shows a picker (choose a class → 2 cantrips + 1 first-level spell) whose picks are added to `preparedSpells`; the sheet raises the cantrip/spell counters by the feat's allowance.
 - Saves character to localStorage with `local-{uuid}` ID
 
 ## CharacterSheet.jsx (~3593 lines)
@@ -39,7 +39,7 @@ Full interactive character sheet — the main feature of the app.
 - **wrapWidget()** — Function (not component) that wraps sections in draggable widgets
 
 ### Tabs:
-- **Actions** — Weapon attacks (equipped), unarmed strike, spell attacks with upcast support, and a **Class Features & Actions** list. The feature list is *derived by level* from `CLASS_LEVELS` + `CLASSES` (descriptions) + unlocked `SUBCLASS_FEATURES` (e.g. Lay on Hands / Rage / Channel Divinity / Sneak Attack), so it works for every class/level even when `char.features` is empty. Bookkeeping rows (ASI, generic subclass placeholders) are filtered; each row shows its unlock level and opens the full description in the side panel. Features descriptions fall back to `utils/featureDescriptions.js`. Limited-use features show a −/＋ **usage counter** (remaining/max from `utils/featureUses.js`) that resets on long rest (all) or short rest (short-recharge features). Unarmed Strike scales with Monk Martial Arts and the Tavern Brawler feat (1d4)
+- **Actions** — Weapon attacks (equipped), unarmed strike, **racial natural weapons** (Aarakocra Talons, Lizardfolk Bite, etc. from `NATURAL_WEAPONS` — rollable attack + damage), spell attacks with upcast support, and a **Class Features & Actions** list. Versatile weapons show both a **1H** and **2H** damage roll (the 2H die comes from the `versatile (…)` property); Great Weapon Fighting / Dueling apply to the correct grip. Rollable features (Second Wind, Sneak Attack, Divine Smite, Bardic Inspiration, Song of Rest — via `utils/featureRolls.js`) show an inline dice button. The feature list is *derived by level* from `CLASS_LEVELS` + `CLASSES` (descriptions) + unlocked `SUBCLASS_FEATURES` (e.g. Lay on Hands / Rage / Channel Divinity / Sneak Attack), so it works for every class/level even when `char.features` is empty. Bookkeeping rows (ASI, generic subclass placeholders) are filtered; each row shows its unlock level and opens the full description in the side panel. Features descriptions fall back to `utils/featureDescriptions.js`. Limited-use features show a −/＋ **usage counter** (remaining/max from `utils/featureUses.js`) that resets on long rest (all) or short rest (short-recharge features). Unarmed Strike scales with Monk Martial Arts and the Tavern Brawler feat (1d4)
 - **Spells** — Spell list by level, preparation toggle, slot tracking with +/- buttons. Cantrip/spell **limits** are enforced (prepared casters = ability mod + level; known casters use `SPELLS_KNOWN`; cantrips use `CANTRIPS_KNOWN`; summed across multiclass) with X/Y counters, and each leveled spell has a **Cast** button that spends a slot of its (upcast) level and disables when none remain
 - **Inventory** — Equipment list with equip toggle, weight, rarity colors, ammo tracking, browse/add
 - **Features** — Class features, racial traits, feats, background feature
@@ -73,15 +73,16 @@ Full interactive character sheet — the main feature of the app.
 ## CharacterEdit.jsx (~1603 lines)
 Edit form for existing characters with tabbed sections:
 - **Basic Info** — Name, race, class, level, alignment, portrait
-- **Ability Scores** — Direct number editing
-- **Skills** — Toggle proficiency (click) / expertise (right-click)
-- **Combat** — AC, speed, initiative, HP
+- **Ability Scores** — Standard array / point-buy / manual entry for the base score, plus per-ability *Misc Bonus* boxes (`abilityBonuses`) for items/homebrew kept separate from the base and folded into the effective `scores` everywhere. Saving-throw proficiencies are class-locked by default; an *Override — edit any save* toggle makes them freely clickable.
+- **Skills** — Toggle proficiency (click) / expertise (right-click), capped at the class/background/feat max; an *Override — ignore skill limit* toggle bypasses the cap.
+- **Combat** — Max HP, Speed, Gold (direct edits); *Initiative Bonus* (`initiativeBonus`); and an Armor Class block with a *Misc AC Bonus* (`acBonus`) and *Override AC* toggle (`acOverride`) — because the sheet auto-recomputes AC from equipped armor, a plain AC number can't stick, so these are the way to adjust/fix it
 - **Equipment** — Manage inventory items
-- **Spells** — Add/remove known spells
-- **Features & Feats** — Edit class features and feats (with Tip tooltips). An "Override — add any feat" toggle bypasses the ASI limit and allows adding a custom (homebrew) feat name
+- **Spells** — Add/remove known spells (class list, limit-checked, **ruleset-aware** via `getSpellLimits` — a 2024 Paladin/Ranger can prepare spells from level 1). An "Override — add any spell" toggle adds *any* spell by name or via a full-spell-list search, ignoring class/level/known-prepared limits; works on non-casters too (item/feat-granted spells, homebrew). Writes into `preparedSpells`.
+- **Features & Feats** — Edit class features and feats (with Tip tooltips). An "Override — add any feat" toggle bypasses the ASI limit and allows adding a custom (homebrew) feat name. Feats with mechanical effects (proficiencies, `+1` ability, save proficiency, bonus HP) show a reminder note pointing to the section to set them; proficiency-granting feats also raise the Skills/Tools limits by their grant count. Editor stats stay manual (no auto-apply) to avoid double-counting a saved character's creation-time bonuses
 - **Details** — Background, personality, bonds, flaws
 - **Notes** — Free-text notes
 - **Settings** — Level up, character-specific settings (ammo tracking)
+- **Stat Breakdown** — Read-only provenance view: every derived number (ability scores = base + misc bonus, proficiency bonus, initiative, AC, max HP, passive Perception, spell save DC/attack, all saves, all skills) shown with its component parts, for debugging a too-high/too-low stat. Initiative shows the ruleset-aware Alert bonus (2014 +5 / 2024 +PB)
 - Hover effect on tabs (cc-skill class)
 - ImageCropper for portrait editing
 - **Data flow:** CharacterEdit is server-oriented — it `fetch`es the character from `/api/characters/:id` on load and `PUT`s the object back on save — but falls back to `localStorage` (`ond-char-{id}`) when the server has no copy, so local-only characters (`local-` id) can be edited and saved offline. Saves write the merged local copy first, then hit the server for non-local ids. Portrait uploads go through `POST /api/upload`. See `known-patterns-and-gotchas.md` → "CharacterEdit Server + Local Fallback."

@@ -58,10 +58,10 @@ Canvas-based image cropper for character portraits.
 - `onCancel` — Cancel callback
 - `outputSize` — Output dimensions (default 256)
 
-## NumInput.jsx (~22 lines)
+## NumInput.jsx (~24 lines)
 Number input that prevents the deselection bug.
 - Stores raw text in local state while focused
-- Only parses/clamps value on blur
+- Only parses/clamps value on blur — empty/NaN becomes `0` (via `Number.isNaN`), **not** a falsy fallback to `min`, so `0` and negatives are valid entries (supports the misc-bonus boxes with negative `min`)
 - Prevents React re-render from resetting cursor position
 
 ### Props:

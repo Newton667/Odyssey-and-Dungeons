@@ -263,6 +263,17 @@ export const RACES = {
   },
 };
 
+// Racial natural weapons — rendered as rollable attacks on the sheet's Actions tab.
+// Keyed by base race name (strip any " (Subrace)"). `ability` picks the attack/damage modifier.
+export const NATURAL_WEAPONS = {
+  Aarakocra:  [{ name: 'Talons', damage: '1d4', damageType: 'slashing', ability: 'strength' }],
+  Lizardfolk: [{ name: 'Bite', damage: '1d6', damageType: 'piercing', ability: 'strength' }],
+  Tabaxi:     [{ name: "Cat's Claws", damage: '1d4', damageType: 'slashing', ability: 'strength' }],
+  Tortle:     [{ name: 'Claws', damage: '1d4', damageType: 'slashing', ability: 'strength' }],
+  Leonin:     [{ name: 'Claws', damage: '1d4', damageType: 'slashing', ability: 'strength' }],
+  Satyr:      [{ name: 'Ram', damage: '1d4', damageType: 'bludgeoning', ability: 'strength' }],
+};
+
 export const CLASS_LEVELS = {
   Barbarian: { 1: ['Rage (2/day)', 'Unarmored Defense'], 2: ['Reckless Attack', 'Danger Sense'], 3: ['Primal Path'], 4: ['ASI'], 5: ['Extra Attack', 'Fast Movement (+10ft)'], 6: ['Path Feature'], 7: ['Feral Instinct'], 8: ['ASI'], 9: ['Brutal Critical (+1 die)'], 10: ['Path Feature'], 11: ['Relentless Rage'], 12: ['ASI'], 13: ['Brutal Critical (+2 dice)'], 14: ['Path Feature'], 15: ['Persistent Rage'], 16: ['ASI'], 17: ['Brutal Critical (+3 dice)'], 18: ['Indomitable Might'], 19: ['ASI'], 20: ['Primal Champion (+4 STR/CON)'] },
   Bard: { 1: ['Spellcasting', 'Bardic Inspiration (d6)'], 2: ['Jack of All Trades', 'Song of Rest (d6)'], 3: ['Bard College', 'Expertise'], 4: ['ASI'], 5: ['Bardic Inspiration (d8)', 'Font of Inspiration'], 6: ['Countercharm', 'College Feature'], 7: [], 8: ['ASI'], 9: ['Song of Rest (d8)'], 10: ['Bardic Inspiration (d10)', 'Expertise', 'Magical Secrets'], 11: [], 12: ['ASI'], 13: ['Song of Rest (d10)'], 14: ['Magical Secrets', 'College Feature'], 15: ['Bardic Inspiration (d12)'], 16: ['ASI'], 17: ['Song of Rest (d12)'], 18: ['Magical Secrets'], 19: ['ASI'], 20: ['Superior Inspiration'] },

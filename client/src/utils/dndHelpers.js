@@ -25,7 +25,7 @@ export function hpColor(current, max) {
 
 // ─── Spell Helpers ───────────────────────────────────────────────────
 
-export function maxSpellLevel(cls, lvl) {
+export function maxSpellLevel(cls, lvl, ruleset = '2014') {
   if (['Bard','Cleric','Druid','Sorcerer','Wizard'].includes(cls)) {
     if (lvl >= 17) return 9; if (lvl >= 15) return 8; if (lvl >= 13) return 7;
     if (lvl >= 11) return 6; if (lvl >= 9) return 5; if (lvl >= 7) return 4;
@@ -36,7 +36,8 @@ export function maxSpellLevel(cls, lvl) {
     if (lvl >= 3) return 2; return 1;
   }
   if (['Paladin','Ranger'].includes(cls)) {
-    if (lvl < 2) return 0;
+    // 2024 Paladin/Ranger cast from level 1; 2014 half-casters start at level 2.
+    if (lvl < 2) return ruleset === '2024' ? 1 : 0;
     if (lvl >= 17) return 5; if (lvl >= 13) return 4; if (lvl >= 9) return 3;
     if (lvl >= 5) return 2; return 1;
   }
@@ -47,22 +48,26 @@ export function maxSpellLevel(cls, lvl) {
   return 0;
 }
 
-export function getSpellInfo(cls, lvl, abilityMod, CLASSES) {
+export function getSpellInfo(cls, lvl, abilityMod, CLASSES, ruleset = '2014') {
   const hasSpells = CLASSES[cls]?.spellcasting;
   if (!hasSpells) return null;
-  if (['Paladin','Ranger'].includes(cls) && lvl < 2) return null;
+  // 2024 Paladin/Ranger gain Spellcasting at level 1; in 2014 they start at level 2.
+  const halfCasterStart = ruleset === '2024' ? 1 : 2;
+  if (['Paladin','Ranger'].includes(cls) && lvl < halfCasterStart) return null;
 
   const idx = Math.min(lvl, 20) - 1;
   const cantrips = CANTRIPS_KNOWN[cls]?.[idx] || 0;
-  const maxLvl = maxSpellLevel(cls, lvl);
+  const maxLvl = maxSpellLevel(cls, lvl, ruleset);
 
-  if (SPELLS_KNOWN[cls]) {
+  // 2024 Ranger prepares spells (WIS mod + half level) instead of knowing a fixed number.
+  const rangerPrepared2024 = ruleset === '2024' && cls === 'Ranger';
+  if (SPELLS_KNOWN[cls] && !rangerPrepared2024) {
     return { cantrips, spellsKnown: SPELLS_KNOWN[cls][idx] || 0, type: 'known', maxLevel: maxLvl };
   }
   if (['Cleric','Druid'].includes(cls)) {
     return { cantrips, prepareCount: Math.max(1, abilityMod + lvl), type: 'prepared', maxLevel: maxLvl };
   }
-  if (cls === 'Paladin') {
+  if (cls === 'Paladin' || rangerPrepared2024) {
     return { cantrips: 0, prepareCount: Math.max(1, abilityMod + Math.floor(lvl / 2)), type: 'prepared', maxLevel: maxLvl };
   }
   if (cls === 'Wizard') {
