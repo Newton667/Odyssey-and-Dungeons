@@ -360,6 +360,60 @@ export function getSpellSlots(className, level) {
   return null;
 }
 
+// ─── Multiclass Spellcasting ──────────────────────────
+// Combined caster level: full casters add their full level, half casters add
+// level÷2 (down), Artificer adds level÷2 (up), third-casters (Eldritch Knight /
+// Arcane Trickster) add level÷3 (down). Warlock's Pact Magic is NOT combined.
+const FULL_CASTERS = ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Wizard'];
+const HALF_CASTERS = ['Paladin', 'Ranger'];
+const isThirdCaster = (c) => (c.class === 'Fighter' && c.subclass === 'Eldritch Knight')
+  || (c.class === 'Rogue' && c.subclass === 'Arcane Trickster');
+const isStandardCaster = (c) => FULL_CASTERS.includes(c.class) || HALF_CASTERS.includes(c.class)
+  || c.class === 'Artificer' || isThirdCaster(c);
+
+export function getMulticlassCasterLevel(classes) {
+  let cl = 0;
+  for (const c of classes || []) {
+    const lvl = c.level || 0;
+    if (FULL_CASTERS.includes(c.class)) cl += lvl;
+    else if (HALF_CASTERS.includes(c.class)) cl += Math.floor(lvl / 2);
+    else if (c.class === 'Artificer') cl += Math.ceil(lvl / 2);
+    else if (isThirdCaster(c)) cl += Math.floor(lvl / 3);
+  }
+  return cl;
+}
+
+/**
+ * Spell slots for a (possibly multiclass) set of classes.
+ * Returns { standard: number[]|null, pact: {pact,slots,level}|null }.
+ * - Exactly one standard caster → that class's own table (RAW single-class rule).
+ * - Two or more standard casters → combined-caster-level multiclass table.
+ * - Warlock Pact Magic is always reported separately in `pact`.
+ */
+export function getMulticlassSpellSlots(classes) {
+  const list = classes || [];
+  const standardCasters = list.filter(isStandardCaster);
+  const warlock = list.find(c => c.class === 'Warlock');
+
+  let standard = null;
+  if (standardCasters.length === 1) {
+    // Single standard caster uses its own class progression table.
+    const c = standardCasters[0];
+    standard = getSpellSlots(c.class, c.level);
+    // Third-caster single-class returns null (unsupported alone) — leave as null.
+  } else if (standardCasters.length > 1) {
+    const casterLevel = getMulticlassCasterLevel(standardCasters);
+    if (casterLevel > 0) standard = FULL_CASTER_SLOTS[Math.min(casterLevel, 20)] || null;
+  }
+
+  let pact = null;
+  if (warlock) {
+    const p = WARLOCK_PACT_SLOTS[Math.min(warlock.level, 20)];
+    if (p) pact = { pact: true, ...p };
+  }
+  return { standard, pact };
+}
+
 // ─── Extra Attack by Class/Level ──────────────────────
 export function getExtraAttacks(className, level) {
   if (!className || !level) return 0;

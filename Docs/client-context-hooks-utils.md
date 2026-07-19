@@ -109,11 +109,13 @@ Static D&D 5e reference data.
 - `RARITY_ORDER` — Maps rarity string to sort order number
 - `TOOL_OPTIONS` — Array of all tool proficiency strings
 - `FEATS` — All PHB feats with name, prereq, desc
+- `FEAT_EFFECTS` — Unconditional numeric feat bonuses applied to derived character-sheet stats (e.g. `Alert: { initiative: 5 }`, `Observant: { passivePerception: 5, passiveInvestigation: 5 }`). Consumed by `CharacterSheet`'s `featEffects` memo. Excludes ability-score bumps (applied at creation) and stored stats like speed/max HP (would double-count).
 - `ALL_LANGUAGES` — Standard and exotic languages
 - `BACKGROUNDS` — All 13 PHB backgrounds with skills, tools, languages, feature, equipment
 - `CANTRIPS_KNOWN` — Per-class cantrip count by level (20-element arrays)
 - `SPELLS_KNOWN` — Per-class spells known by level (Bard, Sorcerer, Warlock, Ranger)
 - `MULTICLASS_REQS` — Ability score prerequisites for multiclassing
+- `MULTICLASS_PROFICIENCIES` — Reduced proficiencies granted when a class is taken as a multiclass (`{armor, weapons, skills, tools}`); applied on multiclass level-up (tools stored on the char; armor/weapons recorded as a visible feature note)
 - `RACIAL_SPELL_MAP` — Maps race to racial spell lookup key functions
 - `RACIAL_SKILL_CHOICES` — Races with skill choice options (Kenku, Lizardfolk, etc.)
 - `RACIAL_TOOL_CHOICES` — Races with tool choice options (Warforged)
@@ -185,11 +187,29 @@ CLASSES['Fighter'] = {
 ```
 
 **Additional classData.js exports:**
-- `getSpellSlots(className, level)` — Returns spell slot array or Warlock pact object
-- `getExtraAttacks(className, level)` — Returns number of extra attacks
+- `getSpellSlots(className, level)` — Returns spell slot array or Warlock pact object (single class)
+- `getMulticlassCasterLevel(classes)` — Combined caster level (full=full, half=÷2, Artificer=÷2↑, EK/AT=÷3; Warlock excluded)
+- `getMulticlassSpellSlots(classes)` — `{ standard: number[]|null, pact: {pact,slots,level}|null }`. One standard caster → its own table; 2+ → combined-level multiclass table; Warlock pact always separate
+- `getExtraAttacks(className, level)` — Returns number of extra attacks (per class)
 - `RACE_DEFENSES` — Racial resistances/immunities
 - `getClassDefenses(className, level, subclass)` — Returns class-based resistances
 - `SAVING_THROWS_BY_CLASS` — Maps class name to saving throw proficiency array
+
+### featureUses.js (~55 lines)
+`FEATURE_USES` — limited-use class features keyed by base name → `{ max(classLevel, char, className), recharge: 'short'|'long'|fn, unit? }`. `computeFeatureUses(name, classLevel, char, className)` returns `{max, recharge, unit}` or null (0 = unlimited, e.g. Rage 20). `baseFeatureName(name)` strips `(x/day)` etc. for a stable storage key. Remaining uses persist in `char.featureUses[baseName]`; long rest clears the whole object, short rest deletes short-recharge keys.
+
+### featureDescriptions.js (~140 lines)
+`FEATURE_DESCRIPTIONS` — concise text for every class feature name in `CLASS_LEVELS` (all 13 classes, levels 1-20). `featureDescription(name)` looks up a description, stripping `(x/day)` / level qualifiers and `improvement(s)` suffixes. Used by `CharacterSheet` as the fallback description for features that lack their own text (the level-1 `CLASSES[class].features` and `SUBCLASS_FEATURES` provide the rest).
+
+### multiclass.js (~110 lines)
+Normalizes single- and multi-class characters and derives combined stats. Single-class saves have no `char.classes`; helpers synthesize one from `char.class/subclass/level`, so all callers treat characters uniformly and existing saves keep working.
+- `getCharClasses(char)` — Canonical `[{class, subclass, level}]` (per-class levels)
+- `getTotalLevel(char)` / `isMulticlass(char)`
+- `formatClasses(char, {withSubclass})` — "Fighter 5 / Wizard 3"
+- `getHitDicePools(char)` / `formatHitDice(char)` — Per-class hit-dice pools (`[{die,count}]` / "5d10 + 5d6")
+- `getMulticlassExtraAttacks(char)` — Best single class (does not stack)
+- `getSpellcastingClasses(char)` — `[{class, ability, level}]` for per-class DCs
+- `syncPrimaryFromClasses(classes)` — Patch to keep `class/subclass/level/proficiencyBonus` in sync with the `classes` array after a level-up
 
 **CLASS_LEVELS Object:**
 Features gained at each level per class. Values are arrays of strings.

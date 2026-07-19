@@ -10,6 +10,7 @@ import {
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel } from '../utils/dndHelpers';
 import { CLASSES, RACES, SAVING_THROWS_BY_CLASS } from '../utils/classData';
+import { getCharClasses, isMulticlass, syncPrimaryFromClasses, formatHitDice, formatClasses } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 
 // Skill count by class
@@ -460,16 +461,35 @@ export default function CharacterEdit() {
                     <input style={st.input} value={form.name} onChange={e => set('name', e.target.value)} />
                   </div>
                   <div>
-                    <label style={st.label}>Level</label>
+                    <label style={st.label}>Level{isMulticlass(form) ? ' (total)' : ''}</label>
                     <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <NumInput style={{ ...st.input, flex: 1 }} min={1} max={20} value={form.level} onChange={v => set('level', v)} />
+                      <NumInput style={{ ...st.input, flex: 1 }} min={1} max={20} value={form.level} onChange={v => set('level', v)} disabled={isMulticlass(form)} />
                       {(form.level || 1) < 20 && (
                         <button className="btn" style={{ padding: '6px 14px', fontSize: '12px', background: 'linear-gradient(135deg, #1a3a1a, #2a5a2a)', border: '1px solid #4ade80', color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}
                           onClick={() => {
+                            const conMod = modVal((form.abilityScores?.constitution ?? 10));
+                            if (isMulticlass(form)) {
+                              // Advance the primary class and re-sync summary fields
+                              const classes = getCharClasses(form).map(c => ({ ...c }));
+                              classes[0].level += 1;
+                              const hd = CLASSES[classes[0].class]?.hitDice || HIT_DICE[classes[0].class] || 'd8';
+                              const avg = Math.floor(parseInt(hd.replace('d', '')) / 2) + 1;
+                              const hpGain = avg + conMod;
+                              const patch = syncPrimaryFromClasses(classes);
+                              set('classes', patch.classes);
+                              set('level', patch.level);
+                              set('class', patch.class);
+                              set('subclass', patch.subclass);
+                              set('proficiencyBonus', patch.proficiencyBonus);
+                              set('maxHp', (form.maxHp || 0) + hpGain);
+                              set('currentHp', (form.maxHp || 0) + hpGain);
+                              set('hitDice', formatHitDice({ classes }));
+                              alert(`${classes[0].class} leveled to ${classes[0].level} (total ${patch.level}). +${hpGain} HP.`);
+                              return;
+                            }
                             const newLevel = (form.level || 1) + 1;
                             const hd = HIT_DICE[form.class] || 'd8';
                             const dieMax = parseInt(hd.replace('d', ''));
-                            const conMod = modVal((form.abilityScores?.constitution ?? 10));
                             const avg = Math.floor(dieMax / 2) + 1;
                             const hpGain = avg + conMod;
                             const newMaxHp = (form.maxHp || 0) + hpGain;
@@ -485,6 +505,9 @@ export default function CharacterEdit() {
                         </button>
                       )}
                     </div>
+                    {isMulticlass(form) && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{formatClasses(form, { withSubclass: true })} — Lv Up advances {getCharClasses(form)[0]?.class}; use the sheet's Level Up to add classes.</div>
+                    )}
                   </div>
                 </div>
 

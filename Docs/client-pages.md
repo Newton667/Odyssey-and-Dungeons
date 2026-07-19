@@ -39,13 +39,13 @@ Full interactive character sheet — the main feature of the app.
 - **wrapWidget()** — Function (not component) that wraps sections in draggable widgets
 
 ### Tabs:
-- **Actions** — Weapon attacks (equipped), unarmed strike, spell attacks with upcast support
+- **Actions** — Weapon attacks (equipped), unarmed strike, spell attacks with upcast support, and a **Class Features & Actions** list. The feature list is *derived by level* from `CLASS_LEVELS` + `CLASSES` (descriptions) + unlocked `SUBCLASS_FEATURES` (e.g. Lay on Hands / Rage / Channel Divinity / Sneak Attack), so it works for every class/level even when `char.features` is empty. Bookkeeping rows (ASI, generic subclass placeholders) are filtered; each row shows its unlock level and opens the full description in the side panel. Features descriptions fall back to `utils/featureDescriptions.js`. Limited-use features show a −/＋ **usage counter** (remaining/max from `utils/featureUses.js`) that resets on long rest (all) or short rest (short-recharge features). Unarmed Strike scales with Monk Martial Arts and the Tavern Brawler feat (1d4)
 - **Spells** — Spell list by level, preparation toggle, slot tracking with +/- buttons
 - **Inventory** — Equipment list with equip toggle, weight, rarity colors, ammo tracking, browse/add
 - **Features** — Class features, racial traits, feats, background feature
 - **Background** — Personality, ideals, bonds, flaws
 - **Notes** — Free-text notes with DebouncedTextarea
-- **Progression** — Level-up choices: ASI/feats, subclass, class features
+- **Progression** — Level-up choices: ASI/feats, subclass, class features. Renders one section per class for multiclass characters (via `renderClassSection`), with choice storage namespaced by class so classes don't collide
 
 ### Major Systems:
 - **Weapon Masteries** — 2024 PHB weapon masteries (Cleave, Graze, Nick, etc.) shown as purple badge on weapon attacks; full description in side panel; only active for classes with Weapon Mastery feature (Fighter, Barbarian, etc.)
@@ -59,6 +59,7 @@ Full interactive character sheet — the main feature of the app.
 - **Defenses** — Resistances, immunities, vulnerabilities editor
 - **Death Saves** — Track successes/failures
 - **Carrying Capacity** — STR x 15, shows current weight
+- **Multiclassing** — All class-derived stats route through `utils/multiclass.js`. Spell slots use the combined caster level (Warlock pact shown separately, per-class DCs), Extra Attack takes the best class, hit dice show as per-class pools with a die picker on short rest, and features aggregate across all classes. The **Level Up modal** advances an existing class or multiclasses into a new one (enforcing ability requirements + granting reduced proficiencies). Header shows the "Fighter 5 / Wizard 5" breakdown
 
 ### State Management:
 - `useCharacter(id)` hook for character data + auto-sync

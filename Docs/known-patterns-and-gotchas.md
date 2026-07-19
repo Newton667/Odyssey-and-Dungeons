@@ -131,6 +131,38 @@ In dev mode, the Vite dev server proxies `/api/*` requests to `localhost:3001`. 
 ### Heavy Armor AC
 Heavy armor does NOT add DEX modifier. The `calcAC` useMemo must check subcategory. Subcategory strings are inconsistent — DB has "Heavy Armor" but local data may use "heavy". Always do case-insensitive matching with `.toLowerCase().includes('heavy')`.
 
+### `char.features` Is Not Populated for Most Classes
+**Gotcha:** At creation, `CharacterCreate` only sets `char.features` when the character has a **fighting style** (see the `...(fightingStyle && { features: [...] })` spread). A fresh Barbarian/Wizard/Cleric/Rogue/**level-1 Paladin** has **no `features` array at all** — which is why class features (e.g. Lay on Hands) historically showed up nowhere.
+
+**Rule:** For display, derive class features from class data by level (`CLASS_LEVELS[class]` for names, `CLASSES[class].features` + `SUBCLASS_FEATURES[subclass]` for descriptions) rather than trusting `char.features`. The Actions tab's "Class Features & Actions" list does exactly this and merges any stored `char.features` extras on top. Filter bookkeeping rows with the `isNoise()` predicate: `ASI`, `Fighting Style`, and generic `<X> Feature` subclass placeholders (`Oath Feature`, `Domain Feature`, etc.), which are replaced by real `SUBCLASS_FEATURES` entries.
+
+### Feat Effects on the Character Sheet
+Feats affect the sheet through two channels:
+1. **Additive derived-stat bonuses** — data-driven via the `FEAT_EFFECTS` table in `dndConstants.js` (e.g. `Alert: { initiative: 5 }`, `Observant: { passivePerception: 5, passiveInvestigation: 5 }`). `CharacterSheet` sums them in the `featEffects` useMemo (keyed on the normalized `featSet`) and adds them into `initiative` / `passivePerception` / `passiveInvestigation`.
+2. **Context-conditional effects** — evaluated inline where the sheet already knows the condition: `Medium Armor Master` raises the medium-armor DEX cap 2→3 in `calcAC` (only when medium armor is equipped; `featSet` is a `calcAC` dependency), and `Tavern Brawler` makes the Actions-tab Unarmed Strike die 1d4.
+
+**Rules:**
+- Only add a feat to `FEAT_EFFECTS` if its bonus is **unconditional** AND the target stat is recomputed from scratch each render.
+- Do **not** apply bonuses to **stored** stats like `char.speed` or `char.maxHp` (Mobile, Tough) at render — those are persisted/editable and a display-time bonus would double-count; handle them in the level-up/edit flow instead.
+- Ability-score feat bonuses (`+1 STR`, etc.) are applied to `abilityScores` at character creation, so never repeat them.
+- Most feats (advantage, resistances, reactions, proficiency grants, situational combat riders) have **no flat sheet number** — do not invent one; applying a conditional bonus unconditionally is a correctness bug.
+- Always read feat names through the normalized `featSet` (handles `string | {name}` entries from old saves).
+
+### Action Side Panel — Guard Optional Fields
+The `type: 'action'` side panel is reused for weapon-style actions **and** for class features (which have no `toHit`/`proficient`). The stat grid must guard those fields (`sidePanel.data.toHit != null && {...}`) and filter with `.filter(i => i && i.value)`, otherwise features render "To Hit: +undefined" or a spurious "Proficient: No".
+
+### Multiclassing
+Multiclass characters carry a canonical `char.classes = [{class, subclass, level}]` (per-class levels); `char.class/subclass` = primary (classes[0]) and `char.level` = **total** level. Single-class characters have **no** `classes` array.
+
+**Rules:**
+- Never read `char.class`/`char.level` directly for class-derived math — go through `getCharClasses(char)` (from `utils/multiclass.js`), which synthesizes a one-element array for single-class characters. This keeps existing single-class saves working and all code uniform.
+- **Spell slots:** use `getMulticlassSpellSlots(getCharClasses(char))` → `{ standard, pact }`. A single standard caster uses its own class table (a pure Paladin 5 has 2nd-level slots — the combined formula would be wrong); 2+ casters use the combined-caster-level multiclass table. Warlock Pact Magic is **always** separate (`pactData`), and can coexist with standard slots — render both blocks independently, never `spellSlotData.pact`.
+- **Extra Attack does not stack** across classes — use `getMulticlassExtraAttacks` (max, not sum).
+- **Hit dice** are per-class pools (`getHitDicePools` / `formatHitDice`), not a single `NdX` string. `char.hitDice` is a display fallback only.
+- After any level change, run `syncPrimaryFromClasses(classes)` to keep `class/subclass/level/proficiencyBonus` consistent with the `classes` array. Proficiency bonus is based on **total** level.
+- The sheet's **Level Up modal** advances an existing class or adds a new one (enforcing `MULTICLASS_REQS`, applying `MULTICLASS_PROFICIENCIES`), and **prompts for a subclass** when the advanced/added class hits its `subclassLevel` without one. CharacterEdit's simple "Lv Up" advances the **primary** class only when multiclass, and disables the raw total-level input to avoid desyncing from `classes`.
+- **Progression tab** renders one `renderClassSection(ctx)` per class from `charClasses`. When multiclass, level-choice storage (`char.levelChoices`) and expand-state keys are **namespaced by class** (`${cls}:${level}` / `${cls}-...`) so two classes never collide; `getSelected` scopes its scan to the current class. Subclass picks update the matching entry in `char.classes` via `syncPrimaryFromClasses`; fighting styles are stored per-class as `Fighting Style (Cls): X` features. Single-class characters keep the original un-namespaced keys — do not change that or existing saves lose their choices.
+
 ### Spell Slot Types
 Three slot systems coexist:
 1. **Full casters** (Wizard, Cleric, etc.) — Standard slot progression

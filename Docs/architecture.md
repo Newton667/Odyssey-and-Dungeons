@@ -50,6 +50,9 @@ The `useCharacterSync` hook still contains debounced POST-to-server plumbing, bu
 
 > **`CharacterEdit.jsx` data flow:** it talks to the server (`fetch` on load, `PUT` on save against `/api/characters/:id`) but now also falls back to `localStorage` (`ond-char-{id}`). Load tries the server first, then the local copy if the server is unreachable or has no record; local-only characters (id prefixed `local-`) read straight from localStorage. Save always writes the merged local copy first (matching the server's `{...existing, ...body}` merge so unmanaged fields survive), then PUTs to the server for non-local ids, tolerating an offline server. This closes the earlier gap where local-only characters 404'd in the editor.
 
+### Multiclass Data Shape
+Characters may hold a `classes` array (`[{class, subclass, level}]`) alongside the summary fields `class`/`subclass` (primary = `classes[0]`) and `level` (total). Single-class characters omit `classes`. All class-derived math (spell slots, features, extra attack, hit dice, proficiency bonus) flows through `utils/multiclass.js`, which normalizes both shapes via `getCharClasses(char)` so existing single-class saves need no migration. See `known-patterns-and-gotchas.md` → "Multiclassing."
+
 ### Database Mode (Optional)
 When a MongoDB URI is configured:
 - Equipment/Spells can be served from the database

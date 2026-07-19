@@ -5,8 +5,11 @@ import { useCharacter } from '../hooks/useCharacterSync';
 import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
-import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES } from '../utils/dndConstants';
-import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
+import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES } from '../utils/dndConstants';
+import { CLASS_LEVELS, CLASSES, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
+import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses } from '../utils/multiclass';
+import { featureDescription } from '../utils/featureDescriptions';
+import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
 import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor } from '../utils/dndHelpers';
@@ -126,11 +129,13 @@ export default function CharacterSheet() {
   const [rollLog, setRollLog] = useState([]);
   const [rollToast, setRollToast] = useState(null);
   const [healToast, setHealToast] = useState(null);
+  const [longRestToast, setLongRestToast] = useState(null);
   const [showRollLog, setShowRollLog] = useState(false);
   const [defensePicker, setDefensePicker] = useState(null); // null or { field, label, color }
   const [showAvatar, setShowAvatar] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   const [shortRestModal, setShortRestModal] = useState(null); // null or { diceToSpend, rolls, totalHealed }
+  const [levelUpModal, setLevelUpModal] = useState(null); // null or { targetClass, isNew, subclass }
   const [upcastLevels, setUpcastLevels] = useState({});
   const [showSpellBrowser, setShowSpellBrowser] = useState(false);
   const [spellBrowserSearch, setSpellBrowserSearch] = useState('');
@@ -343,8 +348,8 @@ export default function CharacterSheet() {
       healTimer.current = setTimeout(() => setHealToast(null), 2500);
       return;
     }
-    // Open short rest modal
-    setShortRestModal({ rolls: [], totalHealed: 0, diceSpent: 0 });
+    // Open short rest modal (default to the largest hit die in the pool)
+    setShortRestModal({ rolls: [], totalHealed: 0, diceSpent: 0, selectedDie: getHitDicePools(char)[0]?.die || HIT_DICE[char.class] || 'd8' });
   }, [char]);
 
   const shortRestRollDie = useCallback(async () => {
@@ -353,7 +358,7 @@ export default function CharacterSheet() {
     if (remaining <= 0) return;
     if (char.currentHp + shortRestModal.totalHealed >= char.maxHp) return;
 
-    const hd = HIT_DICE[char.class] || 'd8';
+    const hd = shortRestModal.selectedDie || getHitDicePools(char)[0]?.die || HIT_DICE[char.class] || 'd8';
     const conMod = modVal(char.abilityScores?.constitution ?? 10);
     const formula = `1${hd}${conMod >= 0 ? '+' : ''}${conMod}`;
     const { total } = await rollDice3D(formula, 'Short Rest — Hit Die');
@@ -376,10 +381,21 @@ export default function CharacterSheet() {
     const newRemaining = (char.hitDiceRemaining ?? char.level) - shortRestModal.diceSpent;
 
     const updates = { currentHp: newHp, hitDiceRemaining: newRemaining };
-    // Warlock pact slots recover on short rest
-    if (char.class === 'Warlock') {
+    // Warlock pact slots recover on short rest (works when Warlock is any of the classes)
+    if (getCharClasses(char).some(c => c.class === 'Warlock')) {
       updates.usedSpellSlots = { ...(char.usedSpellSlots || {}), pact: 0 };
     }
+    // Reset short-rest feature counters (Second Wind, Action Surge, Ki, Channel Divinity, Wild Shape, …)
+    const su = { ...(char.featureUses || {}) };
+    let suChanged = false;
+    for (const cc of getCharClasses(char)) {
+      const clsLv = CLASS_LEVELS[cc.class] || {};
+      for (let l = 1; l <= cc.level; l++) for (const nm of (clsLv[l] || [])) {
+        const u = computeFeatureUses(nm, cc.level, char, cc.class);
+        if (u && u.recharge === 'short') { const k = baseFeatureName(nm); if (k in su) { delete su[k]; suChanged = true; } }
+      }
+    }
+    if (suChanged) updates.featureUses = su;
     updateChar(prev => ({ ...prev, ...updates }));
 
     setShortRestModal(null);
@@ -394,8 +410,65 @@ export default function CharacterSheet() {
   const doLongRest = useCallback(() => {
     if (!char) return;
     const maxDice = char.level || 1;
-    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {} }));
+    const hpRestored = Math.max(0, (char.maxHp || 0) - (char.currentHp || 0));
+    const diceRegained = Math.max(0, maxDice - (char.hitDiceRemaining ?? maxDice));
+    // Clearing featureUses returns every limited-use feature to full
+    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {}, featureUses: {} }));
+    setLongRestToast({ hpRestored, maxHp: char.maxHp, diceRegained, maxDice });
+    if (healTimer.current) clearTimeout(healTimer.current);
+    healTimer.current = setTimeout(() => setLongRestToast(null), 4000);
   }, [char, updateChar]);
+
+  // Level up — advance an existing class or add a new one (multiclass). Handles HP,
+  // proficiency bonus, hit-dice pool, and reduced multiclass proficiencies for new classes.
+  const applyLevelUp = useCallback(async ({ targetClass, isNew, subclass, useAvg }) => {
+    if (!char || !targetClass) return;
+    const classes = getCharClasses(char).map(c => ({ ...c }));
+    if (isNew) {
+      classes.push({ class: targetClass, subclass: subclass || '', level: 1 });
+    } else {
+      const t = classes.find(c => c.class === targetClass);
+      if (!t) return;
+      t.level += 1;
+      if (subclass && !t.subclass) t.subclass = subclass;   // subclass unlocked this level
+    }
+    const hd = CLASSES[targetClass]?.hitDice || HIT_DICE[targetClass] || 'd8';
+    const dieMax = parseInt(hd.replace('d', '')) || 8;
+    const conMod = modVal(char.abilityScores?.constitution ?? 10);
+    const avg = Math.floor(dieMax / 2) + 1;
+    let hpGain;
+    if (useAvg) {
+      hpGain = avg + conMod;
+    } else {
+      const { total } = await rollDice3D(hd, 'Level Up HP');
+      hpGain = total + conMod;
+      logRoll('Level Up HP', hd, total, 'Level Up');
+    }
+    const patch = syncPrimaryFromClasses(classes);
+    const newMaxHp = (char.maxHp || 0) + Math.max(1, hpGain);
+    patch.maxHp = newMaxHp;
+    patch.currentHp = newMaxHp;
+    patch.hitDiceRemaining = patch.level;             // regain all hit dice on level up
+    patch.hitDice = formatHitDice({ classes });        // pooled string, e.g. "5d10 + 5d6"
+
+    if (isNew) {
+      const mp = MULTICLASS_PROFICIENCIES[targetClass] || {};
+      if (mp.tools?.length) patch.toolProficiencies = [...new Set([...(char.toolProficiencies || []), ...mp.tools])];
+      const bits = [];
+      if (mp.armor?.length) bits.push(`Armor: ${mp.armor.join(', ')}`);
+      if (mp.weapons?.length) bits.push(`Weapons: ${mp.weapons.join(', ')}`);
+      if (mp.tools?.length) bits.push(`Tools: ${mp.tools.join(', ')}`);
+      if (mp.skills) bits.push(`${mp.skills} skill${mp.skills > 1 ? 's' : ''} of your choice`);
+      const note = `Multiclass Proficiencies (${targetClass}): ${bits.join(' · ') || 'None'}`;
+      const kept = (char.features || []).filter(f => {
+        const s = typeof f === 'string' ? f : (f?.name || '');
+        return !s.startsWith(`Multiclass Proficiencies (${targetClass})`);
+      });
+      patch.features = [...kept, note];
+    }
+    updateChar(prev => ({ ...prev, ...patch }));
+    setLevelUpModal(null);
+  }, [char, updateChar, rollDice3D, logRoll]);
 
   // Roll with result tracking
   const doRollWithResult = useCallback(async (label, formula) => {
@@ -490,10 +563,24 @@ export default function CharacterSheet() {
 
   const profBonus = char?.proficiencyBonus || 2;
   const scores = char?.abilityScores || {};
-  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Perception') ? profBonus : 0);
-  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char?.skillProficiencies?.includes('Investigation') ? profBonus : 0);
+  // Normalized set of the character's feat names (handles string | {name} entries from old saves)
+  const featSet = useMemo(
+    () => new Set((char?.feats || []).map(f => (typeof f === 'string' ? f : (f?.name || ''))).filter(Boolean)),
+    [char?.feats]
+  );
+  // Sum unconditional feat bonuses that feed into derived stats (e.g. Alert → +5 initiative)
+  const featEffects = useMemo(() => {
+    const totals = { initiative: 0, passivePerception: 0, passiveInvestigation: 0 };
+    for (const name of featSet) {
+      const eff = FEAT_EFFECTS[name];
+      if (eff) for (const k in eff) totals[k] = (totals[k] || 0) + eff[k];
+    }
+    return totals;
+  }, [featSet]);
+  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Perception') ? profBonus : 0) + featEffects.passivePerception;
+  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char?.skillProficiencies?.includes('Investigation') ? profBonus : 0) + featEffects.passiveInvestigation;
   const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Insight') ? profBonus : 0);
-  const initiative = modVal(scores.dexterity ?? 10);
+  const initiative = modVal(scores.dexterity ?? 10) + featEffects.initiative;
   const dexMod = modVal(scores.dexterity ?? 10);
 
   // Auto-calculate AC from equipped armor
@@ -518,7 +605,8 @@ export default function CharacterSheet() {
         baseAC = ac;
         hasArmor = true;
       } else if (sub.includes('medium')) {
-        baseAC = ac + Math.min(dexMod, 2);
+        // Medium Armor Master raises the DEX cap from +2 to +3
+        baseAC = ac + Math.min(dexMod, featSet.has('Medium Armor Master') ? 3 : 2);
         hasArmor = true;
       } else if (sub.includes('light')) {
         baseAC = ac + dexMod;
@@ -529,7 +617,7 @@ export default function CharacterSheet() {
       }
     }
     return baseAC + shieldBonus;
-  }, [char?.equippedItems, dexMod, equipDataLoaded]);
+  }, [char?.equippedItems, dexMod, equipDataLoaded, featSet]);
 
   // Check if equipped armor gives stealth disadvantage
   const hasStealthDisadvantage = useMemo(() => {
@@ -550,19 +638,32 @@ export default function CharacterSheet() {
   if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;
   if (!char) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Character not found.</div>;
 
-  // Spell slots
-  const spellSlotData = getSpellSlots(char.class, char.level);
+  // Class breakdown (single- or multi-class, normalized)
+  const charClasses = getCharClasses(char);
+  const charIsMulticlass = isMulticlass(char);
+
+  // Spell slots — standard slots (array) and Warlock Pact Magic (separate) can coexist
+  const mcSlots = getMulticlassSpellSlots(charClasses);
+  const spellSlotData = mcSlots.standard;
+  const pactData = mcSlots.pact;
   const usedSlots = char.usedSpellSlots || {};
 
-  // Extra Attack
-  const extraAttacks = getExtraAttacks(char.class, char.level);
+  // Extra Attack — best single class, does not stack across classes
+  const extraAttacks = getMulticlassExtraAttacks(char);
 
   // Carrying capacity
   const carryCapacity = (scores.strength ?? 10) * 15;
 
-  // Resistances / Immunities / Vulnerabilities
+  // Resistances / Immunities / Vulnerabilities (aggregated across all classes)
   const raceDef = RACE_DEFENSES[char.race] || { resistances: [], immunities: [], vulnerabilities: [] };
-  const classDef = getClassDefenses(char.class, char.level, char.subclass);
+  const classDef = charClasses.reduce((acc, c) => {
+    const d = getClassDefenses(c.class, c.level, c.subclass);
+    return {
+      resistances: [...acc.resistances, ...(d.resistances || [])],
+      immunities: [...acc.immunities, ...(d.immunities || [])],
+      vulnerabilities: [...acc.vulnerabilities, ...(d.vulnerabilities || [])],
+    };
+  }, { resistances: [], immunities: [], vulnerabilities: [] });
   const allResistances = [...new Set([...(raceDef.resistances || []), ...(classDef.resistances || []), ...(char.customResistances || [])])];
   const allImmunities = [...new Set([...(raceDef.immunities || []), ...(classDef.immunities || []), ...(char.customImmunities || [])])];
   const allVulnerabilities = [...new Set([...(raceDef.vulnerabilities || []), ...(classDef.vulnerabilities || []), ...(char.customVulnerabilities || [])])];
@@ -774,7 +875,7 @@ export default function CharacterSheet() {
     const canUpcast = spell.level > 0 && spell.damage && spell.scaling;
     const castLevel = upcastLevels[spell.name] || spell.level;
     const effectiveDamage = canUpcast ? getUpcastDamage(spell, castLevel) : spell.damage;
-    const maxSlot = spellSlotData?.pact ? spellSlotData.level : (spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 9);
+    const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
     return (
       <div onClick={() => onClick(spell)}
         className="cc-skill"
@@ -1350,33 +1451,7 @@ export default function CharacterSheet() {
                       Ready to level up!
                     </div>
                     <button className="btn" style={{ padding: '6px 20px', fontSize: '13px', background: 'linear-gradient(135deg, #1a3a1a, #2a5a2a)', border: '1px solid #4ade80', color: '#4ade80', fontWeight: 700 }}
-                      onClick={async () => {
-                        const newLevel = (char.level || 1) + 1;
-                        const hd = HIT_DICE[char.class] || 'd8';
-                        const dieMax = parseInt(hd.replace('d', ''));
-                        const conMod = modVal(scores.constitution ?? 10);
-                        const avg = Math.floor(dieMax / 2) + 1;
-                        const useAvg = confirm(`Level up to ${newLevel}!\n\nHP increase: ${hd} (avg ${avg}) + ${conMod} CON mod = ${avg + conMod}\n\nOK = Take average (${avg + conMod} HP)\nCancel = Roll ${hd}`);
-                        let hpGain;
-                        if (useAvg) {
-                          hpGain = avg + conMod;
-                        } else {
-                          const { total } = await rollDice3D(hd);
-                          hpGain = Math.max(1, total + conMod);
-                          logRoll('Level Up HP', hd, total, 'Level Up');
-                        }
-                        const newMaxHp = (char.maxHp || 0) + hpGain;
-                        const newPB = newLevel <= 4 ? 2 : newLevel <= 8 ? 3 : newLevel <= 12 ? 4 : newLevel <= 16 ? 5 : 6;
-                        updateChar(prev => ({
-                          ...prev,
-                          level: newLevel,
-                          maxHp: newMaxHp,
-                          currentHp: newMaxHp,
-                          hitDice: `${newLevel}${hd}`,
-                          hitDiceRemaining: newLevel,
-                          proficiencyBonus: newPB,
-                        }));
-                      }}>
+                      onClick={() => setLevelUpModal({ targetClass: charClasses[0]?.class || char.class, isNew: false, subclass: '', useAvg: true })}>
                       Level Up to {(char.level || 1) + 1}
                     </button>
                   </div>
@@ -1520,7 +1595,7 @@ export default function CharacterSheet() {
               <div style={{ ...st.combatBox, minWidth: '80px', justifyContent: 'center', gap: '4px' }}>
                 <span style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '1px', fontWeight: 600 }}>Hit Dice</span>
                 <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--gold)' }}>{char.hitDiceRemaining ?? char.level}</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{char.hitDice || HIT_DICE[char.class] || 'd8'}</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{formatHitDice(char) || char.hitDice || HIT_DICE[char.class] || 'd8'}</span>
               </div>
             </div>
 
@@ -1555,6 +1630,60 @@ export default function CharacterSheet() {
     const spellMod = modVal(scores[char.spellcastingAbility] ?? scores.intelligence ?? 10);
     const attackSpells = spellData.filter(sp => sp.damage || sp.attackType || sp.savingThrow);
     const strMod = modVal(scores.strength ?? 10);
+
+    // Unarmed strike die: Monk Martial Arts scaling → else Tavern Brawler (1d4) → else 1
+    const monkUnarmedDie = char.level >= 17 ? '1d10' : char.level >= 11 ? '1d8' : char.level >= 5 ? '1d6' : '1d4';
+    const unarmedDie = char?.class === 'Monk' ? monkUnarmedDie : (featSet.has('Tavern Brawler') ? '1d4' : '1');
+    const unarmedRollFormula = `${unarmedDie === '1' ? '1d1' : unarmedDie}+${strMod}`;
+
+    // Class & subclass features surfaced here as usable actions/abilities (e.g. Lay on Hands).
+    // Derived from class data by level so it works for EVERY class/level, even for characters
+    // whose stored char.features array was never populated at creation.
+    const parseFeature = (f) => {
+      if (f && typeof f === 'object') return { name: f.name || 'Feature', desc: f.desc || '' };
+      const str = String(f || '');
+      const emDash = str.indexOf(' — ');
+      if (emDash !== -1) return { name: str.slice(0, emDash).trim(), desc: str.slice(emDash + 3).trim() };
+      const colon = str.indexOf(': ');
+      if (colon !== -1) return { name: str.slice(0, colon).trim(), desc: str.slice(colon + 2).trim() };
+      return { name: str.trim(), desc: '' };
+    };
+    // Skip pure bookkeeping / generic subclass placeholders (real subclass features are added below)
+    const isNoise = (n) => n === 'ASI' || n === 'Fighting Style'
+      || /^(Path|Oath|Domain|Archetype|College|Circle|Tradition|Patron|Specialist|Origin) Feature$/.test(n);
+    const classActionsRaw = [];
+    // Aggregate features from every class the character has, each at its own level
+    for (const cc of charClasses) {
+      const subMap = cc.subclass ? (SUBCLASS_FEATURES[cc.subclass] || {}) : {};
+      const featureDesc = {};
+      (CLASSES[cc.class]?.features || []).forEach(f => { const p = parseFeature(f); if (p.name) featureDesc[p.name] = p.desc; });
+      Object.values(subMap).forEach(f => { if (f?.name) featureDesc[f.name] = f.desc; });
+      const clsLevels = CLASS_LEVELS[cc.class] || {};
+      for (let lv = 1; lv <= cc.level; lv++) {
+        (clsLevels[lv] || []).forEach(name => {
+          if (isNoise(name)) return;
+          classActionsRaw.push({
+            name, desc: featureDesc[name] || featureDescription(name), level: lv, source: cc.class,
+            uses: computeFeatureUses(name, cc.level, char, cc.class), useKey: baseFeatureName(name),
+          });
+        });
+      }
+      // Real unlocked subclass features (with names + descriptions)
+      Object.entries(subMap)
+        .filter(([lvl]) => parseInt(lvl) <= cc.level)
+        .forEach(([lvl, f]) => { if (f?.name) classActionsRaw.push({ name: f.name, desc: f.desc || '', level: parseInt(lvl), source: cc.subclass }); });
+    }
+    // Extra stored features not already covered (e.g. "Fighting Style: Defense", metamagic, homebrew)
+    (char.features || []).map(parseFeature).forEach(p => {
+      if (p.name && !classActionsRaw.some(a => a.name === p.name)) classActionsRaw.push({ ...p, desc: p.desc || featureDescription(p.name), source: char.class });
+    });
+    // Dedupe by name, keeping the entry that has a description
+    const seenFeat = new Map();
+    for (const a of classActionsRaw) {
+      const existing = seenFeat.get(a.name);
+      if (!existing || (!existing.desc && a.desc)) seenFeat.set(a.name, a);
+    }
+    const classActions = [...seenFeat.values()].filter(f => f.name).sort((a, b) => (a.level || 0) - (b.level || 0));
 
     // Equipped weapons from cache
     const equippedWeapons = (char.equippedItems || [])
@@ -1714,7 +1843,7 @@ export default function CharacterSheet() {
               actionType: '1 Action',
               attackType: 'Melee Attack',
               toHit: strMod + profBonus,
-              damage: char?.class === 'Monk' ? `${char.level >= 17 ? '1d10' : char.level >= 11 ? '1d8' : char.level >= 5 ? '1d6' : '1d4'}+${strMod}` : `1+${strMod}`,
+              damage: `${unarmedDie}+${strMod}`,
               damageType: 'Bludgeoning',
               stat: 'STR',
               range: '5ft. Reach',
@@ -1733,8 +1862,8 @@ export default function CharacterSheet() {
               </RollBtn>
             </span>
             <span style={{ fontSize: '12px' }}>
-              <RollBtn label="Unarmed Strike Damage" formula={char?.class === 'Monk' ? `${char.level >= 17 ? '1d10' : char.level >= 11 ? '1d8' : char.level >= 5 ? '1d6' : '1d4'}+${strMod}` : `1d1+${strMod}`}>
-                {char?.class === 'Monk' ? `${char.level >= 17 ? '1d10' : char.level >= 11 ? '1d8' : char.level >= 5 ? '1d6' : '1d4'}` : '1'} + {strMod}
+              <RollBtn label="Unarmed Strike Damage" formula={unarmedRollFormula}>
+                {unarmedDie} + {strMod}
               </RollBtn>
               {' '}<span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>bludg.</span>
             </span>
@@ -1761,7 +1890,7 @@ export default function CharacterSheet() {
               const castLevel = upcastLevels[sp.name] || sp.level;
               const effectiveDamage = canUpcast ? getUpcastDamage(sp, castLevel) : sp.damage;
               // Max spell slot level available
-              const maxSlot = spellSlotData?.pact ? spellSlotData.level : (spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 9);
+              const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
               return (
                 <div key={sp._id} className="cc-skill"
                   onClick={() => openSpellPanel(sp)}
@@ -1810,37 +1939,89 @@ export default function CharacterSheet() {
             })}
           </div>
         )}
+
+        {/* ── Class Features & Actions ── */}
+        {classActions.length > 0 && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--gold)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'Cinzel, serif' }}>
+              Class Features & Actions
+            </div>
+            {classActions.map((f, i) => (
+              <div key={`feat-${i}`} className="cc-skill"
+                onClick={() => setSidePanel({ type: 'action', data: {
+                  name: f.name,
+                  actionType: f.source ? `${f.source} Feature` : 'Feature',
+                  description: f.desc || 'No description available.',
+                } })}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--surface)', fontSize: '13px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 500 }}>{f.name}</div>
+                  {f.desc && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.desc}</div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {f.uses && (() => {
+                    const remaining = char.featureUses?.[f.useKey] ?? f.uses.max;
+                    const setUse = (v) => updateField('featureUses', { ...(char.featureUses || {}), [f.useKey]: Math.max(0, Math.min(f.uses.max, v)) });
+                    const stepBtn = (enabled, color) => ({ width: '22px', height: '22px', borderRadius: '5px', cursor: enabled ? 'pointer' : 'default', background: 'var(--surface)', border: `1px solid ${enabled ? color : 'var(--border)'}`, color: enabled ? color : 'var(--text-dim)', fontSize: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: enabled ? 1 : 0.4, lineHeight: 1 });
+                    return (
+                      <div onClick={e => e.stopPropagation()} title={`Recharges on a ${f.uses.recharge === 'short' ? 'short or long' : 'long'} rest`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <button className="cc-skill" onClick={() => setUse(remaining - 1)} style={stepBtn(remaining > 0, '#f87171')}>−</button>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: remaining > 0 ? 'var(--gold)' : '#f87171', minWidth: f.uses.unit ? '46px' : '30px', textAlign: 'center' }}>{remaining}/{f.uses.max}{f.uses.unit ? ` ${f.uses.unit}` : ''}</span>
+                        <button className="cc-skill" onClick={() => setUse(remaining + 1)} style={stepBtn(remaining < f.uses.max, '#4ade80')}>+</button>
+                        <span style={{ fontSize: '9px', color: 'var(--text-dim)', fontWeight: 700, width: '10px', textAlign: 'center' }}>{f.uses.recharge === 'short' ? 'S' : 'L'}</span>
+                      </div>
+                    );
+                  })()}
+                  {f.level != null && <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>Lv {f.level}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
 
   const renderSpellsTab = () => {
-    // Spell save DC & spell attack bonus
-    const castAbility = char.spellcastingAbility || '';
-    const castMod = castAbility ? modVal(scores[castAbility] ?? 10) : 0;
-    const spellSaveDC = castAbility ? 8 + profBonus + castMod : null;
-    const spellAttackBonus = castAbility ? profBonus + castMod : null;
+    // Spell save DC & attack bonus — one entry per spellcasting class (multiclass uses each class's ability)
+    const casterClasses = getSpellcastingClasses(char);
+    let dcEntries = casterClasses.map(c => {
+      const mod = modVal(scores[c.ability] ?? 10);
+      return { label: c.class, ability: c.ability, dc: 8 + profBonus + mod, atk: profBonus + mod };
+    });
+    if (dcEntries.length === 0 && char.spellcastingAbility) {
+      const mod = modVal(scores[char.spellcastingAbility] ?? 10);
+      dcEntries = [{ label: '', ability: char.spellcastingAbility, dc: 8 + profBonus + mod, atk: profBonus + mod }];
+    }
+    const multiCaster = dcEntries.length > 1;
 
     return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-        {/* Spell Save DC & Attack Bonus */}
-        {spellSaveDC && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>Spell Save DC</span>
-              <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold)' }}>{spellSaveDC}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>Spell Attack</span>
-              <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold)' }}>+{spellAttackBonus}</span>
-            </div>
+        {/* Spell Save DC & Attack Bonus (per caster class) */}
+        {dcEntries.length > 0 && (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {dcEntries.map((e, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>{multiCaster ? `${e.label} DC` : 'Spell Save DC'}</span>
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold)' }}>{e.dc}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                  <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '0.5px' }}>{multiCaster ? 'Atk' : 'Spell Attack'}</span>
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--gold)' }}>+{e.atk}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
       {/* ── Spell Slots ── */}
-      {spellSlotData && !spellSlotData.pact && (
+      {spellSlotData && (
         <div style={{ marginBottom: '16px', padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>Spell Slots</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -1890,14 +2071,14 @@ export default function CharacterSheet() {
       )}
 
       {/* Warlock Pact Magic Slots */}
-      {spellSlotData?.pact && (
+      {pactData && (
         <div style={{ marginBottom: '16px', padding: '10px 12px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}>
           <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
-            Pact Magic Slots <span style={{ color: 'var(--gold)', fontSize: '11px' }}>(Level {spellSlotData.level})</span>
+            Pact Magic Slots <span style={{ color: 'var(--gold)', fontSize: '11px' }}>(Level {pactData.level})</span>
           </div>
           {(() => {
             const pactUsed = usedSlots['pact'] || 0;
-            const pactRemaining = spellSlotData.slots - pactUsed;
+            const pactRemaining = pactData.slots - pactUsed;
             return (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button onClick={() => {
@@ -1910,7 +2091,7 @@ export default function CharacterSheet() {
                   style={{ width: '28px', height: '28px', borderRadius: '6px', cursor: pactRemaining > 0 ? 'pointer' : 'default', background: pactRemaining > 0 ? '#3a1a1a' : 'var(--surface)', border: `1px solid ${pactRemaining > 0 ? '#6a2a2a' : 'var(--border)'}`, color: pactRemaining > 0 ? '#f87171' : 'var(--text-dim)', fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: pactRemaining > 0 ? 1 : 0.3 }}
                   title="Use a pact slot">−</button>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  {Array.from({ length: spellSlotData.slots }, (_, s) => (
+                  {Array.from({ length: pactData.slots }, (_, s) => (
                     <span key={s} style={{
                       width: '16px', height: '16px', borderRadius: '50%',
                       background: s < pactRemaining ? '#a335ee' : 'transparent',
@@ -1929,7 +2110,7 @@ export default function CharacterSheet() {
                   className="cc-skill"
                   style={{ width: '28px', height: '28px', borderRadius: '6px', cursor: pactUsed > 0 ? 'pointer' : 'default', background: pactUsed > 0 ? '#2a1a3a' : 'var(--surface)', border: `1px solid ${pactUsed > 0 ? '#6a3a8a' : 'var(--border)'}`, color: pactUsed > 0 ? '#a335ee' : 'var(--text-dim)', fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: pactUsed > 0 ? 1 : 0.3 }}
                   title="Restore a pact slot">+</button>
-                <span style={{ fontSize: '12px', color: '#a335ee', fontWeight: 600 }}>{pactRemaining}/{spellSlotData.slots}</span>
+                <span style={{ fontSize: '12px', color: '#a335ee', fontWeight: 600 }}>{pactRemaining}/{pactData.slots}</span>
                 <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>(Short rest recovery)</span>
               </div>
             );
@@ -2025,7 +2206,7 @@ export default function CharacterSheet() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--gold)', fontFamily: 'Cinzel, serif' }}>Level {lvl}</span>
                   {/* Inline slot indicators per level */}
-                  {spellSlotData && !spellSlotData.pact && spellSlotData[lvl - 1] > 0 && (() => {
+                  {spellSlotData && spellSlotData[lvl - 1] > 0 && (() => {
                     const slotTotal = spellSlotData[lvl - 1];
                     const slotUsed = usedSlots[String(lvl)] || 0;
                     const slotRemaining = slotTotal - slotUsed;
@@ -2284,17 +2465,24 @@ export default function CharacterSheet() {
   };
 
   const renderFeaturesTab = () => {
-    // Get subclass features up to current level
-    const subFeatures = char.subclass ? SUBCLASS_FEATURES[char.subclass] : null;
-    const unlockedSubFeatures = subFeatures ? Object.entries(subFeatures).filter(([lvl]) => parseInt(lvl) <= (char.level || 1)).map(([lvl, feat]) => ({ ...feat, level: parseInt(lvl) })) : [];
+    // Subclass features up to each class's level (one card per subclass for multiclass)
+    const subclassCards = charClasses
+      .filter(cc => cc.subclass && SUBCLASS_FEATURES[cc.subclass])
+      .map(cc => ({
+        subclass: cc.subclass,
+        features: Object.entries(SUBCLASS_FEATURES[cc.subclass])
+          .filter(([lvl]) => parseInt(lvl) <= cc.level)
+          .map(([lvl, feat]) => ({ ...feat, level: parseInt(lvl) })),
+      }))
+      .filter(c => c.features.length > 0);
 
     return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {/* Subclass Features */}
-      {unlockedSubFeatures.length > 0 && (
-        <div style={st.sideCard}>
-          <div style={st.sideLabel}>{char.subclass}</div>
-          {unlockedSubFeatures.map((f, i) => (
+      {subclassCards.map((card, ci) => (
+        <div key={ci} style={st.sideCard}>
+          <div style={st.sideLabel}>{card.subclass}</div>
+          {card.features.map((f, i) => (
             <div key={i} style={{ fontSize: '12px', marginBottom: '8px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                 <strong style={{ color: 'var(--gold)', fontSize: '13px' }}>{f.name}</strong>
@@ -2304,7 +2492,7 @@ export default function CharacterSheet() {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Class Features */}
       {char.features?.length > 0 && (
@@ -2312,11 +2500,12 @@ export default function CharacterSheet() {
           <div style={st.sideLabel}>Class Features</div>
           {char.features.map((f, i) => {
             const fStr = typeof f === 'object' && f !== null ? (f.name || JSON.stringify(f)) : String(f || '');
-            const [name, ...desc] = fStr.split(': ');
+            const [name, ...descParts] = fStr.split(': ');
+            const desc = descParts.length > 0 ? descParts.join(': ') : featureDescription(name);
             return (
               <div key={i} style={{ fontSize: '12px', marginBottom: '6px', padding: '4px 0', borderBottom: i < char.features.length - 1 ? '1px solid var(--surface)' : 'none' }}>
                 <strong style={{ color: 'var(--gold)' }}>{name}</strong>
-                {desc.length > 0 && <span style={{ color: 'var(--text-dim)' }}> — {desc.join(': ')}</span>}
+                {desc && <span style={{ color: 'var(--text-dim)' }}> — {desc}</span>}
               </div>
             );
           })}
@@ -2387,13 +2576,28 @@ export default function CharacterSheet() {
   );
 
   const renderProgressionTab = () => {
-    const cls = char.class || '';
-    const lvl = char.level || 1;
-    const levels = CLASS_LEVELS[cls] || {};
-    const classInfo = CLASSES[cls] || {};
-    const nextLvl = lvl < 20 ? lvl + 1 : null;
-    const nextFeatures = nextLvl ? (levels[nextLvl] || []) : [];
-    const nextChoices = nextLvl ? getLevelChoices(cls, nextLvl, char.subclass) : [];
+    const sections = charClasses;
+    // Fighting style is stored per-class in features for multiclass ("Fighting Style (Cls): X")
+    const fightingStyleOf = (clsName) => {
+      const pref = charIsMulticlass ? `Fighting Style (${clsName}):` : 'Fighting Style:';
+      const f = (char.features || []).find(x => (typeof x === 'string' ? x : (x?.name || '')).startsWith(pref));
+      if (!f) return null;
+      return (typeof f === 'string' ? f : (f.name || '')).slice(pref.length).trim();
+    };
+
+    // Renders the full progression UI for ONE class (single-class characters have one section)
+    const renderClassSection = (ctx) => {
+      const cls = ctx.class;
+      const lvl = ctx.level;
+      const subclass = ctx.subclass || '';
+      const levels = CLASS_LEVELS[cls] || {};
+      const classInfo = CLASSES[cls] || {};
+      const nextLvl = lvl < 20 ? lvl + 1 : null;
+      const nextFeatures = nextLvl ? (levels[nextLvl] || []) : [];
+      const nextChoices = nextLvl ? getLevelChoices(cls, nextLvl, subclass) : [];
+      // Choice storage + expand-state keys are namespaced by class when multiclass
+      const skey = (level) => charIsMulticlass ? `${cls}:${level}` : String(level);
+      const kp = charIsMulticlass ? `${cls}-` : '';
 
     // Get options for a choice type
     const getChoiceOptions = (choice) => {
@@ -2442,12 +2646,15 @@ export default function CharacterSheet() {
       const choiceKey = choice.type;
       // Find what's already been selected
       const getSelected = () => {
-        for (const [, val] of Object.entries(savedChoices)) {
-          if (val?.[choiceKey]) return val[choiceKey];
+        const directKey = skey(choice.level || lvl);
+        if (savedChoices[directKey]?.[choiceKey] != null) return savedChoices[directKey][choiceKey];
+        for (const [k, val] of Object.entries(savedChoices)) {
+          if (charIsMulticlass && !k.startsWith(`${cls}:`)) continue;   // scope to this class
+          if (val?.[choiceKey] != null) return val[choiceKey];
         }
         // Check direct character fields
-        if (choiceKey === 'subclass') return char.subclass || null;
-        if (choiceKey === 'fighting-style') return char.fightingStyle || null;
+        if (choiceKey === 'subclass') return subclass || null;
+        if (choiceKey === 'fighting-style') return charIsMulticlass ? fightingStyleOf(cls) : (char.fightingStyle || null);
         return null;
       };
       const rawSelected = getSelected();
@@ -2459,7 +2666,7 @@ export default function CharacterSheet() {
 
       const selectOption = (name) => {
         const lc = { ...(char.levelChoices || {}) };
-        const lvlKey = String(choice.level || lvl);
+        const lvlKey = skey(choice.level || lvl);
         if (!lc[lvlKey]) lc[lvlKey] = {};
 
         if (isMulti) {
@@ -2478,14 +2685,20 @@ export default function CharacterSheet() {
         const updates = { levelChoices: lc };
 
         if (choiceKey === 'subclass') {
-          updates.subclass = name;
+          if (charIsMulticlass) {
+            const newClasses = getCharClasses(char).map(c => c.class === cls ? { ...c, subclass: name } : c);
+            Object.assign(updates, syncPrimaryFromClasses(newClasses));
+          } else {
+            updates.subclass = name;
+          }
         }
         if (choiceKey === 'fighting-style') {
-          updates.fightingStyle = name;
-          // Add to features
-          const feat = `Fighting Style: ${name}`;
-          if (!(char.features || []).includes(feat)) {
-            updates.features = [...(char.features || []).filter(f => !f.startsWith('Fighting Style:')), feat];
+          if (charIsMulticlass) {
+            const pref = `Fighting Style (${cls}):`;
+            updates.features = [...(char.features || []).filter(f => !(typeof f === 'string' ? f : (f?.name || '')).startsWith(pref)), `${pref} ${name}`];
+          } else {
+            updates.fightingStyle = name;
+            updates.features = [...(char.features || []).filter(f => !(typeof f === 'string' ? f : (f?.name || '')).startsWith('Fighting Style:')), `Fighting Style: ${name}`];
           }
         }
         if (choiceKey === 'asi') {
@@ -2693,20 +2906,20 @@ export default function CharacterSheet() {
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{feat}</div>
                 </div>
               ))}
-              {nextChoices.map((choice, ci) => renderChoiceCard(choice, `next-${ci}`))}
+              {nextChoices.map((choice, ci) => renderChoiceCard(choice, `${kp}next-${ci}`))}
             </div>
           </div>
         )}
 
         {/* Current level choices (if any still need to be made) */}
         {(() => {
-          const currentChoices = getLevelChoices(cls, lvl, char.subclass);
+          const currentChoices = getLevelChoices(cls, lvl, subclass);
           if (currentChoices.length === 0) return null;
           return (
             <div style={{ ...st.sideCard, border: '1px solid #4ade80', background: 'rgba(74, 222, 128, 0.05)' }}>
               <div style={{ ...st.sideLabel, color: '#4ade80' }}>Current Level {lvl} — Available Choices</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {currentChoices.map((choice, ci) => renderChoiceCard(choice, `cur-${ci}`))}
+                {currentChoices.map((choice, ci) => renderChoiceCard(choice, `${kp}cur-${ci}`))}
               </div>
             </div>
           );
@@ -2719,7 +2932,7 @@ export default function CharacterSheet() {
             <span>Hit Die: <strong style={{ color: 'var(--text)' }}>{classInfo.hitDice || HIT_DICE[cls] || 'd8'}</strong></span>
             {classInfo.subclassLevel && <span>Subclass at Level: <strong style={{ color: 'var(--text)' }}>{classInfo.subclassLevel}</strong></span>}
             {classInfo.spellcasting && <span>Spellcasting: <strong style={{ color: 'var(--text)' }}>{classInfo.spellcastingAbility}</strong></span>}
-            {char.subclass && <span>Subclass: <strong style={{ color: 'var(--gold)' }}>{char.subclass}</strong></span>}
+            {subclass && <span>Subclass: <strong style={{ color: 'var(--gold)' }}>{subclass}</strong></span>}
           </div>
         </div>
 
@@ -2729,18 +2942,18 @@ export default function CharacterSheet() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {Array.from({ length: 20 }, (_, i) => i + 1).map(l => {
               const features = levels[l] || [];
-              const choices = getLevelChoices(cls, l, char.subclass);
+              const choices = getLevelChoices(cls, l, subclass);
               const isCurrent = l === lvl;
               const isPast = l < lvl;
               const isFuture = l > lvl;
               const isNext = l === nextLvl;
               const hasContent = features.length > 0 || choices.length > 0;
               if (!hasContent && !isCurrent) return null;
-              const levelExpanded = expandedChoices[`lvl-${l}`];
+              const levelExpanded = expandedChoices[`${kp}lvl-${l}`];
               return (
                 <div key={l}>
                   <div
-                    onClick={() => { if (choices.length > 0) setExpandedChoices(prev => ({ ...prev, [`lvl-${l}`]: !prev[`lvl-${l}`] })); }}
+                    onClick={() => { if (choices.length > 0) setExpandedChoices(prev => ({ ...prev, [`${kp}lvl-${l}`]: !prev[`${kp}lvl-${l}`] })); }}
                     style={{
                       display: 'flex', gap: '10px', padding: '8px 10px', borderRadius: '6px', cursor: choices.length > 0 ? 'pointer' : 'default',
                       background: isCurrent ? 'rgba(200, 168, 78, 0.1)' : isNext ? 'rgba(74, 222, 128, 0.05)' : 'transparent',
@@ -2762,7 +2975,7 @@ export default function CharacterSheet() {
                         const isASI = feat === 'ASI';
                         // Check if this is a generic subclass feature placeholder
                         const isSubFeature = feat.includes('Feature') && (feat.includes('Path') || feat.includes('Archetype') || feat.includes('Tradition') || feat.includes('College') || feat.includes('Domain') || feat.includes('Circle') || feat.includes('Origin') || feat.includes('Patron') || feat.includes('Oath') || feat.includes('Specialist'));
-                        const subFeatData = isSubFeature && char.subclass && SUBCLASS_FEATURES[char.subclass]?.[l];
+                        const subFeatData = isSubFeature && subclass && SUBCLASS_FEATURES[subclass]?.[l];
                         return (
                           <div key={fi} style={{
                             fontSize: '12px', fontWeight: isASI ? 600 : 400,
@@ -2791,7 +3004,7 @@ export default function CharacterSheet() {
                   </div>
                   {levelExpanded && choices.length > 0 && (
                     <div style={{ marginLeft: '42px', marginTop: '6px', marginBottom: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {choices.map((choice, ci) => renderChoiceCard(choice, `lvl${l}-${ci}`))}
+                      {choices.map((choice, ci) => renderChoiceCard(choice, `${kp}lvl${l}-${ci}`))}
                     </div>
                   )}
                 </div>
@@ -2799,6 +3012,22 @@ export default function CharacterSheet() {
             })}
           </div>
         </div>
+      </div>
+    );
+    }; // end renderClassSection
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {sections.map((ctx, i) => (
+          <div key={`${ctx.class}-${i}`}>
+            {charIsMulticlass && (
+              <div style={{ ...st.sideLabel, color: 'var(--gold)', fontSize: '15px', marginBottom: '6px', borderBottom: '1px solid var(--gold-dim)', paddingBottom: '4px' }}>
+                {ctx.class} {ctx.level}{ctx.subclass ? ` · ${ctx.subclass}` : ''}
+              </div>
+            )}
+            {renderClassSection(ctx)}
+          </div>
+        ))}
       </div>
     );
   };
@@ -2833,8 +3062,12 @@ export default function CharacterSheet() {
           <h1 style={{ fontSize: '24px', margin: '2px 0 4px', lineHeight: 1 }}>{char.name}</h1>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {char.race && <span className="badge badge-race">{char.race}</span>}
-            {char.class && <span className="badge badge-class">{char.class}{char.subclass ? ` · ${char.subclass}` : ''}</span>}
-            <span className="badge badge-level">Level {char.level}</span>
+            {charIsMulticlass
+              ? charClasses.map((cc, i) => (
+                  <span key={i} className="badge badge-class">{cc.class}{cc.subclass ? ` · ${cc.subclass}` : ''} {cc.level}</span>
+                ))
+              : char.class && <span className="badge badge-class">{char.class}{char.subclass ? ` · ${char.subclass}` : ''}</span>}
+            <span className="badge badge-level">Level {char.level}{charIsMulticlass ? ' (total)' : ''}</span>
             {char.alignment && <span className="badge" style={{ background: '#1a1a2e', border: '1px solid #3a3a6e', color: '#8080c0' }}>{char.alignment}</span>}
           </div>
         </div>
@@ -2861,7 +3094,7 @@ export default function CharacterSheet() {
               {char.inspiration ? '★' : '☆'} Heroic Inspiration
             </button>
           </Tip>
-          <Tip text={`Short Rest: Spend 1 hit die (${char.hitDice || HIT_DICE[char.class] || 'd8'} + CON mod) to heal.\n${char.hitDiceRemaining ?? char.level} of ${char.level} hit dice remaining.`}>
+          <Tip text={`Short Rest: Spend 1 hit die (${formatHitDice(char) || char.hitDice || HIT_DICE[char.class] || 'd8'} + CON mod) to heal.\n${char.hitDiceRemaining ?? char.level} of ${char.level} hit dice remaining.`}>
             <button onClick={doShortRest}
               style={{
                 padding: '8px 14px', fontSize: '12px', fontWeight: 600,
@@ -3334,13 +3567,13 @@ export default function CharacterSheet() {
                   {[
                     { label: 'Action Type', value: sidePanel.data.actionType },
                     { label: 'Attack Type', value: sidePanel.data.attackType },
-                    { label: 'To Hit', value: `+${sidePanel.data.toHit}` },
+                    sidePanel.data.toHit != null && { label: 'To Hit', value: `+${sidePanel.data.toHit}` },
                     { label: 'Damage', value: sidePanel.data.damage },
                     { label: 'Damage Type', value: sidePanel.data.damageType },
                     { label: 'Stat', value: sidePanel.data.stat },
                     { label: 'Range/Area', value: sidePanel.data.range },
-                    { label: 'Proficient', value: sidePanel.data.proficient ? 'Yes' : 'No' },
-                  ].filter(i => i.value).map(item => (
+                    sidePanel.data.proficient != null && { label: 'Proficient', value: sidePanel.data.proficient ? 'Yes' : 'No' },
+                  ].filter(i => i && i.value).map(item => (
                     <div key={item.label} style={{ background: 'var(--surface)', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                       <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '2px' }}>{item.label}</div>
                       <div style={{ fontSize: '13px', fontWeight: 600 }}>{item.value}</div>
@@ -3393,6 +3626,31 @@ export default function CharacterSheet() {
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
             {healToast.diceUsed} / {healToast.diceMax} hit dice remaining
+          </div>
+        </div>
+      )}
+
+      {/* ═══ LONG REST TOAST ═══ */}
+      {longRestToast && (
+        <div style={{
+          position: 'fixed', bottom: '80px', left: 0, right: 0, marginInline: 'auto', width: 'fit-content',
+          background: 'radial-gradient(ellipse at center, rgba(20, 24, 48, 0.97), rgba(8, 10, 24, 0.97))',
+          border: '2px solid var(--gold)', borderRadius: '16px', padding: '20px 32px',
+          zIndex: 9500, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+          boxShadow: '0 0 40px rgba(201, 162, 39, 0.25), 0 8px 32px rgba(0,0,0,0.8)',
+          animation: 'fadeIn 0.3s ease', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: '14px', color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'Cinzel, serif', fontWeight: 600 }}>
+            🌙 Long Rest
+          </div>
+          <div style={{ fontSize: '30px', fontWeight: 800, color: 'var(--gold)', fontFamily: 'Cinzel, serif', lineHeight: 1.1, textShadow: '0 0 20px rgba(201, 162, 39, 0.4)' }}>
+            Fully Rested
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '4px', lineHeight: 1.6 }}>
+            {longRestToast.hpRestored > 0 && <div><span style={{ color: '#4ade80', fontWeight: 700 }}>+{longRestToast.hpRestored} HP</span> restored to full ({longRestToast.maxHp})</div>}
+            {longRestToast.hpRestored === 0 && <div>HP already full ({longRestToast.maxHp})</div>}
+            {longRestToast.diceRegained > 0 && <div><span style={{ color: 'var(--gold)', fontWeight: 700 }}>+{longRestToast.diceRegained}</span> hit dice regained</div>}
+            <div>Spell slots &amp; feature uses reset</div>
           </div>
         </div>
       )}
@@ -3522,7 +3780,8 @@ export default function CharacterSheet() {
 
       {/* Short Rest Modal */}
       {shortRestModal && (() => {
-        const hd = HIT_DICE[char.class] || 'd8';
+        const hdPools = getHitDicePools(char);
+        const hd = shortRestModal.selectedDie || hdPools[0]?.die || HIT_DICE[char.class] || 'd8';
         const conMod = modVal(scores.constitution ?? 10);
         const remaining = (char.hitDiceRemaining ?? char.level) - shortRestModal.diceSpent;
         const currentHpAfter = Math.min(char.maxHp, char.currentHp + shortRestModal.totalHealed);
@@ -3546,8 +3805,24 @@ export default function CharacterSheet() {
               {/* Hit Dice remaining */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
                 <span style={{ color: 'var(--text-dim)' }}>Hit Dice Remaining</span>
-                <span style={{ fontWeight: 700, color: remaining > 0 ? 'var(--gold)' : '#f87171' }}>{remaining} / {char.level} ({hd})</span>
+                <span style={{ fontWeight: 700, color: remaining > 0 ? 'var(--gold)' : '#f87171' }}>{remaining} / {char.level} ({hdPools.map(p => `${p.count}${p.die}`).join(' + ')})</span>
               </div>
+
+              {/* Multiclass: choose which hit die to spend */}
+              {hdPools.length > 1 && (
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                  {hdPools.map(p => (
+                    <button key={p.die} className="cc-skill"
+                      onClick={() => setShortRestModal(prev => ({ ...prev, selectedDie: p.die }))}
+                      style={{ padding: '4px 12px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600,
+                        background: hd === p.die ? 'var(--accent)' : 'var(--surface)',
+                        border: `1px solid ${hd === p.die ? 'var(--gold)' : 'var(--border)'}`,
+                        color: hd === p.die ? 'var(--gold)' : 'var(--text-dim)' }}>
+                      {p.die}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Roll log */}
               {shortRestModal.rolls.length > 0 && (
@@ -3584,6 +3859,124 @@ export default function CharacterSheet() {
               <button onClick={() => setShortRestModal(null)} style={{ display: 'block', margin: '12px auto 0', padding: '4px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '12px' }}>
                 Cancel
               </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══ LEVEL UP MODAL (single- & multi-class) ═══ */}
+      {levelUpModal && (() => {
+        const abScores = char.abilityScores || {};
+        const meetsReq = (cls) => {
+          const req = MULTICLASS_REQS[cls];
+          if (!req) return true;
+          const main = Object.entries(req).filter(([k]) => k !== '_or');
+          if (main.every(([ab, min]) => (abScores[ab] ?? 10) >= min)) return true;
+          if (req._or) return Object.entries(req._or).every(([ab, min]) => (abScores[ab] ?? 10) >= min);
+          return false;
+        };
+        const reqText = (cls) => {
+          const req = MULTICLASS_REQS[cls];
+          if (!req) return '';
+          const main = Object.entries(req).filter(([k]) => k !== '_or').map(([ab, min]) => `${ABBR[ab]} ${min}`).join(', ');
+          const orPart = req._or ? ` or ${Object.entries(req._or).map(([ab, min]) => `${ABBR[ab]} ${min}`).join(', ')}` : '';
+          return main + orPart;
+        };
+        const current = getCharClasses(char);
+        const currentNames = current.map(c => c.class);
+        const addable = Object.keys(CLASSES).filter(c => !currentNames.includes(c));
+        const lu = levelUpModal;
+        const targetInfo = CLASSES[lu.targetClass] || {};
+        const targetCurrent = current.find(c => c.class === lu.targetClass);
+        const resultingLevel = lu.isNew ? 1 : (targetCurrent ? targetCurrent.level + 1 : 1);
+        const existingSubclass = lu.isNew ? '' : (targetCurrent?.subclass || '');
+        // Prompt for subclass whenever the class reaches its unlock level without one set
+        const needsSubclass = (targetInfo.subclasses || []).length > 0 && !existingSubclass
+          && resultingLevel >= (targetInfo.subclassLevel || 99);
+        const eligible = !lu.isNew || meetsReq(lu.targetClass);
+        const canConfirm = eligible && (!needsSubclass || lu.subclass);
+        const hd = targetInfo.hitDice || HIT_DICE[lu.targetClass] || 'd8';
+        const totalLvl = getTotalLevel(char);
+        const chip = (active) => ({ padding: '5px 12px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, background: active ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`, color: active ? 'var(--gold)' : 'var(--text-dim)' });
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'var(--bg-card)', border: '2px solid var(--gold-dim)', borderRadius: '12px', padding: '24px', maxWidth: '440px', width: '92%', maxHeight: '85vh', overflowY: 'auto' }}>
+              <h3 style={{ fontFamily: 'Cinzel, serif', color: 'var(--gold)', marginBottom: '4px', fontSize: '20px' }}>Level Up</h3>
+              <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '16px' }}>Total level {totalLvl} → {totalLvl + 1}</div>
+
+              {/* Advance an existing class */}
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Advance a class</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                {current.map(c => (
+                  <button key={c.class} style={chip(!lu.isNew && lu.targetClass === c.class)}
+                    onClick={() => setLevelUpModal(prev => ({ ...prev, isNew: false, targetClass: c.class, subclass: '' }))}>
+                    {c.class} {c.level} → {c.level + 1}
+                  </button>
+                ))}
+              </div>
+
+              {/* Add a new class */}
+              {addable.length > 0 && (
+                <>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Or multiclass into</div>
+                  <select value={lu.isNew ? lu.targetClass : ''}
+                    onChange={e => { const v = e.target.value; if (v) setLevelUpModal(prev => ({ ...prev, isNew: true, targetClass: v, subclass: '' })); }}
+                    style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', marginBottom: '8px' }}>
+                    <option value="">— Choose a new class —</option>
+                    {addable.map(c => <option key={c} value={c}>{c}{MULTICLASS_REQS[c] && !meetsReq(c) ? ' (requirements not met)' : ''}</option>)}
+                  </select>
+                  {lu.isNew && (
+                    <div style={{ fontSize: '12px', marginBottom: '10px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: `1px solid ${eligible ? 'var(--border)' : '#6a2a2a'}` }}>
+                      <div style={{ color: eligible ? '#4ade80' : '#f87171', fontWeight: 600, marginBottom: '4px' }}>
+                        {eligible ? '✓ Meets requirements' : '✕ Requirements not met'}{reqText(lu.targetClass) ? ` — ${reqText(lu.targetClass)}` : ''}
+                      </div>
+                      {(() => {
+                        const mp = MULTICLASS_PROFICIENCIES[lu.targetClass] || {};
+                        const bits = [];
+                        if (mp.armor?.length) bits.push(`Armor: ${mp.armor.join(', ')}`);
+                        if (mp.weapons?.length) bits.push(`Weapons: ${mp.weapons.join(', ')}`);
+                        if (mp.tools?.length) bits.push(`Tools: ${mp.tools.join(', ')}`);
+                        if (mp.skills) bits.push(`${mp.skills} skill${mp.skills > 1 ? 's' : ''}`);
+                        return <div style={{ color: 'var(--text-dim)' }}>Grants: {bits.join(' · ') || 'no extra proficiencies'}</div>;
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Subclass prompt — when this class hits its unlock level without one */}
+              {needsSubclass && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', marginBottom: '6px' }}>Choose {lu.targetClass} subclass (unlocks at level {targetInfo.subclassLevel})</div>
+                  <select value={lu.subclass || ''} onChange={e => setLevelUpModal(prev => ({ ...prev, subclass: e.target.value }))}
+                    style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}>
+                    <option value="">— Choose subclass —</option>
+                    {(targetInfo.subclasses || []).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* HP method */}
+              <div style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', margin: '6px 0' }}>Hit points ({hd})</div>
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+                <button style={chip(lu.useAvg !== false)} onClick={() => setLevelUpModal(prev => ({ ...prev, useAvg: true }))}>
+                  Average ({Math.floor(parseInt(hd.replace('d', '')) / 2) + 1} + CON)
+                </button>
+                <button style={chip(lu.useAvg === false)} onClick={() => setLevelUpModal(prev => ({ ...prev, useAvg: false }))}>
+                  Roll {hd} + CON
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn" disabled={!canConfirm}
+                  style={{ flex: 1, padding: '9px 16px', fontSize: '14px', background: canConfirm ? 'linear-gradient(135deg, #1a3a1a, #2a5a2a)' : 'var(--surface)', border: `1px solid ${canConfirm ? '#4ade80' : 'var(--border)'}`, color: canConfirm ? '#4ade80' : 'var(--text-dim)', fontWeight: 700 }}
+                  onClick={() => canConfirm && applyLevelUp({ targetClass: lu.targetClass, isNew: lu.isNew, subclass: lu.subclass, useAvg: lu.useAvg !== false })}>
+                  Confirm Level Up
+                </button>
+                <button onClick={() => setLevelUpModal(null)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px' }}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         );

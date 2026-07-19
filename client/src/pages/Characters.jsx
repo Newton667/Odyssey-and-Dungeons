@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useCharacterList } from '../hooks/useCharacterSync';
+import { getCharClasses, isMulticlass } from '../utils/multiclass';
 
 function hpColor(current, max) {
   const pct = current / max;
@@ -56,7 +57,11 @@ export default function Characters() {
                     <h3 style={{ fontSize: '20px', marginBottom: '6px' }}>{c.name}</h3>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                       {c.race && <span className="badge badge-race">{c.race}</span>}
-                      {c.class && <span className="badge badge-class">{c.class}{c.subclass ? ` · ${c.subclass}` : ''}</span>}
+                      {isMulticlass(c)
+                        ? getCharClasses(c).map((cc, i) => (
+                            <span key={i} className="badge badge-class">{cc.class} {cc.level}</span>
+                          ))
+                        : c.class && <span className="badge badge-class">{c.class}{c.subclass ? ` · ${c.subclass}` : ''}</span>}
                       <span className="badge badge-level">Lv {c.level}</span>
                     </div>
                   </div>

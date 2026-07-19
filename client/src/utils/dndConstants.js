@@ -88,6 +88,18 @@ export const FEATS = {
   'Weapon Master': { prereq: null, desc: '+1 STR or DEX. Gain proficiency with 4 weapons of your choice.' },
 };
 
+// Unconditional, always-on ADDITIVE numeric bonuses that feats apply to DERIVED character-sheet
+// stats (initiative, passive scores). Summed by CharacterSheet's `featEffects` memo.
+// - Ability-score increases from feats (+1 STR, etc.) are applied to abilityScores at creation,
+//   so they are intentionally NOT repeated here.
+// - Stored/editable stats (speed, max HP — Mobile, Tough) are excluded to avoid double-counting.
+// - Context-conditional feats are handled inline in CharacterSheet, not here:
+//   Medium Armor Master (medium-armor DEX cap 2→3 in calcAC), Tavern Brawler (unarmed die 1d4).
+export const FEAT_EFFECTS = {
+  Alert: { initiative: 5 },
+  Observant: { passivePerception: 5, passiveInvestigation: 5 },
+};
+
 export const ALL_LANGUAGES = [
   'Abyssal', 'Aarakocra', 'Aquan', 'Auran', 'Celestial', 'Deep Speech', 'Draconic',
   'Dwarvish', 'Elvish', 'Giant', 'Gith', 'Gnomish', 'Goblin', 'Halfling', 'Ignan',
@@ -141,6 +153,26 @@ export const MULTICLASS_REQS = {
   Warlock: { charisma: 13 },
   Wizard: { intelligence: 13 },
   Artificer: { intelligence: 13 },
+};
+
+// Reduced proficiencies gained when a class is taken as a MULTICLASS (PHB ch.6),
+// distinct from the fuller set granted at 1st level. `skills` = number of skill
+// choices, `tools` = tool proficiencies granted. armor/weapons are recorded as a
+// visible note (the app doesn't track armor/weapon proficiency as data).
+export const MULTICLASS_PROFICIENCIES = {
+  Barbarian: { armor: ['Shields'], weapons: ['Simple weapons', 'Martial weapons'] },
+  Bard: { armor: ['Light armor'], skills: 1, tools: ['One musical instrument'] },
+  Cleric: { armor: ['Light armor', 'Medium armor', 'Shields'] },
+  Druid: { armor: ['Light armor', 'Medium armor', 'Shields (non-metal)'] },
+  Fighter: { armor: ['Light armor', 'Medium armor', 'Shields'], weapons: ['Simple weapons', 'Martial weapons'] },
+  Monk: { weapons: ['Simple weapons', 'Shortswords'] },
+  Paladin: { armor: ['Light armor', 'Medium armor', 'Shields'], weapons: ['Simple weapons', 'Martial weapons'] },
+  Ranger: { armor: ['Light armor', 'Medium armor', 'Shields'], weapons: ['Simple weapons', 'Martial weapons'], skills: 1 },
+  Rogue: { armor: ['Light armor'], skills: 1, tools: ["Thieves' tools"] },
+  Sorcerer: {},
+  Warlock: { armor: ['Light armor'], weapons: ['Simple weapons'] },
+  Wizard: {},
+  Artificer: { armor: ['Light armor', 'Medium armor', 'Shields'], tools: ["Thieves' tools", "Tinker's tools"] },
 };
 
 export const RACIAL_SPELL_MAP = {
