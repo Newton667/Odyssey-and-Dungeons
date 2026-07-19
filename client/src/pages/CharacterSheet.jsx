@@ -417,7 +417,7 @@ export default function CharacterSheet() {
     const su = { ...(char.featureUses || {}) };
     let suChanged = false;
     for (const cc of getCharClasses(char)) {
-      const clsLv = CLASS_LEVELS[cc.class] || {};
+      const clsLv = getClassLevels(cc.class, char.ruleset);
       for (let l = 1; l <= cc.level; l++) for (const nm of (clsLv[l] || [])) {
         const u = computeFeatureUses(nm, cc.level, char, cc.class);
         if (u && u.recharge === 'short') { const k = baseFeatureName(nm); if (k in su) { delete su[k]; suChanged = true; } }
@@ -1016,23 +1016,29 @@ export default function CharacterSheet() {
           const rider = SPELL_WEAPON_RIDERS[spell.name];
           if (rider) {
             const isActive = (char.activeBuffs || []).includes(spell.name);
+            // Activation costs a slot; block it when none is available (deactivation is always allowed)
+            const stdAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
+            const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
+            const canActivate = stdAvail || pactAvail;
+            const disabled = !isActive && !canActivate;
             return (
-              <button onClick={(e) => {
+              <button disabled={disabled} onClick={(e) => {
                 e.stopPropagation();
                 updateChar(prev => {
                   const cur = prev.activeBuffs || [];
                   if (cur.includes(spell.name)) return { ...prev, activeBuffs: cur.filter(n => n !== spell.name) };
-                  // Activate = cast: spend a slot of the (upcast) level if one is available
+                  // Activate = cast: spend a slot of the (upcast) level; refuse if none available
                   const us = prev.usedSpellSlots || {};
-                  let newUs = us;
                   const stdTotal = spellSlotData ? (spellSlotData[castLevel - 1] || 0) : 0;
-                  if (stdTotal > 0 && (us[String(castLevel)] || 0) < stdTotal) newUs = { ...us, [String(castLevel)]: (us[String(castLevel)] || 0) + 1 };
-                  else if (pactData && castLevel <= pactData.level && (us['pact'] || 0) < pactData.slots) newUs = { ...us, pact: (us['pact'] || 0) + 1 };
-                  return { ...prev, usedSpellSlots: newUs, activeBuffs: [...cur, spell.name] };
+                  if (stdTotal > 0 && (us[String(castLevel)] || 0) < stdTotal)
+                    return { ...prev, usedSpellSlots: { ...us, [String(castLevel)]: (us[String(castLevel)] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
+                  if (pactData && castLevel <= pactData.level && (us['pact'] || 0) < pactData.slots)
+                    return { ...prev, usedSpellSlots: { ...us, pact: (us['pact'] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
+                  return prev; // no slot available — can't activate
                 });
               }}
-                title={`${isActive ? 'Deactivate' : 'Activate (spends a slot)'} — adds ${rider.die} ${rider.type} to your weapon attacks`}
-                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: 'pointer', background: isActive ? 'rgba(176,126,224,0.25)' : 'var(--surface)', border: `1px solid ${isActive ? '#b07ee0' : 'var(--border)'}`, color: isActive ? '#d8b4f0' : 'var(--text-dim)' }}>
+                title={isActive ? 'Deactivate' : (canActivate ? `Activate (spends a slot) — adds ${rider.die} ${rider.type} to your weapon attacks` : 'No spell slot available to cast this')}
+                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: disabled ? 'not-allowed' : 'pointer', background: isActive ? 'rgba(176,126,224,0.25)' : 'var(--surface)', border: `1px solid ${isActive ? '#b07ee0' : 'var(--border)'}`, color: isActive ? '#d8b4f0' : 'var(--text-dim)', opacity: disabled ? 0.5 : 1 }}>
                 {isActive ? '◉ Active' : 'Activate'}
               </button>
             );
@@ -2113,9 +2119,11 @@ export default function CharacterSheet() {
     let cantripLimit = 0, leveledLimit = 0;
     for (const c of casterClasses) {
       cantripLimit += CANTRIPS_KNOWN[c.class]?.[c.level - 1] || 0;
-      if (SPELLS_KNOWN[c.class]) leveledLimit += SPELLS_KNOWN[c.class][c.level - 1] || 0;         // known casters
+      // 2024 Ranger is a prepared (WIS mod + half level) caster instead of a known caster
+      const rangerPrepared2024 = char.ruleset === '2024' && c.class === 'Ranger';
+      if (SPELLS_KNOWN[c.class] && !rangerPrepared2024) leveledLimit += SPELLS_KNOWN[c.class][c.level - 1] || 0;   // known casters
       else if (PREPARED_FULL.includes(c.class)) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + c.level);
-      else if (PREPARED_HALF.includes(c.class)) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + Math.floor(c.level / 2));
+      else if (PREPARED_HALF.includes(c.class) || rangerPrepared2024) leveledLimit += Math.max(1, modVal(scores[c.ability] ?? 10) + Math.floor(c.level / 2));
     }
     // Count non-racial prepared spells by tier
     const cantripCount = spellData.filter(s => s.level === 0 && s.source !== 'race').length;

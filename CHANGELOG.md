@@ -28,6 +28,11 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+### Fixed
+- Active weapon-buff spells (Hunter's Mark, Hex, etc.) can no longer be activated with no spell slot available — the Activate toggle now enforces the slot cost like the Cast button (deactivation is still always allowed). *(code review)*
+- Short-rest feature-recharge scan now uses the ruleset-aware class levels, so a future 2024 short-rest feature would reset correctly. *(code review)*
+- A 2024-ruleset Ranger's spell-preparation limit now uses the prepared-caster formula (WIS mod + half level) instead of the 2014 known-spells table. *(code review)*
+
 ---
 
 ## v1.3.0 — 2026-07-19
