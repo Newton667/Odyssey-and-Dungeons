@@ -47,8 +47,9 @@ export default function DiceRoller({ onClose }) {
 
     setRolling(true);
     setResults(null);
-    const { results: diceResults } = await rollDice3D(dice3d);
-    setResults(diceResults);
+    const rolled = await rollDice3D(dice3d);
+    if (!rolled) { setRolling(false); return; } // dice already in the air
+    setResults(rolled.results);
     setRolling(false);
   }, [queue, rolling, rollDice3D]);
 
@@ -57,8 +58,9 @@ export default function DiceRoller({ onClose }) {
     setQueue({ [die]: 1 });
     setRolling(true);
     setResults(null);
-    const { results: diceResults } = await rollDice3D([{ die, sides }]);
-    setResults(diceResults);
+    const rolled = await rollDice3D([{ die, sides }]);
+    if (!rolled) { setRolling(false); return; } // dice already in the air
+    setResults(rolled.results);
     setRolling(false);
   };
 

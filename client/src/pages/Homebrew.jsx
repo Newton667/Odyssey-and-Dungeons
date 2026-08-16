@@ -28,8 +28,9 @@ function DiceFormulaBuilder({ value, onChange, label }) {
 
   const testRoll = async () => {
     if (!value) return;
-    const { results, total } = await rollDice3D(value, label || 'Test Roll');
-    setLastRoll({ results, total });
+    const rolled = await rollDice3D(value, label || 'Test Roll');
+    if (!rolled) return; // dice already in the air
+    setLastRoll({ results: rolled.results, total: rolled.total });
   };
   // Parse existing formula like "2d8+3" into parts
   const parseFormula = (str) => {

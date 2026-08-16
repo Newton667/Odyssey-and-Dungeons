@@ -10,7 +10,7 @@ import {
   MULTICLASS_REQS, RACIAL_SPELL_MAP, RACIAL_SKILL_CHOICES, RACIAL_TOOL_CHOICES,
   KOBOLD_LEGACY_OPTIONS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, CANTRIPS_KNOWN,
   SPELLS_KNOWN, CLASS_RECOMMENDED_GEAR, ALL_LANGUAGES, ARMORS, BACKGROUNDS, RARITY_COLORS,
-  PB_COSTS,
+  PB_COSTS, MAGIC_INITIATE_CLASSES,
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras } from '../utils/dndHelpers';
 import { RACES, CLASS_LEVELS, CLASSES } from '../utils/classData';
@@ -84,6 +84,15 @@ export default function CharacterCreate() {
 
   // Ruleset: '2014' (classic) or '2024' (revised). Affects class features/progression.
   const [ruleset, setRuleset] = useState('2014');
+
+  // Magic Initiate's class list is ruleset-dependent (2024 drops Bard/Sorcerer/
+  // Warlock), so clear the pick and its spells when the ruleset changes —
+  // otherwise a 2024 character could keep a Warlock list.
+  useEffect(() => {
+    setMiClass('');
+    setMiCantrips([]);
+    setMiSpell('');
+  }, [ruleset]);
 
   // Multiclassing
   const [multiclassEnabled, setMulticlassEnabled] = useState(false);
@@ -476,6 +485,10 @@ export default function CharacterCreate() {
         }),
         equipment: selectedEquipmentList,
         preparedSpells: [...new Set([...racialSpellNames, ...(highElfCantrip ? [highElfCantrip] : []), ...(koboldCantrip ? [koboldCantrip] : []), ...selectedCantrips, ...selectedSpells, ...(selectedFeats.includes('Magic Initiate') ? [...miCantrips, miSpell].filter(Boolean) : [])])],
+        // Persist which spell list Magic Initiate drew from, so the sheet's and
+        // editor's spell browsers can offer it. Array-valued — the 2024 feat is
+        // repeatable, and this avoids a data migration later.
+        ...(miClass && selectedFeats.includes('Magic Initiate') && { featSpellLists: { 'Magic Initiate': [miClass] } }),
         ...(fightingStyle && { features: [...(classData?.features?.map(f => f.split(' — ')[0]) || []), `Fighting Style: ${fightingStyle}`] }),
         ...(Object.keys(homebrewLevels).length > 0 && { homebrewLevels }),
       });
@@ -2045,7 +2058,7 @@ export default function CharacterCreate() {
                     <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '10px' }}>Choose a class's spell list, then learn 2 cantrips and one 1st-level spell (cast it once per long rest, or with a slot you have).</p>
                     <select value={miClass} onChange={e => { setMiClass(e.target.value); setMiCantrips([]); setMiSpell(''); }} style={{ minWidth: '200px', marginBottom: '10px' }}>
                       <option value="">— Choose a class —</option>
-                      {['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard'].map(c => <option key={c} value={c}>{c}</option>)}
+                      {(MAGIC_INITIATE_CLASSES[ruleset] || MAGIC_INITIATE_CLASSES['2014']).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     {miClass && (
                       <>

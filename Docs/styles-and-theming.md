@@ -73,6 +73,17 @@ export function rarityBg(r) {
 }
 ```
 
+### Layout containment — grid tracks, `minWidth: 0`, and word wrap
+Long text (a homebrew item name, a feature description, a URL in Notes) used to stretch the character sheet wider than the viewport. The fix is structural, not per-tab:
+
+- **Every grid track uses `minmax(0, 1fr)`, never a bare `1fr`.** A bare `1fr` means `minmax(auto, 1fr)`, which cannot shrink below its content, so one long string widens the whole page. All 11 grid templates in `CharacterSheet.jsx` were converted: `repeat(6, minmax(0, 1fr))` (ability bar), `${sidebarWidth}px minmax(0, 1fr) …` (main layout), `'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)'` (action/spell tables), `'minmax(0, 1fr) minmax(0, 1fr)'` (side panels). Check with `rg -n "gridTemplateColumns" client/src/pages/CharacterSheet.jsx | rg -v minmax` — it should return nothing.
+- **`minWidth: 0` on grid/flex children that hold long text.** The track can shrink, but the child still won't unless it may. Cells containing a `<select>` are the worst offenders — a select carries its own intrinsic width.
+- **`overflow-x: hidden`** on `.page` (`index.css`) and on the character-sheet wrapper, as a backstop.
+- **`body { overflow-wrap: break-word; }`** — inherited, so it covers descendants, and safe: it only breaks a word that can't fit on its own line. **Do not** use a blanket `overflow-wrap: anywhere` — that breaks words mid-character even when the line has room. `.wrap-text` is the opt-in class for description blocks that genuinely need aggressive breaking.
+- Deliberate exceptions to preserve: the `whiteSpace: 'nowrap'` + ellipsis on the Actions-tab feature blurb, and `whiteSpace: 'pre-wrap'` in the side panels.
+
+Manual check: at 1280px and again at 900px, on every tab and with the side panels open, `document.documentElement.scrollWidth === document.documentElement.clientWidth`.
+
 ### Widget System (CharacterSheet)
 Character sheet sections are wrapped in `wrapWidget()` which provides:
 - Consistent border/padding/title styling

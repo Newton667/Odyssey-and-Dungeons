@@ -1,17 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { resolveLoadAction } from '../utils/charSync';
 
 const STORAGE_PREFIX = 'ond-char-';
 const SYNC_DEBOUNCE = 1500; // ms before syncing to server
 
 /**
- * Local-first character storage with server sync.
+ * Local-first character storage.
  *
- * - localStorage is the master copy (instant reads/writes)
- * - Server is the backup (synced in background)
+ * - localStorage is **authoritative** — it is the only complete copy
+ * - The server is a write-only backup, plus a discovery source for characters
+ *   this browser has never seen (no local copy at all)
+ * - The server NEVER overwrites an existing local document, however new its
+ *   `updatedAt` looks. The sheet writes fields the backup may not hold
+ *   (equipped items, ammo, spent spell slots, feature uses, multiclass
+ *   `classes`, ...) and adopting the server copy wiped them.
  * - On load: show local instantly, fetch server in background
- * - If local is newer → push to server
- * - If server is newer → update local
+ * - If local is newer → push to server; otherwise keep local untouched
  * - All mutations go to local first, then debounce-sync to server
+ * - The policy itself lives in `utils/charSync.js` (`resolveLoadAction`)
  */
 export function useCharacter(id, { syncEnabled = true } = {}) {
   const [char, setChar] = useState(null);
@@ -92,24 +98,16 @@ export function useCharacter(id, { syncEnabled = true } = {}) {
 
         lastSynced.current = server.updatedAt;
 
-        if (!local) {
-          // No local copy — use server
+        const action = resolveLoadAction(local, server);
+        if (action === 'adopt') {
+          // No local copy — discover the character from the server
           setChar(server);
           writeLocal(server);
-        } else {
-          // Both exist — compare timestamps
-          const localTime = new Date(local.updatedAt || 0).getTime();
-          const serverTime = new Date(server.updatedAt || 0).getTime();
-
-          if (serverTime > localTime) {
-            // Server is newer — update local
-            setChar(server);
-            writeLocal(server);
-          } else if (localTime > serverTime) {
-            // Local is newer — push to server
-            syncToServer(local);
-          }
+        } else if (action === 'push') {
+          // Local is newer — push it up. Never the other way round.
+          syncToServer(local);
         }
+        // 'keep' → the local copy wins; do nothing.
       })
       .catch(() => {
         clearTimeout(fetchTimeout);
@@ -204,18 +202,11 @@ export function useCharacterList() {
         // Merge server chars
         (serverChars || []).forEach(sc => {
           const local = merged.get(sc._id);
-          if (!local) {
-            // New from server — save locally
+          if (resolveLoadAction(local, sc) === 'adopt') {
+            // New from server — save locally. Anything else keeps the local
+            // entry: the server copy must never replace a local character.
             merged.set(sc._id, sc);
             try { localStorage.setItem(`${STORAGE_PREFIX}${sc._id}`, JSON.stringify(sc)); } catch {}
-          } else {
-            // Compare timestamps
-            const lt = new Date(local.updatedAt || 0).getTime();
-            const st = new Date(sc.updatedAt || 0).getTime();
-            if (st > lt) {
-              merged.set(sc._id, sc);
-              try { localStorage.setItem(`${STORAGE_PREFIX}${sc._id}`, JSON.stringify(sc)); } catch {}
-            }
           }
         });
         const result = [...merged.values()].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));

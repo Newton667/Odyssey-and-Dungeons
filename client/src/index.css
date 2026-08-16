@@ -34,6 +34,13 @@ body {
   background-color: var(--bg-dark);
   color: var(--text);
   min-height: 100vh;
+  /* Long unbroken strings (homebrew names, URLs in notes) wrap instead of
+     stretching their container. Inherited, so it covers descendants too.
+     Deliberately `break-word`, not `anywhere` — `anywhere` breaks mid-word
+     even when the line has room. Pair with `minmax(0, 1fr)` grid tracks and
+     `min-width: 0` on flex/grid children, which is what actually lets a cell
+     shrink below its content. */
+  overflow-wrap: break-word;
   background-image:
     radial-gradient(ellipse at top, #2a1a05 0%, #1a1209 60%),
     url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%235c3d1e' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
@@ -219,6 +226,14 @@ input:focus, textarea:focus, select:focus {
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px;
+  /* Horizontal containment — long content must never widen the page. */
+  overflow-x: hidden;
+}
+
+/* Opt-in for description blocks that need aggressive breaking. */
+.wrap-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .page-header {

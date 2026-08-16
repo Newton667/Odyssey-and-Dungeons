@@ -98,8 +98,53 @@ style={{ color: rarityColor(item.rarity), background: rarityBg(item.rarity) }}
 
 ## Architecture Gotchas
 
-### CharacterEdit Server + Local Fallback
-`CharacterEdit.jsx` is server-oriented (`fetch` on load, `PUT` on save against `/api/characters/:id`) but falls back to `localStorage` (`ond-char-{id}`): load tries the server then the local copy; local-only characters (id prefixed `local-`) read straight from localStorage. Save always writes the merged local copy first — `{ ...char, ...body }`, mirroring the server's `{...existing, ...body}` merge so fields the edit form doesn't manage (spell slots, conditions, etc.) survive — then PUTs for non-local ids, tolerating an offline server. **Rule:** when a page can operate on `local-`prefixed characters, always provide a localStorage path; never assume a server file exists. (Earlier this page had no fallback and 404'd on local-only characters.) Separately, `useCharacterSync`'s server-sync is disabled app-wide (`CharacterSheet` calls it with `syncEnabled: false`), yet the hook's `updateHp()` still PATCHes `/api/characters/:id/hp` unconditionally.
+### localStorage is authoritative — the server never overwrites a local character
+`localStorage` (`ond-char-{id}`) holds the only complete copy of a character. The server is a **write-only backup** plus a **discovery source** for characters this browser has never seen. The policy lives in one place, `utils/charSync.js`'s `resolveLoadAction(local, server)` → `'adopt' | 'push' | 'keep' | 'none'`, and both `useCharacter`'s load effect and `useCharacterList`'s merge loop call it.
+
+- `'adopt'` (write the server copy to local) is reachable **only when there is no local copy at all**.
+- If the local copy exists, it wins — even when the server's `updatedAt` is newer, and even when the local record has **no** `updatedAt`.
+- `'push'` sends local → server when local is newer (a no-op while `syncEnabled` is false).
+
+This used to be a timestamp race, and it silently destroyed data: the sheet writes fields the editor's `PUT` body never carried, the server stamped a fresh `updatedAt` on every save *and* every HP PATCH, and the next load replaced localStorage with the lossy server copy. Symptoms were ammo refilling itself and gear unequipping after a level-up.
+
+`CharacterEdit.jsx` still loads server-then-local and tolerates an offline server; local-only ids (prefixed `local-`) read straight from localStorage. Its save writes the merged local copy `{ ...char, ...body, updatedAt }` **and PUTs that same merged object** — never the bare form body, or the backup goes lossy again. `updateHp()` deliberately still PATCHes `/api/characters/:id/hp` unconditionally: `CampaignView.jsx` reads player HP from the server, and with the read-side overwrite gone the `updatedAt` bump is harmless.
+
+**Rules:** never replace the local document wholesale from any remote source. When a page can operate on `local-`prefixed characters, always provide a localStorage path; never assume a server file exists.
+
+### Sheet-owned fields live only in localStorage
+These are written by the character sheet and are **not** part of the editor's form, so they exist only in the local document: `equippedItems`, `ammo`, `usedSpellSlots`, `featureUses`, `activeBuffs`, `activeConditions`, `hitDiceRemaining`, `temporaryHp`, death saves, `attunedItems`, `classes` (multiclass levels) and `levelChoices`.
+
+**Rule:** any code that writes a whole character object must start from the current local copy and spread over it. A payload built only from form fields will drop every field in this list. This is why the editor PUTs `merged`, not `body`.
+
+### Weapon damage strings carry the magic bonus twice
+`equipment.json` stores a `+1 Longsword` as `{damage: "1d8+1", bonus: 1}` — the modifier is in **both** fields (65 weapon entries have a flat modifier baked into `damage`). The sheet already folds `wpn.bonus` into its damage modifier, so rolling `damage` raw counts it twice.
+
+**Rule:** whenever `wpn.bonus` is added separately, run the damage string through `weaponDamageDice()` (or build the whole roll with `weaponDamageFormula(damage, dmgBonus, riderSuffix)`) from `dndHelpers.js`. Same family as the versatile-parsing note below. Two more traps in that helper:
+- The strip regex must **not** eat a second dice group — `Flame Tongue` is `"1d8 + 2d6 fire"`, `Oathbow` `"1d8 + 3d6"`, `Frost Brand` `"1d8 + 1d6 cold"`. The lookahead is `(?![\d\s]*d)`, not a plain `(?!d)`, or `+ 12d6` gets partially stripped.
+- Truthiness is not a damage check. `Net`'s damage is the em dash `'—'`, which is truthy — guard on "has dice **or** has a digit", or the Net grows a dead damage button.
+- The button's **label must render the same sanitized string it rolls**, or the text and the result disagree.
+- Read-time sanitising is deliberate: do not "fix" `equipment.json`, or it desyncs from `server/seed-magic-items.js`.
+
+### One roll at a time — `rollDice3D` can return `null`
+`DiceContext` holds the pending `resolve` and the roll's static bonus in single-slot refs, and a new roll clears the previous roll's delivery timer. A second roll started mid-flight therefore used to swallow the first roll's result, leaving a stale number on the button.
+
+`rollDice3D` now guards on a `rollingRef` and returns `Promise.resolve(null)` while dice are in the air. **Rule:** every caller must guard — `const r = await rollDice3D(...); if (!r) return;` — before touching the result. Never `const { total } = await rollDice3D(...)`; that throws `TypeError: Cannot destructure property … of 'null'`. There are 12 call sites across `CharacterSheet`, `DiceRoller`, `Equipment`, `Homebrew` and `Spells`; grep for `= await rollDice3D` after any change. Callers with their own local `rolling` state must also clear it on the null path, or their button latches. Note the build does **not** catch this class of error.
+
+The guard needs a **watchdog** to be safe. `rollingRef` is cleared inside `onDiceSettled`, and `Dice3D` arms its own 6 s safety timeout — but only *after* the `THREE.WebGLRenderer` is constructed. If that setup throws or bails (no canvas, WebGL unavailable, context lost on a GPU switch), `onDiceSettled` never fires, the guard is never released, and **every subsequent roll in the session returns `null`** until a page reload. `DiceContext` therefore arms a 10 s watchdog alongside the promise (comfortably past Dice3D's 6 s) that releases the guard and resolves `null`, cleared at the top of `onDiceSettled`. **Rule:** any code path that sets `rollingRef.current = true` must have a guaranteed release — don't rely on the renderer's own timeout.
+
+### `CLASSES[cls].hitDice` is a bare `'d10'` — always add an explicit count
+Hit dice are stored **without** a leading count: `hitDice: 'd10'`, and `HIT_DICE[cls]` is the same shape. A formula built by interpolating one directly (`` rollDice3D(hd) ``) is not a valid dice string.
+
+This silently produced the wrong result rather than an error: `parseDiceFormula`'s dice regex required a digit before the `d`, so `'d10'` matched no dice group, fell through to the bare-integer branch, and the `10` was summed as a **flat modifier**. The level-up "Roll for HP" button therefore granted the maximum die every time and threw no dice at all — build clean, tests green, and in the player's favour, so nobody reported it.
+
+Two defences, both in place:
+- **Call sites interpolate a count** — `` `1${hd}` `` — as the short-rest hit-die spend has always done. Match that when adding a new one.
+- **The parser tolerates a countless die** — the regex is `/(\d*)d(\d+)/g` with `count = Number(m[1] || 1)`, so `'d10'` is one d10. The strip pattern is widened to match (`/\d*d\d+/g`), or the leftover digits would be read as a modifier.
+
+**Rule:** never pass a raw `hitDice`/`HIT_DICE` value to anything that parses dice. `weaponDamageDice` still uses the narrower `/\d+d\d+/` — a hand-edited `damage: 'd6'` would fall to its flat branch and drop the die; widen it if that ever becomes reachable.
+
+### Grid tracks must be `minmax(0, 1fr)`
+A bare `1fr` is `minmax(auto, 1fr)`, which **cannot shrink below its content** — one long feature description, spell name or homebrew item name then pushes the whole page wider than the viewport. Use `minmax(0, 1fr)` for every track (`repeat(6, minmax(0, 1fr))`, `'minmax(0, 2fr) minmax(0, 1fr) …'`), and add `minWidth: 0` to grid/flex children that hold long text — especially cells containing a `<select>`, which carries its own intrinsic width. `body { overflow-wrap: break-word }` and `.page { overflow-x: hidden }` back this up in `index.css`; `.wrap-text` is the opt-in for aggressive breaking. Do **not** apply a blanket `overflow-wrap: anywhere` — it breaks words mid-character even when the line has room. Check: `rg -n "gridTemplateColumns" client/src/pages/CharacterSheet.jsx | rg -v minmax` should return nothing.
 
 ### Express JSON Limit
 `express.json({ limit: '10mb' })` is required because character data includes base64 portrait images. Default 100KB limit causes `PayloadTooLargeError`.
@@ -147,7 +192,20 @@ Feats affect the sheet through two channels:
 - Ability-score feat bonuses (`+1 STR`, etc.) are applied to `abilityScores` **in the creator** via `FEAT_ABILITY_BONUSES` (fixed abilities apply automatically; choice/half-feats like Resilient/Observant show a picker). They flow into every derived stat from there, so never add them again at render. The **editor** does NOT auto-apply them (its scores are manually edited and a saved character already includes the bonus) — it shows a reminder note. Same split for `FEAT_HP_PER_LEVEL` (Tough) and Resilient's save proficiency.
 - Most feats (advantage, resistances, reactions, proficiency grants, situational combat riders) have **no flat sheet number** — do not invent one; applying a conditional bonus unconditionally is a correctness bug.
 - Always read feat names through the normalized `featSet` (handles `string | {name}` entries from old saves).
-- **A feat in the `FEATS` table is descriptive-only until it is explicitly wired.** Adding a feat's text does not make its mechanics happen. The wiring maps: `FEAT_EFFECTS` (unconditional derived-stat numbers), `FEAT_ABILITY_BONUSES` (+1 ability, fixed or choice), `FEAT_HP_PER_LEVEL` (Tough), `FEAT_PROFICIENCY_GRANTS` (Skilled → skill/tool picker). A feat not in any of these grants nothing mechanically — which is correct for the many conditional/situational feats (advantage, reactions, riders) that have no flat sheet number, but was a bug for Skilled/half-feats which do. Armor/weapon-proficiency feats (Heavily/Lightly/Moderately Armored, Weapon Master) are intentionally left descriptive because the character model has no armor/weapon-proficiency field and the sheet doesn't enforce it — they still grant their `+1` via `FEAT_ABILITY_BONUSES`.
+- **A feat in the `FEATS` table is descriptive-only until it is explicitly wired.** Adding a feat's text does not make its mechanics happen. The wiring maps: `FEAT_EFFECTS` (unconditional derived-stat numbers), `FEAT_ABILITY_BONUSES` (+1 ability, fixed or choice), `FEAT_HP_PER_LEVEL` (Tough), `FEAT_PROFICIENCY_GRANTS` (Skilled → skill/tool picker), `MAGIC_INITIATE_CLASSES` (which spell lists Magic Initiate may draw from, **per ruleset**) plus the per-character `char.featSpellLists` that records the choice. A feat not in any of these grants nothing mechanically — which is correct for the many conditional/situational feats (advantage, reactions, riders) that have no flat sheet number, but was a bug for Skilled/half-feats which do. Armor/weapon-proficiency feats (Heavily/Lightly/Moderately Armored, Weapon Master) are intentionally left descriptive because the character model has no armor/weapon-proficiency field and the sheet doesn't enforce it — they still grant their `+1` via `FEAT_ABILITY_BONUSES`.
+
+### Feat-granted spell lists (`char.featSpellLists`)
+Magic Initiate grants spells from **another class's** list, so the character must record which list they chose or every spell browser filters them out. That choice lives in `char.featSpellLists`, shaped `{ 'Magic Initiate': ['Cleric'] }` — **array-valued**, because the 2024 feat is repeatable and this avoids a later data migration. The allowed classes per ruleset are in `MAGIC_INITIATE_CLASSES` (`dndConstants.js`): 2014 = Bard/Cleric/Druid/Sorcerer/Warlock/Wizard, 2024 = Cleric/Druid/Wizard. Never hardcode either list — route through `char.ruleset` / `form.ruleset`.
+
+**Rules:**
+- Read through `allowedSpellClasses(char)` / `spellMatchesClasses(spell, allowed)` (`utils/spellAccess.js`), which union all of the character's classes (via `getCharClasses`, so multiclass works) with the feat lists. Never filter a spell browser on `char.class` alone.
+- Normalise values with `[].concat(v)` at every read site — old data may hold a bare string.
+- The field is only persisted if it is in the editor's **form object**; the form *is* the save body, so a field missing there is silently dropped on every save.
+- Non-casters must not be short-circuited out of the spell list when a feat list is present — a Fighter or level-1 Paladin is exactly the character this serves.
+- Paladins and Rangers still have no cantrips of their own; the feat's `+2 cantrips / +1 spell` cap on the sheet is the only reason a Paladin has any.
+
+### Normalizing feat names — use `normalizeFeatNames`
+`dndHelpers.normalizeFeatNames(feats)` returns names only, handling the `string | {name, prereq, desc}` mix from old saves and dropping nulls. Use it before any `.includes('Feat Name')` test — a bare `includes` silently fails on the object form, which shows up as a UI control that never appears. (Components still carry older inline copies of this normalisation; prefer the helper in new code.)
 
 ### `NumInput` accepts 0 and negatives — never fall back on falsy
 `NumInput` (used for every numeric field) commits on blur. Parsing must treat **empty/NaN** as the "no value" case, not falsy — `parseInt('0')` is `0`, which is falsy, so `parseInt(raw) || min` wrongly snaps a legitimate `0` (or a cleared field) to `min`. With the misc-bonus boxes (`min: -10`/`-20`) that surfaced as every score dropping by 10 and the field refusing to hold `0`. Correct pattern: `let v = parseInt(raw, 10); if (Number.isNaN(v)) v = 0; then clamp to [min, max]`. Any new min/max defaulting must key off `Number.isNaN`, not truthiness.

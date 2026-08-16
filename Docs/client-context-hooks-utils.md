@@ -33,6 +33,8 @@ Manages 3D dice rolling as an async operation with global force settings.
   - `label`: Optional string shown while rolling (e.g., "Fire Bolt -- Damage")
 - Creates a Dice3D canvas overlay when rolling
 - Resolves with `{ results: [{die,sides,value},...], total: number }`
+- **Or resolves with `null`** when dice are already in the air. A `rollingRef` guard rejects re-entrant rolls (the pending `resolve` and static bonus live in single-slot refs, so a second roll used to swallow the first one's result and leave a stale number on the button). **Every caller must guard `if (!result) return;` before touching the result** — there are 12 call sites; see *"One roll at a time"* in `known-patterns-and-gotchas.md`.
+- Formula parsing is delegated to `parseDiceFormula` (`utils/diceFormula.js`), shared with the sheet's advantage/disadvantage math. A formula with no dice (e.g. a Blowgun's `'1'`) resolves immediately with `{results: [], total: staticBonus}` rather than a hardcoded `0`.
 - Handles roll queue (one roll at a time)
 - **Global force setting** — controls throw intensity for ALL dice rolls (character sheet saves, attacks, manual rolls, etc.)
 - Force persists to `localStorage('ond-dice-force')`
@@ -63,7 +65,14 @@ Local-first character data management.
 ```js
 const { char, loading, syncing, syncError, setChar, updateField, updateHp, forceSync } = useCharacter(id, { syncEnabled: false });
 ```
-> **In the shipped app `syncEnabled` is `false`.** The only call site is `CharacterSheet.jsx` (~line 74), which passes `{ syncEnabled: false }` — characters are local-only (the sync toggle was removed in v1.1.0). The debounced server-sync flow below is retained plumbing that does not run. **Caveat:** `updateHp()` still fires `PATCH /api/characters/:id/hp` unconditionally (it never checks `syncEnabled`), so an HP change attempts a background server write even with sync off.
+> **In the shipped app `syncEnabled` is `false`.** The only call site is `CharacterSheet.jsx` (~line 79), which passes `{ syncEnabled: false }` — characters are local-only (the sync toggle was removed in v1.1.0). The debounced server-sync flow below is retained plumbing that does not run. `updateHp()` still fires `PATCH /api/characters/:id/hp` unconditionally (it never checks `syncEnabled`) — that is **deliberate**: `CampaignView` reads player HP from the server, and the load policy below makes the resulting `updatedAt` bump harmless.
+
+**Load-and-merge policy (localStorage is authoritative):**
+The hook decides via `resolveLoadAction(local, server)` in `utils/charSync.js`, and `useCharacterList`'s server-merge loop uses the same function.
+- **No local copy** → `'adopt'`: take the server record and cache it locally. This is the only server → local path, and it exists so a character created on another device can be discovered.
+- **Local copy exists** → the local copy always wins. If it is newer, `'push'` it to the server (a no-op while sync is off); otherwise `'keep'` and do nothing. The server is **never** written over local, even with a newer `updatedAt`, and even when the local record has no `updatedAt` at all.
+
+This replaced a timestamp comparison that silently wiped sheet-owned fields (equipped items, ammo, spent slots, feature uses, multiclass `classes`) — see *"localStorage is authoritative"* and *"Sheet-owned fields live only in localStorage"* in `known-patterns-and-gotchas.md`.
 
 **Flow (only when `syncEnabled: true`, which the app never sets):**
 1. Reads character from `localStorage` key `ond-char-{id}`
@@ -77,7 +86,7 @@ const { char, loading, syncing, syncError, setChar, updateField, updateHp, force
 const { characters, loading, deleteCharacter } = useCharacterList();
 ```
 - Reads all `ond-char-*` keys from localStorage
-- Falls back to server API with 3 second timeout
+- Falls back to server API with 3 second timeout. Server characters that are **not** already in localStorage are adopted and cached; ones that are keep their local copy untouched (same `resolveLoadAction` policy — opening the character list used to be a second, independent way to clobber local data).
 - `deleteCharacter(id)` removes from both localStorage and server
 
 **Create Character:**
@@ -113,6 +122,7 @@ Static D&D 5e reference data.
 - `FEAT_PROFICIENCY_GRANTS` — Feats that grant player-chosen skill/tool proficiencies (`{ Skilled: { count: 3, type: 'skillsOrTools' } }`). The creator renders a `count`-slot picker (each slot = any skill OR tool) when the feat is selected; chosen skills merge into `skillProficiencies`, chosen tools into `toolProficiencies`. The editor raises the Skills/Tools limits by `count` so the picks can be added in those sections without tripping the "too many" guard.
 - `FEAT_ABILITY_BONUSES` — Half-feats that grant `+1` to an ability. `{ fixed: 'charisma' }` applies always; `{ choice: ['strength','dexterity'] }` shows a picker in the creator (defaults to the first option); `save: true` (Resilient) also grants saving-throw proficiency in the chosen ability. The creator applies these to `abilityScores` at creation (capped at 20, never lowering an already-high score), so they flow into every derived stat. The editor does **not** auto-apply (stats are manual there and a saved character already has the bonus baked in) — it shows a reminder note instead.
 - `FEAT_HP_PER_LEVEL` — Flat max-HP feats (`{ Tough: 2 }`). The creator adds `value × total level` to `computedHp`. Editor is manual (reminder note only).
+- `MAGIC_INITIATE_CLASSES` — Spell lists Magic Initiate may draw from, keyed by ruleset: `'2014'` = Bard/Cleric/Druid/Sorcerer/Warlock/Wizard, `'2024'` = Cleric/Druid/Wizard. Used by the creator's and editor's pickers; the character's choice is stored as `char.featSpellLists = { 'Magic Initiate': ['Cleric'] }` (array-valued) and read via `utils/spellAccess.js`.
 - `ALL_LANGUAGES` — Standard and exotic languages
 - `BACKGROUNDS` — All 13 PHB backgrounds with skills, tools, languages, feature, equipment
 - `CANTRIPS_KNOWN` — Per-class cantrip count by level (20-element arrays)
@@ -148,6 +158,19 @@ Calculation and formatting helpers.
 - `getArmorCategories(armorProfStr)` — Parses armor proficiency string into category array
 - `canUseShield(armorProfStr)` — Checks if proficiency string includes shields
 - `countLangExtras(langArray)` — Counts extra language slots from racial traits
+- `normalizeFeatNames(feats)` — Feat arrays hold names **or** `{name, prereq, desc}` objects from old saves; returns names only, dropping nulls/nameless entries. Use before any `.includes('Feat Name')`.
+- `weaponDamageDice(damage)` — Strips the flat modifier baked into a weapon's damage string (`'1d8+1'` → `'1d8'`), keeping multi-group damage intact (`'1d8 + 2d6 fire'` unchanged). Returns `null` when there are no dice (`'1'`, `'—'`). Needed because `equipment.json` stores a magic bonus in **both** `damage` and `bonus`.
+- `weaponDamageFormula(damage, dmgBonus, riderSuffix='')` — Builds the sheet's damage-button roll string from the sanitized dice + the modifier + any weapon-rider die. Returns `null` when the weapon has no rollable damage (the Net's `'—'` is truthy but is not damage). The button's label must render this same string.
+
+### diceFormula.js
+- `parseDiceFormula(formula)` → `{ dice: [{die, sides}], staticBonus, hasDice, d1Count }`. The single dice-string parser, used by `DiceContext.rollDice3D` and by the sheet's advantage/disadvantage bonus (a regex there used to drop negative modifiers, since a negative renders as `1d20+-2`). Sums **all** modifiers including negatives; folds `d1` dice into `staticBonus` (`d1Count` lets a caller rebuild the d1-only result shape); with no dice groups it still sums bare integers, so `'1'` → 1 and `'—'` → 0. A non-string input passes straight through, so the array form of `rollDice3D` keeps working. **A countless die is one die** — the regex is `/(\d*)d(\d+)/g` with `count = m[1] || 1`, so `'d10'` (the shape of `CLASSES[cls].hitDice`) parses as a single d10 rather than a flat +10; reading it as a modifier is what made level-up HP always roll maximum. See known-patterns-and-gotchas.md → "`CLASSES[cls].hitDice` is a bare `'d10'`".
+
+### spellAccess.js
+- `allowedSpellClasses(char)` → lower-cased class names the character may draw spells from: every class from `getCharClasses(char)` (multiclass included) unioned with `char.featSpellLists` values (normalised via `[].concat`, so a legacy bare string works). Empty ⇒ the caller should not filter.
+- `spellMatchesClasses(spell, allowed)` → whether a browser result survives the filter. Spells with no `classes` (homebrew/racial) always pass; an empty `allowed` set disables filtering.
+
+### charSync.js
+- `resolveLoadAction(local, server)` → `'adopt' | 'push' | 'keep' | 'none'`. The character load-and-merge policy, shared by `useCharacter`'s load effect and `useCharacterList`'s merge loop. `'adopt'` (server → local) is reachable **only when there is no local copy**; otherwise local wins regardless of timestamps.
 
 ### classData.js (~430 lines)
 Race and class definitions.

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useTheme } from './ThemeContext';
 import Dice3D from '../components/Dice3D';
+import { parseDiceFormula } from '../utils/diceFormula';
 
 const DiceContext = createContext(null);
 
@@ -22,6 +23,8 @@ export const FORCE_PRESETS = [
  *     diceArray: [{ die: 'd20', sides: 20 }, ...] or shorthand string '2d8'
  *     label: optional string shown while rolling (e.g. "Fire Bolt — Damage")
  *   Returns: Promise<{ results: [{die,sides,value},...], total: number }>
+ *           or Promise<null> when dice are already in the air — one roll at a
+ *           time. EVERY caller must guard: `if (!result) return;`
  *
  * Force setting is global and persists to localStorage.
  *   diceForce / setDiceForce — get/set the current force level (1-4)
@@ -41,6 +44,15 @@ export function DiceProvider({ children }) {
   const resolveRef = useRef(null);
   const bonusRef = useRef(0);
   const fadeTimers = useRef([]);
+  // Re-entrancy guard. A ref, not the `rolling` state — state is stale inside
+  // the rollDice3D useCallback, and a second roll starting mid-flight used to
+  // cancel the first roll's delivery timer, orphaning its promise forever.
+  const rollingRef = useRef(false);
+  // Watchdog for the rollingRef guard. Dice3D arms its own 6s safety timeout, but
+  // only AFTER the WebGLRenderer is built — if that setup throws or bails (no
+  // canvas, WebGL unavailable, context lost on a GPU switch) onDiceSettled never
+  // fires. Without this, every later roll would return null until a page reload.
+  const watchdogRef = useRef(null);
 
   const setDiceForce = useCallback((f) => {
     const val = Math.max(1, Math.min(4, f));
@@ -54,43 +66,36 @@ export function DiceProvider({ children }) {
   };
 
   const rollDice3D = useCallback((dice, label) => {
-    // Parse shorthand string like '2d8', '1d20', '1d8+2', or '1d8 + 2d6'
-    let diceArray = dice;
-    let staticBonus = 0;
-    if (typeof dice === 'string') {
-      // Try multiple dice groups: "1d8 + 2d6" or "1d8+2"
-      const groups = dice.match(/(\d+)d(\d+)/g);
-      if (groups && groups.length > 0) {
-        diceArray = [];
-        for (const g of groups) {
-          const m = g.match(/(\d+)d(\d+)/);
-          const count = Number(m[1]);
-          const sides = Number(m[2]);
-          const die = `d${sides}`;
-          for (let i = 0; i < count; i++) diceArray.push({ die, sides });
-        }
-        // Sum ALL static modifiers: +5+3-2 = +6. Match any +N or -N not followed by 'd'
-        const stripped = dice.replace(/\d+d\d+/g, ''); // remove dice groups
-        const modMatches = stripped.match(/[+-]\s*\d+/g);
-        if (modMatches) {
-          for (const mod of modMatches) staticBonus += parseInt(mod.replace(/\s/g, ''));
-        }
-        // d1 dice are flat damage (always 1) — add to bonus instead of rendering
-        const d1Count = diceArray.filter(d => d.sides === 1).length;
-        if (d1Count > 0) {
-          staticBonus += d1Count;
-          diceArray = diceArray.filter(d => d.sides !== 1);
-        }
-        // If only d1 dice (no real dice to render), resolve immediately
-        if (diceArray.length === 0) {
-          return Promise.resolve({ results: [{ die: 'd1', sides: 1, value: d1Count }], total: staticBonus });
-        }
-      } else {
-        return Promise.resolve({ results: [], total: 0 });
-      }
+    // One roll at a time — dice are still in the air. Resolve null (before the
+    // parse, so the busy signal is unambiguous); every caller must guard on it.
+    if (rollingRef.current) return Promise.resolve(null);
+    // Defensive: never orphan a pending promise from an earlier roll.
+    if (resolveRef.current) {
+      resolveRef.current(null);
+      resolveRef.current = null;
+    }
+    // Parse shorthand like '2d8', '1d20', '1d8+2', '1d8 + 2d6', '1' (flat damage).
+    // The parser is shared with the sheet's advantage/disadvantage math.
+    const { dice: diceArray, staticBonus, hasDice, d1Count } = parseDiceFormula(dice);
+
+    if (!hasDice) {
+      // Nothing to throw — a flat-damage weapon still scores its modifier.
+      return Promise.resolve({ results: [], total: staticBonus });
+    }
+    // Only d1 dice (always 1) — nothing to render, resolve immediately.
+    if (diceArray.length === 0) {
+      return Promise.resolve({ results: [{ die: 'd1', sides: 1, value: d1Count }], total: staticBonus });
     }
 
     return new Promise((resolve) => {
+      rollingRef.current = true;
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = setTimeout(() => {
+        if (!rollingRef.current) return;
+        rollingRef.current = false;
+        setRolling(false);
+        if (resolveRef.current) { resolveRef.current(null); resolveRef.current = null; }
+      }, 10000);   // comfortably past Dice3D's own 6s safety net
       clearFadeTimers();
       setFading(false);
       setLastResults(null);
@@ -104,9 +109,11 @@ export function DiceProvider({ children }) {
   }, []);
 
   const onDiceSettled = useCallback((diceResults) => {
+    clearTimeout(watchdogRef.current);   // dice landed — stand the watchdog down
     clearFadeTimers();
     const t1 = setTimeout(() => {
       const total = diceResults.reduce((s, r) => s + r.value, 0) + bonusRef.current;
+      rollingRef.current = false;
       setRolling(false);
       setLastResults({ results: diceResults, total, bonus: bonusRef.current });
 

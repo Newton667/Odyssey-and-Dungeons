@@ -1,4 +1,5 @@
 import { XP_THRESHOLDS, RARITY_COLORS, CANTRIPS_KNOWN, SPELLS_KNOWN } from './dndConstants';
+import { parseDiceFormula } from './diceFormula';   // no imports of its own — no cycle
 
 // ─── Core Helpers ────────────────────────────────────────────────────
 
@@ -108,4 +109,72 @@ export function countLangExtras(langArray) {
     if (low.includes('extra')) return n + 1;
     return n;
   }, 0);
+}
+
+// ─── Feat Helpers ────────────────────────────────────────────────────
+
+/**
+ * Feat arrays hold either name strings or `{name, prereq, desc}` objects from
+ * old saves. Always normalise to names before comparing or rendering — a bare
+ * `.includes('Magic Initiate')` silently fails on the object form.
+ *
+ * @returns {string[]} names only; nulls and nameless entries are dropped.
+ */
+export function normalizeFeatNames(feats) {
+  if (!Array.isArray(feats)) return [];
+  return feats
+    .map(f => (typeof f === 'string' ? f : (f?.name || '')))
+    .filter(Boolean);
+}
+
+// ─── Weapon Damage Helpers ───────────────────────────────────────────
+
+/**
+ * Strip the flat modifier a magic weapon bakes into its damage string.
+ *
+ * `equipment.json` stores a +1 Longsword as `{damage: "1d8+1", bonus: 1}` — the
+ * bonus is in *both* fields. The sheet adds `wpn.bonus` into its own damage
+ * modifier, so rolling `damage` raw counts the +1 twice. Sanitise at read time.
+ *
+ * Only a `[+-]N` that is **not** part of another dice group is removed: multi-
+ * group weapons (Flame Tongue `"1d8 + 2d6 fire"`, Oathbow `"1d8 + 3d6"`) must
+ * keep both groups.
+ *
+ * @returns {string|null} the dice-only damage string, or null when the weapon
+ *   has no dice at all (Blowgun `"1"`, Net `"—"`).
+ */
+export function weaponDamageDice(damage) {
+  if (typeof damage !== 'string' || !/\d+d\d+/.test(damage)) return null;
+  // The negative lookahead is load-bearing — '+ 2d6' is a dice group, not a
+  // modifier, and '[\d\s]*d' blocks the backtrack that would strip '+ 1' of '+ 12d6'.
+  return damage.replace(/[+-]\s*\d+(?![\d\s]*d)/g, '').trim();
+}
+
+/**
+ * Build the roll string for a weapon's damage button.
+ *
+ * The one place the sanitised dice, the sheet's damage modifier and any active
+ * weapon-rider die (Hunter's Mark, Hex) are combined — the button's label must
+ * render this same string, or the text and the roll disagree.
+ *
+ * @param {string} damage      `wpn.damage`, e.g. '1d8+1', '1' (Blowgun), '—' (Net)
+ * @param {number} dmgBonus    ability mod + weapon bonus + ammo + fighting style
+ * @param {string} riderSuffix e.g. '+1d6', or '' when no buff is active
+ * @returns {string|null} the roll string, or null when the weapon has no
+ *   rollable damage at all. Note `'—'` is truthy but is *not* damage — the
+ *   guard is "has dice, or has a number", never raw truthiness.
+ */
+export function weaponDamageFormula(damage, dmgBonus, riderSuffix = '') {
+  const dice = weaponDamageDice(damage);
+  if (dice) return `${dice}+${dmgBonus}${riderSuffix}`;
+  // No dice, but a flat damage value is still the weapon's OWN damage and must
+  // be kept — PHB p.149 lists the Blowgun as "1 piercing", and the ability
+  // modifier is added to that, so DEX +2 deals 1 + 2 = 3. Unlike a magic
+  // weapon's baked-in +N, a flat value has no `bonus` field to double-count.
+  // A weapon with no numeric damage at all (Net, '—') gets no button.
+  if (typeof damage === 'string' && /\d/.test(damage)) {
+    const flat = parseDiceFormula(damage).staticBonus;
+    return `${flat}+${dmgBonus}${riderSuffix}`;
+  }
+  return null;
 }

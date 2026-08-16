@@ -135,10 +135,12 @@ export default function Spells() {
   const doRoll = async (spellId, type, diceExpr, spellName) => {
     if (diceRolling) return;
     const label = type === 'hit' ? `${spellName} — Attack` : `${spellName} — Damage`;
-    const { results, total } = await rollDice3D(
+    const rolled = await rollDice3D(
       type === 'hit' ? '1d20' : diceExpr,
       label,
     );
+    if (!rolled) return; // dice already in the air
+    const { results, total } = rolled;
     setRollResults(p => ({
       ...p,
       [spellId + '_' + type]: { results, total, type, ts: Date.now() },

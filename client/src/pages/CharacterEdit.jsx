@@ -6,9 +6,9 @@ import Tip from '../components/Tip';
 import {
   ABILITIES, ABBR, ALIGNMENTS, ALL_SKILLS, SKILLS_WITH_ABILITY, STANDARD_ARRAY, PB_COSTS,
   TOOL_OPTIONS, FEATS, FEAT_EFFECTS, FEAT_PROFICIENCY_GRANTS, FEAT_ABILITY_BONUSES, FEAT_HP_PER_LEVEL, RARITY_COLORS, RARITY_ORDER, HIT_DICE,
-  CANTRIPS_KNOWN, SPELLS_KNOWN, BACKGROUNDS,
+  CANTRIPS_KNOWN, SPELLS_KNOWN, BACKGROUNDS, MAGIC_INITIATE_CLASSES,
 } from '../utils/dndConstants';
-import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel } from '../utils/dndHelpers';
+import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, normalizeFeatNames } from '../utils/dndHelpers';
 import { CLASSES, RACES, SAVING_THROWS_BY_CLASS } from '../utils/classData';
 import { getCharClasses, isMulticlass, syncPrimaryFromClasses, formatHitDice, formatClasses } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
@@ -45,34 +45,56 @@ const CLASS_SPELL_ABILITY = {
   Ranger: 'wisdom', Sorcerer: 'charisma', Warlock: 'charisma', Wizard: 'intelligence', Artificer: 'intelligence',
 };
 
-function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014') {
-  if (!SPELLCASTING_CLASSES.includes(cls)) return null;
+// `featNames` are the character's normalised feat names. Magic Initiate grants
+// 2 cantrips + 1 first-level spell on top of any class allowance — and to a
+// NON-caster it is the entire allowance, so this must return a real limit object
+// for a Fighter rather than null. The sheet applies the same +2/+1 in its own
+// limit math; keep the two in step. (One of the three parallel spell-math sites
+// — see Docs/known-patterns-and-gotchas.md.)
+const MAGIC_INITIATE_CANTRIPS = 2;
+const MAGIC_INITIATE_SPELLS = 1;
+
+function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014', featNames = []) {
+  const mi = featNames.includes('Magic Initiate');
+  // A feat-only caster: no class spellcasting at all, but the feat still grants
+  // spells. Level 1 is the cap — Magic Initiate never scales past 1st level.
+  // The feat's spell is ALWAYS 1st-level and never scales, so the picker has to
+  // cap that one extra slot separately from the class's own maximum — otherwise a
+  // level-5 Wizard could spend it on Fireball. `bonusSpells` is how many of
+  // `maxSpells` came from the feat; `bonusMaxLevel` is the ceiling for those.
+  const bonus = { bonusSpells: mi ? MAGIC_INITIATE_SPELLS : 0, bonusMaxLevel: mi ? 1 : null };
+  const featOnly = () => (mi
+    ? { cantrips: MAGIC_INITIATE_CANTRIPS, maxSpells: MAGIC_INITIATE_SPELLS, type: 'prepared', maxLevel: 1, featOnly: true, ...bonus }
+    : null);
+
+  if (!SPELLCASTING_CLASSES.includes(cls)) return featOnly();
   // 2024 Paladin/Ranger gain Spellcasting at level 1; in 2014 they start at level 2.
   const halfCasterStart = ruleset === '2024' ? 1 : 2;
-  if (['Paladin','Ranger'].includes(cls) && lvl < halfCasterStart) return null;
+  if (['Paladin','Ranger'].includes(cls) && lvl < halfCasterStart) return featOnly();
   const idx = Math.min(lvl, 20) - 1;
-  const cantrips = CANTRIPS_KNOWN[cls]?.[idx] || 0;
-  const maxLvl = maxSpellLevel(cls, lvl, ruleset);
+  const cantrips = (CANTRIPS_KNOWN[cls]?.[idx] || 0) + (mi ? MAGIC_INITIATE_CANTRIPS : 0);
+  const bonusSpells = mi ? MAGIC_INITIATE_SPELLS : 0;
+  const maxLvl = Math.max(maxSpellLevel(cls, lvl, ruleset), mi ? 1 : 0);
 
   // 2024 Ranger prepares spells (WIS mod + half level) instead of knowing a fixed number.
   const rangerPrepared2024 = ruleset === '2024' && cls === 'Ranger';
   if (SPELLS_KNOWN[cls] && !rangerPrepared2024) {
-    return { cantrips, maxSpells: SPELLS_KNOWN[cls][idx] || 0, type: 'known', maxLevel: maxLvl };
+    return { cantrips, maxSpells: (SPELLS_KNOWN[cls][idx] || 0) + bonusSpells, type: 'known', maxLevel: maxLvl , ...bonus };
   }
   if (['Cleric','Druid'].includes(cls)) {
-    return { cantrips, maxSpells: Math.max(1, abilityMod + lvl), type: 'prepared', maxLevel: maxLvl };
+    return { cantrips, maxSpells: Math.max(1, abilityMod + lvl) + bonusSpells, type: 'prepared', maxLevel: maxLvl , ...bonus };
   }
   if (cls === 'Paladin' || rangerPrepared2024) {
-    return { cantrips: 0, maxSpells: Math.max(1, abilityMod + Math.floor(lvl / 2)), type: 'prepared', maxLevel: maxLvl };
+    return { cantrips, maxSpells: Math.max(1, abilityMod + Math.floor(lvl / 2)) + bonusSpells, type: 'prepared', maxLevel: maxLvl , ...bonus };
   }
   if (cls === 'Wizard') {
     const bookSize = 6 + (lvl - 1) * 2;
-    return { cantrips, maxSpells: bookSize, prepareCount: Math.max(1, abilityMod + lvl), type: 'spellbook', maxLevel: maxLvl };
+    return { cantrips, maxSpells: bookSize + bonusSpells, prepareCount: Math.max(1, abilityMod + lvl) + bonusSpells, type: 'spellbook', maxLevel: maxLvl , ...bonus };
   }
   if (cls === 'Artificer') {
-    return { cantrips, maxSpells: Math.max(1, abilityMod + Math.floor(lvl / 2)), type: 'prepared', maxLevel: maxLvl };
+    return { cantrips, maxSpells: Math.max(1, abilityMod + Math.floor(lvl / 2)) + bonusSpells, type: 'prepared', maxLevel: maxLvl , ...bonus };
   }
-  return { cantrips, maxSpells: 0, type: 'known', maxLevel: maxLvl };
+  return { cantrips, maxSpells: 0 + bonusSpells, type: 'known', maxLevel: maxLvl , ...bonus };
 }
 
 const SECTIONS = ['Basic Info', 'Ability Scores', 'Skills', 'Combat', 'Equipment', 'Spells', 'Features & Feats', 'Details', 'Notes', 'Settings', 'Stat Breakdown'];
@@ -162,6 +184,9 @@ export default function CharacterEdit() {
         spellcastingAbility: data.spellcastingAbility || '',
         features: [...(data.features || [])],
         feats: [...(data.feats || [])],
+        // The form object *is* the save body — a field missing here is dropped
+        // on every save, which is how featSpellLists would vanish.
+        featSpellLists: { ...(data.featSpellLists || {}) },
         traits: data.traits || '',
         ideals: data.ideals || '',
         bonds: data.bonds || '',
@@ -245,14 +270,28 @@ export default function CharacterEdit() {
   }, [equipSearch, equipCategory]);
 
   // Fetch all available spells for class
+  // Classes granted by a feat (Magic Initiate) count as spell sources — a Fighter
+  // or a level-1 Paladin is exactly the character this serves, so the non-caster
+  // guards must let them through when a feat list is present. Values may be a
+  // legacy bare string as well as an array, hence [].concat.
+  const featClasses = useMemo(
+    () => Object.values(form.featSpellLists || {}).flatMap(v => [].concat(v)).filter(Boolean),
+    [form.featSpellLists],
+  );
+  const featNames = useMemo(() => normalizeFeatNames(form.feats), [form.feats]);
+
   const [allSpells, setAllSpells] = useState([]);
   useEffect(() => {
-    if (!form.class) return;
-    if (!SPELLCASTING_CLASSES.includes(form.class)) { setAllSpells([]); return; }
+    const castingClass = form.class && SPELLCASTING_CLASSES.includes(form.class) ? form.class : null;
+    if (!castingClass && !featClasses.length) { setAllSpells([]); return; }
     setSpellLoading(true);
-    setAllSpells(queryLocalSpells({ cls: form.class }));
+    const byId = new Map();
+    for (const cls of [castingClass, ...featClasses].filter(Boolean)) {
+      for (const sp of queryLocalSpells({ cls })) if (!byId.has(sp._id)) byId.set(sp._id, sp);
+    }
+    setAllSpells([...byId.values()]);
     setSpellLoading(false);
-  }, [form.class]);
+  }, [form.class, featClasses]);
 
   // Auto-calculate proficiency bonus from level
   const computedProfBonus = useMemo(() => profBonus(form.level || 1), [form.level]);
@@ -300,8 +339,8 @@ export default function CharacterEdit() {
   }, [form.spellcastingAbility, scores]);
 
   const spellLimits = useMemo(() => {
-    return getSpellLimits(form.class, form.level || 1, spellcastingMod, form.ruleset || '2014');
-  }, [form.class, form.level, spellcastingMod, form.ruleset]);
+    return getSpellLimits(form.class, form.level || 1, spellcastingMod, form.ruleset || '2014', featNames);
+  }, [form.class, form.level, spellcastingMod, form.ruleset, featNames]);
 
   // Class change handler — shows confirmation dialog
   const handleClassChange = async (newClass) => {
@@ -402,7 +441,10 @@ export default function CharacterEdit() {
         const res = await fetch(`/api/characters/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          // Send the *merged* character, not just the form fields — otherwise
+          // the server backup is lossy (it would never hold equippedItems,
+          // ammo, usedSpellSlots, featureUses, classes, ...).
+          body: JSON.stringify(merged),
         });
         if (!res.ok) throw new Error('save failed');
       }
@@ -1222,7 +1264,8 @@ export default function CharacterEdit() {
           {/* ═══ SPELLS ═══ */}
           {section === 5 && (() => {
             const currentSpells = form.preparedSpells || [];
-            const isCaster = SPELLCASTING_CLASSES.includes(form.class);
+            // A feat list alone makes a non-caster able to hold spells.
+            const isCaster = SPELLCASTING_CLASSES.includes(form.class) || featClasses.length > 0;
 
             // Separate current spells into cantrips vs leveled based on allSpells data
             const spellsByName = {};
@@ -1297,6 +1340,33 @@ export default function CharacterEdit() {
             return (
             <div style={st.card}>
               <h3 style={st.sectionTitle}>Spells</h3>
+
+              {/* Magic Initiate — which class's spell list the feat drew from. Shown only when the
+                  character actually has the feat; feats may be strings or {name,...} objects, so the
+                  list is normalized first. Inline JSX, never a child component (focus-loss bug). */}
+              {normalizeFeatNames(form.feats).includes('Magic Initiate') && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '14px', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--gold)' }}>Magic Initiate — spell list</label>
+                  <select
+                    value={[].concat(form.featSpellLists?.['Magic Initiate'] || [])[0] || ''}
+                    onChange={e => {
+                      const v = e.target.value;
+                      const next = { ...(form.featSpellLists || {}) };
+                      if (v) next['Magic Initiate'] = [v];
+                      else delete next['Magic Initiate'];
+                      set('featSpellLists', next);
+                    }}
+                    style={{ minWidth: '180px' }}>
+                    <option value="">— Choose a class —</option>
+                    {(MAGIC_INITIATE_CLASSES[form.ruleset] || MAGIC_INITIATE_CLASSES['2014']).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                    Grants 2 cantrips + 1 first-level spell from that class's list, and adds it to the spells you can pick below.
+                  </span>
+                </div>
+              )}
 
               {/* Spell override — add ANY spell regardless of class list or limits (homebrew, cross-class,
                   item/feat-granted spells, or spells on a non-caster). Mirrors the feat override. */}
@@ -1437,7 +1507,13 @@ export default function CharacterEdit() {
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '6px' }}>
                                     {spellsAtLevel.map(spell => {
                                       const sel = currentSpells.includes(spell.name);
-                                      const full = currentLeveled.length >= maxCount;
+                                      // Slots beyond the class's own allowance come from Magic
+                                      // Initiate, and that spell is always 1st-level — so once
+                                      // the class allowance is spent, only level-1 picks remain.
+                                      const baseMax = maxCount - (spellLimits.bonusSpells || 0);
+                                      const bonusCap = spellLimits.bonusMaxLevel ?? Infinity;
+                                      const full = currentLeveled.length >= maxCount
+                                        || (currentLeveled.length >= baseMax && spLvl > bonusCap);
                                       return renderSpellCard(spell, sel, full, () => {
                                         if (sel) set('preparedSpells', currentSpells.filter(n => n !== spell.name));
                                         else if (!full) set('preparedSpells', [...currentSpells, spell.name]);

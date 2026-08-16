@@ -121,10 +121,12 @@ export default function Equipment() {
   const doRoll = async (itemId, diceExpr, itemName, type) => {
     if (diceRolling) return;
     const label = type === 'hit' ? `${itemName} — Attack` : `${itemName} — Damage`;
-    const { results, total } = await rollDice3D(
+    const rolled = await rollDice3D(
       type === 'hit' ? '1d20' : diceExpr,
       label,
     );
+    if (!rolled) return; // dice already in the air
+    const { results, total } = rolled;
     setRollResults(p => ({
       ...p,
       [itemId + '_' + type]: { results, total, type, ts: Date.now() },

@@ -13,7 +13,9 @@ import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
 import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
-import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor } from '../utils/dndHelpers';
+import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageFormula } from '../utils/dndHelpers';
+import { parseDiceFormula } from '../utils/diceFormula';
+import { allowedSpellClasses, spellMatchesClasses } from '../utils/spellAccess';
 import { queryLocalEquipment, queryLocalSpells, getLocalEquipmentByName, getAllLocalSpells } from '../data/localDataService';
 
 const SKILLS = SKILLS_WITH_ABILITY;
@@ -74,7 +76,7 @@ function saveColumnCount(charId, count) {
 export default function CharacterSheet() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { rollDice3D } = useDice();
+  const { rollDice3D, rolling: diceRolling } = useDice();
   const { char, loading, setChar: updateChar, updateField, updateHp } = useCharacter(id, { syncEnabled: false });
 
   // Remember last viewed character
@@ -224,14 +226,15 @@ export default function CharacterSheet() {
       if (spellBrowserLevel !== '') {
         filtered = filtered.filter(s => s.level === Number(spellBrowserLevel));
       }
-      // Filter by class if character has a class
-      if (char?.class) {
-        const cls = char.class.toLowerCase();
-        filtered = filtered.filter(s => !s.classes?.length || s.classes.some(c => c.toLowerCase() === cls));
+      // Filter to the lists the character can actually draw from: all of their
+      // classes (multiclass included) plus any feat-granted list.
+      const allowed = allowedSpellClasses(char);
+      if (allowed.length) {
+        filtered = filtered.filter(s => spellMatchesClasses(s, allowed));
       }
       setSpellBrowserResults(filtered.slice(0, 50));
     }, 200);
-  }, [spellBrowserSearch, spellBrowserLevel, showSpellBrowser, char?.class]);
+  }, [spellBrowserSearch, spellBrowserLevel, showSpellBrowser, char?.class, char?.classes, char?.featSpellLists]);
 
   const invSearchTimer = useRef(null);
   useEffect(() => {
@@ -390,7 +393,9 @@ export default function CharacterSheet() {
     const hd = shortRestModal.selectedDie || getHitDicePools(char)[0]?.die || HIT_DICE[char.class] || 'd8';
     const conMod = modVal(char.abilityScores?.constitution ?? 10);
     const formula = `1${hd}${conMod >= 0 ? '+' : ''}${conMod}`;
-    const { total } = await rollDice3D(formula, 'Short Rest — Hit Die');
+    const rolled = await rollDice3D(formula, 'Short Rest — Hit Die');
+    if (!rolled) return; // dice already in the air
+    const { total } = rolled;
     const healed = Math.max(1, total);
     logRoll('Short Rest Hit Die', formula, total, 'Short Rest');
 
@@ -469,9 +474,14 @@ export default function CharacterSheet() {
     if (useAvg) {
       hpGain = avg + conMod;
     } else {
-      const { total } = await rollDice3D(hd, 'Level Up HP');
-      hpGain = total + conMod;
-      logRoll('Level Up HP', hd, total, 'Level Up');
+      // Send an explicit count — `hitDice` is a bare 'd10'. The parser now
+      // handles a countless die, but the short-rest path builds `1${hd}` too
+      // and the two must not drift apart.
+      const formula = `1${hd}`;
+      const rolled = await rollDice3D(formula, 'Level Up HP');
+      if (!rolled) return; // dice already in the air
+      hpGain = rolled.total + conMod;
+      logRoll('Level Up HP', formula, rolled.total, 'Level Up');
     }
     const patch = syncPrimaryFromClasses(classes);
     const newMaxHp = (char.maxHp || 0) + Math.max(1, hpGain);
@@ -502,6 +512,7 @@ export default function CharacterSheet() {
   // Roll with result tracking
   const doRollWithResult = useCallback(async (label, formula, opts = {}) => {
     const result = await rollDice3D(formula, label);
+    if (!result) return null; // dice already in the air
     let total = result.total;
     // Great Weapon Fighting: reroll damage dice that landed on 1 or 2 (once, keep the new roll)
     if (opts.rerollLow && Array.isArray(result.results)) {
@@ -520,9 +531,11 @@ export default function CharacterSheet() {
   }, [rollDice3D, logRoll]);
 
   const doAdvantage = useCallback(async (label, formula) => {
-    const bonusMatch = formula.match(/1d20([+-]\d+)/);
-    const bonus = bonusMatch ? parseInt(bonusMatch[1]) : 0;
+    // Parse, don't regex — a negative bonus renders as '1d20+-2', which the
+    // old single-modifier regex did not match, silently dropping it.
+    const bonus = parseDiceFormula(formula).staticBonus;
     const result = await rollDice3D(`2d20${bonus >= 0 ? '+' : ''}${bonus}`, `${label} (Advantage)`);
+    if (!result) return; // dice already in the air
     const d20s = result.results.filter(r => r.sides === 20);
     const higher = Math.max(...d20s.map(r => r.value));
     const total = higher + bonus;
@@ -532,9 +545,9 @@ export default function CharacterSheet() {
   }, [rollDice3D, logRoll]);
 
   const doDisadvantage = useCallback(async (label, formula) => {
-    const bonusMatch = formula.match(/1d20([+-]\d+)/);
-    const bonus = bonusMatch ? parseInt(bonusMatch[1]) : 0;
+    const bonus = parseDiceFormula(formula).staticBonus;
     const result = await rollDice3D(`2d20${bonus >= 0 ? '+' : ''}${bonus}`, `${label} (Disadvantage)`);
+    if (!result) return; // dice already in the air
     const d20s = result.results.filter(r => r.sides === 20);
     const lower = Math.min(...d20s.map(r => r.value));
     const total = lower + bonus;
@@ -546,6 +559,7 @@ export default function CharacterSheet() {
   const doCrit = useCallback(async (label, formula) => {
     const critFormula = formula.replace(/(\d+)d(\d+)/g, (_, n, s) => `${parseInt(n) * 2}d${s}`);
     const result = await rollDice3D(critFormula, `${label} (CRIT!)`);
+    if (!result) return; // dice already in the air
     setRollResults(prev => ({ ...prev, [label]: { total: result.total, time: Date.now(), tag: 'CRIT' } }));
     setTimeout(() => setRollResults(prev => { const n = { ...prev }; if (n[label]?.time && Date.now() - n[label].time >= 7500) delete n[label]; return n; }), 8000);
     logRoll(label, critFormula, result.total, 'CRIT');
@@ -829,15 +843,16 @@ export default function CharacterSheet() {
 
   // ─── Styles ──────────────────────────────────────────
   const st = {
-    sheet: { maxWidth: '1400px', margin: '0 auto', padding: '16px', position: 'relative' },
+    // overflowX backstop: no tab's content may push the page wider than the viewport.
+    sheet: { maxWidth: '1400px', margin: '0 auto', padding: '16px', position: 'relative', overflowX: 'hidden' },
     header: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' },
-    abilityBar: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px', marginBottom: '16px' },
+    abilityBar: { display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '6px', marginBottom: '16px' },
     abilityCell: {
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px',
       padding: '8px 4px', cursor: 'pointer', transition: 'border-color 0.15s',
     },
-    layout: { display: 'grid', gridTemplateColumns: columnCount === 2 ? `${sidebarWidth}px 1fr` : columnCount === 3 ? `${sidebarWidth}px 1fr 1fr` : `${sidebarWidth}px 1fr 1fr 1fr`, gap: '16px', alignItems: 'start', position: 'relative' },
+    layout: { display: 'grid', gridTemplateColumns: columnCount === 2 ? `${sidebarWidth}px minmax(0, 1fr)` : columnCount === 3 ? `${sidebarWidth}px minmax(0, 1fr) minmax(0, 1fr)` : `${sidebarWidth}px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)`, gap: '16px', alignItems: 'start', position: 'relative' },
     sidebar: { display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' },
     sideCard: { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px' },
     sideLabel: { fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--text-dim)', fontWeight: 600, marginBottom: '8px', fontFamily: 'Cinzel, serif' },
@@ -869,6 +884,9 @@ export default function CharacterSheet() {
 
     return (
       <button
+        // One roll at a time — a click mid-flight would be swallowed by
+        // rollDice3D's guard and leave the previous number showing.
+        disabled={diceRolling}
         onClick={(e) => { e.stopPropagation(); conditionRoll(); if (onRoll) onRoll(); }}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -881,7 +899,8 @@ export default function CharacterSheet() {
           background: result ? 'var(--accent)' : 'var(--surface)',
           border: `1px solid ${result ? 'var(--gold)' : 'var(--border)'}`,
           borderRadius: '6px',
-          color: 'var(--gold)', cursor: 'pointer', fontSize: '12px', padding: '4px 12px',
+          opacity: diceRolling ? 0.5 : 1,
+          color: 'var(--gold)', cursor: diceRolling ? 'default' : 'pointer', fontSize: '12px', padding: '4px 12px',
           fontFamily: 'Cinzel, serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
           transition: 'all 0.15s', fontWeight: 600, minWidth: '48px', justifyContent: 'center',
           ...extraStyle,
@@ -1152,7 +1171,7 @@ export default function CharacterSheet() {
     switch (wid) {
       case 'combat-stats':
         return wrapWidget(wid,
-            <div style={{ display: 'grid', gridTemplateColumns: extraAttacks > 0 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: extraAttacks > 0 ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', gap: '6px' }}>
               <div style={st.combatBox}>
                 <span style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--text-dim)', letterSpacing: '1px', fontWeight: 600 }}>Prof</span>
                 <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--gold)' }}>+{profBonus}</span>
@@ -1807,7 +1826,7 @@ export default function CharacterSheet() {
       .filter(item => item && item.category === 'weapon');
 
     const actionHeader = (
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0', fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', padding: '4px 10px', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)', gap: '0', fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', padding: '4px 10px', letterSpacing: '0.5px', borderBottom: '1px solid var(--border)' }}>
         <span>Attack</span><span>Range</span><span>Hit</span><span>Damage</span>
       </div>
     );
@@ -1860,8 +1879,10 @@ export default function CharacterSheet() {
             const hitBonus = abilityMod + profBonus + (wpn.bonus || 0) + ammoBonus + archeryBonus;
             const dmgBonus = abilityMod + (wpn.bonus || 0) + ammoBonus + duelingBonus;
             const dmgBonus2H = dmgBonus - duelingBonus; // two-handed grip forfeits the Dueling style
-            // Active weapon-rider spell buffs add their die to weapon damage
-            const dmgFormula = wpn.damage ? `${wpn.damage}+${dmgBonus}${riderDamageSuffix}` : null;
+            // Active weapon-rider spell buffs add their die to weapon damage.
+            // weaponDamageFormula strips the magic +N baked into wpn.damage —
+            // it is already counted in dmgBonus via wpn.bonus.
+            const dmgFormula = weaponDamageFormula(wpn.damage, dmgBonus, riderDamageSuffix);
             const activeStyles = [
               archeryBonus && 'Archery', duelingBonus && 'Dueling',
               (gwfStyle && (isTwoHanded || isVersatile)) && 'Great Weapon', twfApplies && 'Two-Weapon',
@@ -1892,11 +1913,11 @@ export default function CharacterSheet() {
               <div key={`wpn-${i}`} className="cc-skill"
                 onClick={() => openItemPanel(wpn)}
                 style={{
-                  display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0',
+                  display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)', gap: '0',
                   padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--surface)',
                   fontSize: '13px', alignItems: 'center',
                 }}>
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 500, color: wpn.rarity && wpn.rarity !== 'common' ? rarityColor(wpn.rarity) : undefined, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {wpn.name}{wpn.bonus ? ` +${wpn.bonus}` : ''}
                     {(() => {
@@ -1963,7 +1984,7 @@ export default function CharacterSheet() {
                 <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                   {dmgFormula && (
                     <RollBtn label={`${wpn.name} Damage${versatileDie ? ' (1H)' : ''}`} formula={dmgFormula} type="damage" rerollLow={gwf1H}>
-                      {versatileDie ? '1H: ' : ''}{wpn.damage}+{dmgBonus}{riderDamageSuffix}
+                      {versatileDie ? '1H: ' : ''}{dmgFormula}
                     </RollBtn>
                   )}
                   {versatileDie && (
@@ -1979,7 +2000,7 @@ export default function CharacterSheet() {
 
           {/* Unarmed Strike */}
           <div className="cc-skill" style={{
-            display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0',
+            display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)', gap: '0',
             padding: '8px 10px', borderBottom: '1px solid var(--surface)',
             fontSize: '13px', alignItems: 'center', cursor: 'pointer',
           }}
@@ -2019,7 +2040,7 @@ export default function CharacterSheet() {
             const nwMod = modVal(scores[nw.ability] ?? 10);
             return (
               <div key={`nat-${nw.name}`} className="cc-skill" style={{
-                display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0',
+                display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)', gap: '0',
                 padding: '8px 10px', borderBottom: '1px solid var(--surface)',
                 fontSize: '13px', alignItems: 'center', cursor: 'pointer',
               }}
@@ -2036,7 +2057,7 @@ export default function CharacterSheet() {
                   description: `${nw.name} — a natural melee weapon attack from your ${baseRace} heritage. On a hit it deals ${nw.damage} + your ${ABBR[nw.ability]} modifier ${nw.damageType} damage.`,
                 }})}
               >
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 500 }}>{nw.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Natural Weapon · {baseRace}</div>
                 </div>
@@ -2082,11 +2103,11 @@ export default function CharacterSheet() {
                 <div key={sp._id} className="cc-skill"
                   onClick={() => openSpellPanel(sp)}
                   style={{
-                    display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: '0',
+                    display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.5fr)', gap: '0',
                     padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--surface)',
                     fontSize: '13px', alignItems: 'center',
                   }}>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 500, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {sp.name}
                       {canUpcast && (
@@ -3564,6 +3585,7 @@ export default function CharacterSheet() {
                 className="cc-skill"
                 onClick={async () => {
                   const r = await rollDice3D(rollMenu.formula, `${rollMenu.label} (Half)`);
+                  if (!r) return; // dice already in the air
                   const half = Math.floor(r.total / 2);
                   setRollResults(prev => ({ ...prev, [rollMenu.label]: { total: half, time: Date.now(), tag: 'HALF' } }));
                   setTimeout(() => setRollResults(prev => { const n = { ...prev }; if (n[rollMenu.label]?.time && Date.now() - n[rollMenu.label].time >= 7500) delete n[rollMenu.label]; return n; }), 8000);
@@ -3614,7 +3636,7 @@ export default function CharacterSheet() {
             {/* Spell panel */}
             {sidePanel.type === 'spell' && (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   {[
                     { label: 'Casting Time', value: sidePanel.data.castingTime },
                     { label: 'Range', value: sidePanel.data.range },
@@ -3694,7 +3716,7 @@ export default function CharacterSheet() {
             {/* Item panel */}
             {sidePanel.type === 'item' && (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   {[
                     { label: 'Cost', value: sidePanel.data.cost },
                     { label: 'Weight', value: sidePanel.data.weight },
@@ -3781,7 +3803,7 @@ export default function CharacterSheet() {
             {/* Action panel */}
             {sidePanel.type === 'action' && (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '8px', marginBottom: '16px' }}>
                   {[
                     { label: 'Action Type', value: sidePanel.data.actionType },
                     { label: 'Attack Type', value: sidePanel.data.attackType },

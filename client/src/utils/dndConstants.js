@@ -115,6 +115,16 @@ export const FEAT_ABILITY_BONUSES = {
   'Weapon Master': { choice: ['strength', 'dexterity'] },
 };
 
+// Spell lists Magic Initiate may draw from, by ruleset. 2014 (PHB p.168) offers
+// six lists; the 2024 Origin feat is limited to Cleric/Druid/Wizard. Routed through
+// char.ruleset / form.ruleset / the creator's ruleset — never hardcode one edition.
+// The chosen list is persisted as char.featSpellLists = { 'Magic Initiate': ['Cleric'] }
+// (array-valued, so the repeatable 2024 feat needs no data migration later).
+export const MAGIC_INITIATE_CLASSES = {
+  '2014': ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard'],
+  '2024': ['Cleric', 'Druid', 'Wizard'],
+};
+
 // Feats that add flat max-HP. Tough: +2 per character level, applied at creation and on level-up.
 export const FEAT_HP_PER_LEVEL = {
   Tough: 2,

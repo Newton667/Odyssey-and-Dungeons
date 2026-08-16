@@ -28,6 +28,26 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.5.0 — 2026-08-16
+
+### Fixed
+- **Magic Initiate's bonus spell is capped to 1st level.** A spellcaster who also took the feat got an extra spell slot in the editor that could be filled with anything up to their normal maximum — a level-5 Wizard could spend it on Fireball. The feat only ever grants a 1st-level spell, and the picker now enforces that.
+- **Level-up HP rolls the die again.** The Level Up modal passed a bare `d10` to the dice roller, which read the `10` as a flat bonus rather than a die — so "Roll for HP" silently granted the maximum every time and threw no dice. The formula parser now treats a countless die as a single die, and the level-up path sends an explicit count like the short-rest path already did. *(found in review)*
+- **The dice roller can no longer get stuck.** If the 3D dice failed to initialise (WebGL unavailable, context lost), the in-flight guard was never cleared and every subsequent roll silently did nothing until a page reload. A watchdog now releases the guard. *(found in review)*
+- **The editor's spell list no longer shuts out feat casters.** A Fighter with Magic Initiate was told "Fighter is not a spellcaster", and a Paladin's cantrip picker never rendered, so the feat's spells could only be added from the character sheet. The editor now counts feat-granted spell lists and adds the feat's 2 cantrips + 1 spell to its limits. *(found in review)*
+- **Character data no longer gets wiped by the server copy.** The character sheet writes equipped items, ammo, spent spell slots, feature uses, conditions, attunement, death saves and multiclass levels to localStorage only — but the server's stale backup could overwrite it on the next load, which is why arrows refilled themselves and gear unequipped after a level-up. localStorage is now authoritative: the server copy is only adopted when there is no local copy at all, and the character list no longer overwrites local characters either. The editor now sends the *complete* character to the server, so the backup stops being lossy. (Characters already wiped can't be recovered — that data has to be re-entered.)
+- **Magic weapons no longer double-count their bonus.** A `+1 Longsword` stores its bonus in both its damage string and its `bonus` field, so one-handed damage was rolling `1d8+1` *plus* the `+1` again. Damage strings are now sanitized at read time, so the 1H and 2H buttons finally agree.
+- **Weapons with flat damage roll correctly.** Blowgun (`1`) and similar non-dice weapons returned a total of 0; they now roll their own base damage plus the ability modifier (a Blowgun with DEX +2 deals 1 + 2 = 3). Weapons with no damage value (Net) no longer show a dead damage button.
+- **Advantage/disadvantage keeps negative modifiers.** A negative attack bonus (rendered as `1d20+-2`) silently became `+0` on advantage and disadvantage rolls.
+- **Rolls can no longer eat each other.** Starting a second roll while dice were still in the air dropped the first roll's result, leaving the previous number showing on the button. Roll buttons are now disabled while dice are settling.
+- **Long text no longer widens the character sheet.** Every grid track on the sheet now uses `minmax(0, 1fr)` and row cells allow shrinking, so long feature descriptions, spell names and homebrew item names wrap instead of stretching the page sideways.
+
+### Added
+- **Magic Initiate now works after character creation.** The class whose spell list you chose is saved on the character (`featSpellLists`), and both the sheet's spell browser and the editor's spell list now include that class — so a Paladin with Magic Initiate can finally pick the 2 cantrips the feat grants. The class list follows the ruleset: Bard/Cleric/Druid/Sorcerer/Warlock/Wizard for 2014, Cleric/Druid/Wizard for 2024. The editor gained a picker so existing characters can set (or change) their list.
+
+### Changed
+- **The character sheet's spell browser now covers all of your classes.** It previously filtered to the primary class only, so multiclass characters couldn't browse their second class's spell list.
+
 ## v1.4.0 — 2026-07-19
 
 ### Added
