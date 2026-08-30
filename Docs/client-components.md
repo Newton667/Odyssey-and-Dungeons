@@ -93,11 +93,17 @@ Hover tooltip wrapper component.
   any ancestor whose overflow isn't `visible` (the character sheet root sets
   `overflowX: 'hidden'`, which makes CSS compute the other axis to `auto`), and `z-index`
   can't defeat clipping. `fixed` escapes every ancestor. Don't revert it to `absolute`.
-- Flips below the trigger when there's no room above (`r.top > 160`), and clamps horizontally
+- Placed **above** when `r.top > 160`, otherwise **flipped below**; clamps horizontally
   so it stays on screen near the viewport edges. `data-place="above|below"` drives the
   transform and which way the arrow points.
-- Hooks (`useRef`/`useState`/`useCallback`) are declared **before** the `if (!text)` early
-  return, per the hooks-order rule.
+- Hooks (`useRef`/`useState`/`useCallback`/`useEffect`) are declared **before** the `if (!text)`
+  early return, per the hooks-order rule.
+- Because the box is `fixed` it does not travel with the trigger, so a `scroll` (capture-phase,
+  to catch nested scrollers) or `resize` listener clears the position — the tooltip vanishes
+  rather than floating over unrelated content, and the next hover re-measures.
+- `width: max-content` on `.ond-tip-box` is load-bearing: a `fixed` box with `left` set would
+  otherwise shrink-to-fit against `viewport - left`, collapsing right-edge tooltips to
+  `min-width`.
 
 ### Props:
 - `text` — Tooltip content string

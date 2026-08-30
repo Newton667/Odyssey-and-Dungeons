@@ -285,6 +285,10 @@ input:focus, textarea:focus, select:focus {
      overflow is not visible (the sheet root sets overflow-x: hidden, which makes
      CSS compute the other axis to auto). Placed from JS in Tip.jsx. */
   position: fixed;
+  /* width independent of `left` — an abspos/fixed box with `left` set otherwise
+     shrink-to-fits against (viewport - left), collapsing right-edge tooltips to
+     min-width and making them tall and skinny. */
+  width: max-content;
   min-width: 200px;
   max-width: 300px;
   padding: 10px 12px;
@@ -321,7 +325,8 @@ input:focus, textarea:focus, select:focus {
   bottom: 100%;
   border-bottom-color: var(--gold-dim, #8a6f1a);
 }
-.ond-tip:hover .ond-tip-box {
+.ond-tip:hover .ond-tip-box,
+.ond-tip:focus-within .ond-tip-box {
   visibility: visible;
   opacity: 1;
 }
