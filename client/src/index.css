@@ -281,10 +281,10 @@ input:focus, textarea:focus, select:focus {
 .ond-tip-box {
   visibility: hidden;
   opacity: 0;
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  /* fixed, not absolute: an absolute box is clipped by any ancestor whose
+     overflow is not visible (the sheet root sets overflow-x: hidden, which makes
+     CSS compute the other axis to auto). Placed from JS in Tip.jsx. */
+  position: fixed;
   min-width: 200px;
   max-width: 300px;
   padding: 10px 12px;
@@ -302,14 +302,24 @@ input:focus, textarea:focus, select:focus {
   white-space: pre-line;
   text-align: left;
 }
+/* Tip.jsx sets data-place; the transform anchors the box to the trigger and the
+   arrow points back at it. */
+.ond-tip-box[data-place="above"] { transform: translate(-50%, -100%); }
+.ond-tip-box[data-place="below"] { transform: translate(-50%, 0); }
 .ond-tip-box::after {
   content: '';
   position: absolute;
-  top: 100%;
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
+}
+.ond-tip-box[data-place="above"]::after {
+  top: 100%;
   border-top-color: var(--gold-dim, #8a6f1a);
+}
+.ond-tip-box[data-place="below"]::after {
+  bottom: 100%;
+  border-bottom-color: var(--gold-dim, #8a6f1a);
 }
 .ond-tip:hover .ond-tip-box {
   visibility: visible;

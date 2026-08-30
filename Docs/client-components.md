@@ -84,12 +84,20 @@ Textarea that only fires onChange on blur.
 - `onChange(string)` — Callback fired on blur with current text
 - All other props passed through to `<textarea>`
 
-## Tip.jsx (~10 lines)
+## Tip.jsx (~50 lines)
 Hover tooltip wrapper component.
-- Wraps children, shows tooltip on hover
-- Uses CSS class `.ond-tip` for positioning
-- Tooltip content passed as `text` prop
+- Wraps children, shows tooltip on hover; content passed as the `text` prop
 - Supports `pre-line` white-space for multiline tooltips
+- **The box is `position: fixed`, not `absolute`** — placed from the trigger's
+  `getBoundingClientRect()` on `mouseenter`/`focus`. An absolutely-positioned box is clipped by
+  any ancestor whose overflow isn't `visible` (the character sheet root sets
+  `overflowX: 'hidden'`, which makes CSS compute the other axis to `auto`), and `z-index`
+  can't defeat clipping. `fixed` escapes every ancestor. Don't revert it to `absolute`.
+- Flips below the trigger when there's no room above (`r.top > 160`), and clamps horizontally
+  so it stays on screen near the viewport edges. `data-place="above|below"` drives the
+  transform and which way the arrow points.
+- Hooks (`useRef`/`useState`/`useCallback`) are declared **before** the `if (!text)` early
+  return, per the hooks-order rule.
 
 ### Props:
 - `text` — Tooltip content string

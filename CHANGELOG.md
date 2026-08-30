@@ -28,6 +28,11 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.5.2 — 2026-08-16
+
+### Fixed
+- **Tooltips are no longer cut off.** Hovering the header buttons (Heroic Inspiration, Short Rest, Long Rest, and the edit/layout buttons) showed a tooltip sliced in half. The tooltip was positioned inside the sheet, and the sheet clips its own overflow — so the box was cropped by its container. Tooltips now position themselves against the viewport instead, so they escape that clipping entirely, flip below the button when there isn't room above, and stay on screen near the right edge.
+
 ## v1.5.1 — 2026-08-16
 
 ### Fixed
