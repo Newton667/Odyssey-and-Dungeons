@@ -26,21 +26,28 @@ export default function Navbar() {
     <nav style={{
       background: navBg,
       borderBottom: `2px solid ${border}`,
-      padding: '0 32px',
+      // clamp: 2.5vw resolves to exactly 32px at 1280 and shrinks below that, so
+      // wide screens are unchanged while narrow ones stop pushing "Settings" past
+      // the right edge. The nav is a sibling of <Routes>, NOT inside `.page`, so it
+      // overflowed the document rather than being clipped by `.page`'s overflow-x.
+      padding: '0 clamp(12px, 2.5vw, 32px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
+      gap: '12px',
       height: '72px',
       position: 'sticky',
       top: 0,
       zIndex: 100,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(12px, 2.5vw, 32px)', minWidth: 0 }}>
         <span style={{ fontFamily: 'Cinzel, serif', color: gold, fontWeight: 700, letterSpacing: '2px', lineHeight: 1.1 }}>
-          <span style={{ fontSize: '26px' }}>⚔ OND</span>
-          <span style={{ display: 'block', fontSize: '11px', letterSpacing: '3px', opacity: 0.7, textTransform: 'uppercase' }}>Odyssey & Dragons</span>
+          <span style={{ fontSize: '26px', whiteSpace: 'nowrap' }}>⚔ OND</span>
+          <span className="nav-wordmark" style={{ display: 'block', fontSize: '11px', letterSpacing: '3px', opacity: 0.7, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Odyssey &amp; Dragons</span>
         </span>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        {/* minWidth 0 + overflowX auto: the row shrinks and scrolls internally instead of
+            letting its nowrap children spill out and paint over the Settings link. */}
+        <div className="nav-links" style={{ display: 'flex', gap: '4px', minWidth: 0, overflowX: 'auto' }}>
           {links.map(({ to, label }) => (
             <NavLink
               key={to}
@@ -48,7 +55,7 @@ export default function Navbar() {
               end={to === '/'}
               className="nav-link"
               style={({ isActive }) => ({
-                padding: '10px 18px',
+                padding: '10px clamp(9px, 1.40625vw, 18px)',
                 borderRadius: '6px',
                 fontSize: '16px',
                 fontWeight: 500,
@@ -65,9 +72,9 @@ export default function Navbar() {
           {lastCharId && !onCharSheet && (
             <NavLink
               to={`/characters/${lastCharId}`}
-              className="nav-link"
+              className="nav-link nav-mysheet"
               style={{
-                padding: '10px 18px',
+                padding: '10px clamp(9px, 1.40625vw, 18px)',
                 borderRadius: '6px',
                 fontSize: '16px',
                 fontWeight: 600,
@@ -88,7 +95,8 @@ export default function Navbar() {
         to="/settings"
         className="nav-link"
         style={({ isActive }) => ({
-          padding: '10px 16px',
+          flexShrink: 0,
+          padding: '10px clamp(8px, 1.25vw, 16px)',
           borderRadius: '6px',
           fontSize: '16px',
           color: isActive ? gold : textDim,

@@ -28,6 +28,12 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.5.1 — 2026-08-16
+
+### Fixed
+- **The character sheet header no longer cuts off its buttons.** "Heroic Inspiration", "Short Rest" and "Long Rest" were being clipped instead of wrapping — the sheet-wide overflow containment added in v1.5.0 hid the overflow rather than letting the row move down. The header now wraps and the button labels never break.
+- **The top navigation no longer clips or overlaps its links.** "⚙ Settings" was cut off on narrower screens and the page overflowed sideways. Nav spacing now scales with the viewport (identical at 1280px and wider), labels never wrap, Settings is pinned so it is never the item squeezed, and the link row scrolls instead of letting links paint over each other. The "Odyssey & Dragons" subtitle and the "My Sheet" shortcut drop below 1250px so every remaining label stays whole. Verified in Chrome at 1280 / 1101 / 1024 / 900px with the "My Sheet" link present. (At 768px and below the link row still clips — the nav needs a proper collapsed menu for phones.)
+
 ## v1.5.0 — 2026-08-16
 
 ### Fixed

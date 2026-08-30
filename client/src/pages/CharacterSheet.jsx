@@ -845,7 +845,10 @@ export default function CharacterSheet() {
   const st = {
     // overflowX backstop: no tab's content may push the page wider than the viewport.
     sheet: { maxWidth: '1400px', margin: '0 auto', padding: '16px', position: 'relative', overflowX: 'hidden' },
-    header: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' },
+    // flexWrap: the action row drops below the name rather than being clipped by
+    // this same object's `overflowX: 'hidden'` (line above). Without it the
+    // rest/inspiration labels cut off.
+    header: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', padding: '12px 16px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px', flexWrap: 'wrap' },
     abilityBar: { display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: '6px', marginBottom: '16px' },
     abilityCell: {
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -3317,7 +3320,7 @@ export default function CharacterSheet() {
             {char.alignment && <span className="badge" style={{ background: '#1a1a2e', border: '1px solid #3a3a6e', color: '#8080c0' }}>{char.alignment}</span>}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', minWidth: 0 }}>
           <Tip text={char.inspiration
             ? 'You have Heroic Inspiration! Click to use it. Add 1d20 to any attack, save, or ability check you make.'
             : 'Grant Heroic Inspiration. When active, you can add 1d20 to any attack roll, saving throw, or ability check.'}>
@@ -3325,7 +3328,7 @@ export default function CharacterSheet() {
               onClick={() => updateField('inspiration', !char.inspiration)}
               style={{
                 padding: '8px 16px', fontSize: '13px', fontWeight: 700,
-                fontFamily: 'Cinzel, serif', letterSpacing: '0.5px',
+                fontFamily: 'Cinzel, serif', letterSpacing: '0.5px', whiteSpace: 'nowrap',
                 borderRadius: '8px', cursor: 'pointer',
                 border: char.inspiration ? '2px solid var(--gold)' : '2px solid var(--border)',
                 background: char.inspiration
@@ -3343,7 +3346,7 @@ export default function CharacterSheet() {
           <Tip text={`Short Rest: Spend 1 hit die (${formatHitDice(char) || char.hitDice || HIT_DICE[char.class] || 'd8'} + CON mod) to heal.\n${char.hitDiceRemaining ?? char.level} of ${char.level} hit dice remaining.`}>
             <button onClick={doShortRest}
               style={{
-                padding: '8px 14px', fontSize: '12px', fontWeight: 600,
+                padding: '8px 14px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                 fontFamily: 'Cinzel, serif', borderRadius: '8px', cursor: 'pointer',
                 border: '2px solid var(--border)', background: 'var(--surface)',
                 color: 'var(--text-dim)', transition: 'all 0.2s ease',
@@ -3354,7 +3357,7 @@ export default function CharacterSheet() {
           <Tip text="Long Rest: Restore all HP, all spell slots, regain half your hit dice (min 1), and reset death saves. Takes 8 hours.">
             <button onClick={doLongRest}
               style={{
-                padding: '8px 14px', fontSize: '12px', fontWeight: 600,
+                padding: '8px 14px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
                 fontFamily: 'Cinzel, serif', borderRadius: '8px', cursor: 'pointer',
                 border: '2px solid var(--border)', background: 'var(--surface)',
                 color: 'var(--text-dim)', transition: 'all 0.2s ease',

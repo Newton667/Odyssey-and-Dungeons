@@ -107,3 +107,31 @@ Each theme defines all CSS variables listed above. Examples:
 - Character sheet uses configurable 2/3/4 column grid
 - Widgets reflow based on column count
 - Mobile-friendly (most sections stack vertically)
+
+## Responsive containment
+
+`.page` and the character sheet's `st.sheet` both set `overflow-x: hidden`, and `body` sets
+`overflow-wrap: break-word`, so long content wraps rather than widening the page. Anything
+that still doesn't fit is **clipped**, so bars that must not lose content need room made:
+
+- **Character sheet header** (`st.header`) — `flexWrap: 'wrap'` so the action row drops to a
+  second line; the Heroic Inspiration / Short Rest / Long Rest buttons carry
+  `whiteSpace: 'nowrap'` so their labels never break. (The clipper here is `st.sheet`'s own
+  `overflowX`, not `.page` — the sheet does not render inside `.page`.)
+- **Navbar** — a sibling of `<Routes>`, so it is outside `.page` and overflowed the *document*.
+  `padding`, the logo/links `gap` and both link paddings use `clamp(min, Nvw, max)`, with each
+  `vw` term chosen to resolve to the original pixel value at 1280px (`2.5vw`→32px,
+  `1.40625vw`→18px, `1.25vw`→16px), so desktop is unchanged. `.nav-link` is
+  `white-space: nowrap`; Settings is `flexShrink: 0` so it is never the thing squeezed; and
+  `.nav-links` is `min-width: 0; overflow-x: auto` (scrollbar hidden) so the row scrolls
+  instead of letting its children spill out and overlap.
+- **Below 1250px** `.nav-wordmark` ("Odyssey & Dragons") and `.nav-mysheet` (the conditional
+  "My Sheet" shortcut) are hidden, which keeps every remaining label whole. The breakpoint sits
+  well above 1100px deliberately: the width *just above* a `max-width` query is the worst case.
+- `.wrap-text` remains the opt-in for aggressive breaking (`overflow-wrap: anywhere`); never
+  apply that globally.
+
+Verified in Chrome at 1280 / 1101 / 1024 / 900px in the returning-user state (with the
+"My Sheet" link present, on a non-sheet page): `body.scrollWidth` equals the viewport and no
+element paints past the right edge. **Known limitation:** at ≤768px the link row still clips
+mid-label — the nav needs a collapsed/hamburger treatment for phone widths.

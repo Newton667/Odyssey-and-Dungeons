@@ -146,6 +146,24 @@ Two defences, both in place:
 ### Grid tracks must be `minmax(0, 1fr)`
 A bare `1fr` is `minmax(auto, 1fr)`, which **cannot shrink below its content** — one long feature description, spell name or homebrew item name then pushes the whole page wider than the viewport. Use `minmax(0, 1fr)` for every track (`repeat(6, minmax(0, 1fr))`, `'minmax(0, 2fr) minmax(0, 1fr) …'`), and add `minWidth: 0` to grid/flex children that hold long text — especially cells containing a `<select>`, which carries its own intrinsic width. `body { overflow-wrap: break-word }` and `.page { overflow-x: hidden }` back this up in `index.css`; `.wrap-text` is the opt-in for aggressive breaking. Do **not** apply a blanket `overflow-wrap: anywhere` — it breaks words mid-character even when the line has room. Check: `rg -n "gridTemplateColumns" client/src/pages/CharacterSheet.jsx | rg -v minmax` should return nothing.
 
+### Horizontal overflow containment clips — it does not make things fit
+Several containers set `overflow-x: hidden` to stop long text widening the page — `.page`, and the character sheet's own `st.sheet`. That has a cost: anything that still doesn't fit is **silently cut off** instead of producing a scrollbar. A truncated label is therefore a *layout* bug, not a text bug — the element needs room, not a shorter string.
+
+Know which container is actually clipping. The sheet's header is clipped by **`st.sheet`'s** `overflowX: 'hidden'` (`CharacterSheet.jsx:847`), not by `.page`. The navbar is a sibling of `<Routes>` in `App.jsx` and is **not inside `.page` at all** — it overflowed the *document* instead.
+
+This bit the character sheet header: the action row (Heroic Inspiration / Short Rest / Long Rest) exceeded the width and the labels were sliced off. The fix was to let the row move, not to shrink it — `st.header` gained `flexWrap: 'wrap'` so the buttons drop to their own line, and each button got `whiteSpace: 'nowrap'` so its label never breaks.
+
+The navbar had the same failure (`⚙ Settings` clipped, document overflowing 18px). It now scales `padding`/`gap`/link-padding with `clamp(min, Nvw, max)` sized to resolve to the original pixel value at 1280px, keeps `.nav-link { white-space: nowrap }`, pins Settings with `flexShrink: 0`, lets `.nav-links` shrink and scroll (`minWidth: 0; overflow-x: auto`, scrollbar hidden) so its `nowrap` children can never spill out and overlap, and drops both the wordmark and the conditional **"My Sheet"** link below 1250px.
+
+**Count the conditional links.** `Navbar` renders a 7th "My Sheet" link whenever `localStorage['ond-last-character']` exists *and* you are not currently on a sheet — which is every returning user on every other page. A width budget measured on a character sheet (where it is suppressed) or with a fresh profile will pass and still overlap in real use. That is exactly how the first attempt at this fix shipped an overlap at 900px and 1101px.
+
+**Rules:**
+- A fixed-height, non-wrapping bar (`height: 72px`, no `flexWrap`) will clip rather than reflow. Give it either `flexWrap` or viewport-scaled spacing.
+- `whiteSpace: 'nowrap'` on a label plus `flexWrap` on its container is the pair that works; `nowrap` alone just moves the overflow.
+- `minWidth: 0` lets a flex child shrink **below its content** — good for a text block that should wrap, wrong for a row of buttons, where it produces overlap.
+- Verify by measuring **and** by eye, in the state a real user is in (conditional links present, on a page where they render). `document.body.scrollWidth` must equal `document.documentElement.clientWidth`, and no element's `getBoundingClientRect().right` may exceed it. Check the breakpoint boundaries too — the width *just above* a `max-width` media query is the worst case, since everything it hides is back.
+- **Rect maths alone gives false positives** once a scroll container is involved: a child scrolled out of an `overflow-x: auto` row still reports an unclipped rect that appears to overlap its neighbours, while painting nothing. Confirm with a screenshot before believing an overlap.
+
 ### Express JSON Limit
 `express.json({ limit: '10mb' })` is required because character data includes base64 portrait images. Default 100KB limit causes `PayloadTooLargeError`.
 

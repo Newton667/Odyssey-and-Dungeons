@@ -384,6 +384,10 @@ input:focus, textarea:focus, select:focus {
 /* ── Navbar link hover ── */
 .nav-link {
   transition: all 0.15s ease;
+  /* Nav labels must never wrap or break — a shrinking nav used to stack the
+     gear icon above "Settings". The nav shrinks via its clamp() padding/gap
+     instead. */
+  white-space: nowrap;
 }
 .nav-link:hover {
   color: var(--gold) !important;
@@ -483,3 +487,19 @@ input:focus, textarea:focus, select:focus {
   transform: translateY(0) scale(0.97);
   box-shadow: none;
 }
+
+/* The nav fits its links, the wordmark and Settings comfortably at desktop widths.
+   Below that the subtitle is the first thing to go — dropping it frees ~170px and
+   keeps every nav label on one line instead of overlapping. */
+@media (max-width: 1250px) {
+  .nav-wordmark { display: none !important; }
+  /* The "My Sheet" shortcut is a convenience duplicate of Characters -> the sheet.
+     Dropping it before the row starts clipping keeps every remaining label whole. */
+  .nav-mysheet { display: none !important; }
+}
+
+/* The nav link row scrolls rather than overlapping when it runs out of room
+   (a returning user has an extra "My Sheet" link). Hide the scrollbar itself —
+   the row is short and a visible bar inside a 72px nav looks broken. */
+.nav-links { scrollbar-width: none; -ms-overflow-style: none; }
+.nav-links::-webkit-scrollbar { display: none; }
