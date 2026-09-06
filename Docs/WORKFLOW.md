@@ -1,21 +1,26 @@
 # Workflow Cheatsheet
 
-Five commands take a feature from idea to committed code — each runs in its own agent,
-writes a file you can read, and hands off to the next. A sixth, `/ond-execute-ultra`,
-runs the build half of that chain unattended.
+Six commands take a feature from idea to committed code — each runs in its own agent,
+writes a file you can read, and hands off to the next. A seventh, `/ond-execute-ultra`,
+runs the whole chain unattended.
 
 ```
-/ond-research → /ond-plan → /ond-increment → /ond-execute → /ond-review → commit
-      ↓             ↓             ↓               ↓              ↓
-    Docs/         Docs/         Docs/           (code)         Docs/
-  research/       plans/     increments/       + tests        reviews/
+/ond-research → /ond-plan → /ond-plan-review → /ond-increment → /ond-execute → /ond-review → commit
+      ↓             ↓              ↓                  ↓               ↓              ↓
+    Docs/         Docs/       (findings)            Docs/           (code)         Docs/
+  research/       plans/                         increments/       + tests        reviews/
 ```
 
 Every command is prefixed `ond-` so none of them collide with Claude Code's built-ins
 (`/plan` enters plan mode, `/review` is the built-in code review). Type `/ond` to see
-all six.
+all seven.
 
-You review between every stage. Nothing advances on its own.
+You review between every stage. Nothing advances on its own — except inside
+`/ond-execute-ultra`, which is the whole point of that command.
+
+**Claude can invoke these too.** They started out user-only, but any of them can now be
+triggered on your behalf when you ask for the workflow in plain English ("plan this, then
+build it"). Typing the command yourself still does exactly the same thing.
 
 ---
 
@@ -25,10 +30,11 @@ You review between every stage. Nothing advances on its own.
 |---|---|---|---|
 | `/ond-research <topic>` | Investigates the codebase, the D&D rulebooks, and the web. Ends with options + a recommendation. | `Docs/research/` | No |
 | `/ond-plan <what to build>` | Turns a direction into ordered **increments**. | `Docs/plans/` | No |
+| `/ond-plan-review [plan]` | Checks the plan **before code exists** — verifies its claims against the real code, stress-tests the slicing and the test gates. | (reports back) | No |
 | `/ond-increment [plan]` | Expands each increment with a **unit test spec** and red/green gates. | `Docs/increments/` | No |
 | `/ond-execute [plan]` | Builds it — **test first (red), then code (green)**, one increment at a time. | code + tests | **Yes** |
 | `/ond-review [scope]` | Runs **all** review agents at once — code + D&D rules — and merges the findings. | `Docs/reviews/` | No |
-| `/ond-execute-ultra [plan]` | **All of the above in one shot** — increments, build, review. Stops on the first failure. | all of them | **Yes** |
+| `/ond-execute-ultra [plan or request]` | **All of the above in one shot** — plan, plan review, increments, build, review. Stops on the first failure. | all of them | **Yes** |
 
 Only `/ond-execute` (and `/ond-execute-ultra`, which wraps it) can change code. The rest are read-only.
 
@@ -47,7 +53,13 @@ Only `/ond-execute` (and `/ond-execute-ultra`, which wraps it) can change code. 
 #  → picks up the research automatically
 #  → Docs/plans/2026-08-16-concentration.md  · 4 increments
 
-# read it. happy? then:
+# read it. want a second opinion before any code exists? then:
+
+/ond-plan-review Docs/plans/2026-08-16-concentration.md
+#  → verifies the plan's claims against the actual code
+#  → APPROVED | APPROVED WITH FIXES | NEEDS REVISION
+
+# happy? then:
 
 /ond-increment Docs/plans/2026-08-16-concentration.md
 #  → Docs/increments/2026-08-16-concentration.md
@@ -73,18 +85,43 @@ otherwise get wrong twice.
 
 ## One-shot mode: `/ond-execute-ultra`
 
-Runs the whole pipeline unattended, delegating each stage to the agent that owns it:
+Runs the whole workflow unattended, delegating each stage to the agent that owns it.
+It takes **either** an existing plan **or** a plain-English request — given a request, it
+writes the plan first:
 
 ```
 /ond-execute-ultra Docs/plans/2026-08-16-player-reported-bug-fixes.md
+/ond-execute-ultra refine the homebrewer and fix the spell export bug
 ```
 
 | Stage | Agent(s) | Gate before continuing |
 |---|---|---|
-| 1. Increments + test specs | `ond-incrementer` | stops if the plan can't be broken down |
-| 2. Build, one increment at a time | `ond-executor` | stops unless **every** increment is `done` |
-| 3. Review | `ond-reviewer` **+** `ond-dnd-auditor`, in parallel | — |
-| 4. Consolidate into one report | (orchestrator) | — |
+| 0. Write the plan *(only if given a request)* | `ond-planner` | — |
+| 1. **Plan review** | `ond-plan-reviewer` | **blocking** — see below |
+| 2. Increments + test specs | `ond-incrementer` | stops if the plan can't be broken down |
+| 3. Build, one increment at a time | `ond-executor` | stops unless **every** increment is `done` |
+| 4. Review | `ond-reviewer` **+** `ond-dnd-auditor`, in parallel | — |
+| 5. Consolidate into one report | (orchestrator) | — |
+
+### The plan gate
+
+Stage 1 runs **every time**, on a fresh plan or an existing one. It exists because of the
+one thing the red/green gates structurally cannot do:
+
+> **Red/green gates verify code-matches-spec. They cannot tell you the spec was wrong.**
+> A test written from a bad plan doesn't catch the bug — it *enshrines* it, as a green
+> assertion that the wrong behaviour is correct.
+
+When you're not reading the plan yourself, this is the only stage that reads it critically.
+
+| Verdict | What ultra does |
+|---|---|
+| `APPROVED` | continues |
+| `APPROVED WITH FIXES` | applies the fixes to the plan, says what changed, continues |
+| `NEEDS REVISION` | **revises the plan, re-reviews once.** Clean → continues. Still blocking → **stops and shows you.** |
+
+One revision cycle, never two — a plan that fails review twice needs your decision, not
+another lap. Blocking findings are always reported in full, even the ones it fixed.
 
 Same guard and same red/green gates as the manual path — it skips the *review checkpoints*,
 not the safety checks. It **stops at the first blocked increment or failed gate** rather
@@ -94,7 +131,7 @@ than pushing through, and never commits, pushes, or fixes its own review finding
 the plan is large and you'd rather catch a wrong spec early. **Use ultra when** the plan is
 well understood and you just want it built.
 
-If Stage 1 finds an existing increment file with progress in it, ultra resumes from there
+If Stage 2 finds an existing increment file with progress in it, ultra resumes from there
 instead of regenerating.
 
 ---
@@ -191,6 +228,7 @@ cd client && npm run test:watch
 |---|---|---|
 | `ond-researcher` | Investigates — codebase, rulebook PDFs, web | No |
 | `ond-planner` | Writes increment-based plans | Plans only |
+| `ond-plan-reviewer` | Audits a plan before it's built — claims, slicing, gates, scope | No |
 | `ond-incrementer` | Writes execution docs + test specs | Increment docs only |
 | `ond-executor` | Implements, test-first, one increment at a time | **Yes** |
 | `ond-reviewer` | Code correctness, React rules, project conventions | No |
@@ -200,7 +238,7 @@ cd client && npm run test:watch
 into one report. Findings are marked **CONFIRMED** (traced, definitely breaks) or
 **PLAUSIBLE** (looks wrong, unverified).
 
-All six live in `.claude/` — **project-local and gitignored**, so they exist only in this
+All seven live in `.claude/` — **project-local and gitignored**, so they exist only in this
 repo on this machine. The `Docs/` output folders *are* committed.
 
 ---
@@ -233,4 +271,8 @@ Preloaded with this project's rules, so you don't have to repeat them:
 - **Nothing commits or pushes automatically.** Every command leaves changes in the
   working tree for you to inspect.
 - **Agents can be wrong.** `/ond-review` spot-checks HIGH findings before repeating them,
-  but treat a PLAUSIBLE finding as a lead, not a verdict.
+  but treat a PLAUSIBLE finding as a lead, not a verdict. `/ond-plan-review` exists for the
+  same reason one step earlier — the planner is an agent too, and states things about the
+  codebase confidently whether or not they're true.
+- **A green suite is not a correct feature.** Both HIGH findings this workflow has caught in
+  anger came from a wrong or missing *spec*, not from bad code. That's what the plan gate is for.

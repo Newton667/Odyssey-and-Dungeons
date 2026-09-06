@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useDice } from '../context/DiceContext';
+import {
+  encodeShareCode, decodeShareCode,
+  readHomebrew, readHomebrewRaw, writeHomebrew,
+  upsertHomebrewRecord, removeHomebrewRecord, appendImportedRecord,
+  pruneToType, sanitizeImported, validateHomebrew, resetFormForType,
+  attunementChecked, setAttunement,
+  serializeProperty, parseProperty,
+  WEAPON_SUBS, ARMOR_SUBS, SCHOOLS, WEAPON_PROPERTIES,
+} from '../utils/homebrew';
+import { WEAPON_MASTERIES } from '../utils/dndConstants';
+import { getLocalEquipmentByName, getAllLocalSpells } from '../data/localDataService';
+import NumInput from '../components/NumInput';
 
 const TYPES = [
   { key: 'weapon', label: 'Weapon' },
@@ -12,12 +24,26 @@ const TYPES = [
 const RARITIES = ['common', 'uncommon', 'rare', 'very-rare', 'legendary', 'artifact'];
 const RARITY_COLORS = { common: 'var(--text-dim)', uncommon: '#1eff00', rare: '#0070ff', 'very-rare': '#a335ee', legendary: '#ff8000', artifact: '#e6cc80' };
 const DAMAGE_TYPES = ['Bludgeoning', 'Piercing', 'Slashing', 'Acid', 'Cold', 'Fire', 'Force', 'Lightning', 'Necrotic', 'Poison', 'Psychic', 'Radiant', 'Thunder'];
-const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
+// SCHOOLS / WEAPON_SUBS / ARMOR_SUBS are imported from utils/homebrew.js so the
+// pickers and validateHomebrew can never drift apart.
 const CLASSES = ['Bard', 'Cleric', 'Druid', 'Paladin', 'Ranger', 'Sorcerer', 'Warlock', 'Wizard', 'Artificer'];
-const WEAPON_SUBS = ['Simple Melee', 'Simple Ranged', 'Martial Melee', 'Martial Ranged'];
-const ARMOR_SUBS = ['Light', 'Medium', 'Heavy', 'Shield'];
-const PROPERTIES = ['Ammunition', 'Finesse', 'Heavy', 'Light', 'Loading', 'Range', 'Reach', 'Special', 'Thrown', 'Two-Handed', 'Versatile'];
+// Sensible starting values so a freshly ticked chip is already a legal property.
+const PROP_DEFAULTS = {
+  Versatile: { die: '1d10' },
+  Thrown: { normal: 20, long: 60 },
+  Ammunition: { normal: 80, long: 320 },
+};
+const VERSATILE_DICE = ['1d4', '1d6', '1d8', '1d10', '1d12'];
+// The user-facing statement of the Heavy Armor rule — a mis-set type is obvious
+// before saving rather than after the sheet computes the wrong AC.
+const AC_FORMULA = {
+  Light: 'AC + DEX',
+  Medium: 'AC + DEX (max 2)',
+  Heavy: 'AC (no DEX)',
+  Shield: '+AC (added to your total)',
+};
 
+const ERR_STYLE = { borderColor: '#f87171' };
 const DICE = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 const AMMO_TYPES = ['Arrow', 'Bolt', 'Bullet', 'Needle', 'Custom'];
 
@@ -196,12 +222,12 @@ const GEAR_SUBS = ['Adventuring Gear', 'Ammunition', 'Holy Symbol', 'Arcane Focu
 const EMPTY_FORM = {
   type: 'weapon', name: '', description: '', rarity: 'common', category: 'weapon', subcategory: '',
   cost: '', weight: '', damage: '', damageType: '', properties: [], ac: '', magical: false, bonus: 0,
-  ammoType: '', stackSize: 20, requiresAttunement: false,
-  stealthDisadvantage: false, strReq: '',
+  ammoType: '', mastery: '', stackSize: 20, requiresAttunement: false, attunement: false,
+  stealthDisadvantage: false, strReq: 0,
   level: 0, school: '', castingTime: '1 Action', range: '', components: [], materialComponent: '',
   duration: 'Instantaneous', concentration: false, ritual: false, classes: [],
   attackType: '', savingThrow: '', saveEffect: '', higherLevels: '', scaling: '',
-  aoe: false, aoeShape: '', aoeSize: '',
+  aoe: false, aoeShape: '', aoeSize: 0,
 };
 
 export default function Homebrew() {
@@ -216,29 +242,53 @@ export default function Homebrew() {
   const [importError, setImportError] = useState('');
   const [showImport, setShowImport] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [shareCode, setShareCode] = useState(null);
+  const [shareError, setShareError] = useState('');
+  // Page-level (not form-level) storage failures: Duplicate runs outside the form, so
+  // formErrors is the wrong channel for it.
+  const [storageError, setStorageError] = useState('');
   const [expanded, setExpanded] = useState(null);
-
-  const STORAGE_KEY = 'ond-homebrew';
-  const readAll = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; } };
-  const writeAll = (data) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const [formErrors, setFormErrors] = useState({});
 
   const load = () => {
-    let data = readAll();
+    let data = readHomebrew();
     if (filter) data = data.filter(i => i.type === filter);
     if (search) data = data.filter(i => i.name?.toLowerCase().includes(search.toLowerCase()));
+    // Stable sort: type in TYPES order, then name.
+    const typeOrder = t => { const i = TYPES.findIndex(x => x.key === t); return i < 0 ? TYPES.length : i; };
+    data = [...data].sort((a, b) =>
+      typeOrder(a.type) - typeOrder(b.type) || String(a.name || '').localeCompare(String(b.name || '')));
     setItems(data);
     setLoading(false);
   };
 
   useEffect(() => { load(); }, [filter, search]);
 
-  const f = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+  const f = (key, val) => {
+    setFormErrors({});
+    setForm(prev => ({ ...prev, [key]: val }));
+  };
 
   const setType = (type) => {
-    const cat = type === 'spell' ? '' : type === 'ammo' ? 'ammo' : type;
-    f('type', type);
-    f('category', cat);
+    setFormErrors({});
+    setForm(prev => resetFormForType(prev, type, EMPTY_FORM));
   };
+
+  // Properties are stored serialised, exactly as equipment.json stores them
+  // ("versatile (1d10)", "thrown (20/60)"), because that is what the sheet parses.
+  const propList = () => form.properties || [];
+  const parsedProps = propList().map(parseProperty);
+  const hasProp = (name) => parsedProps.some(pp => pp.name === name);
+  const propParams = (name) => parsedProps.find(pp => pp.name === name)?.params || {};
+  const toggleProperty = (name) => {
+    if (hasProp(name)) f('properties', propList().filter(x => parseProperty(x).name !== name));
+    else f('properties', [...propList(), serializeProperty(name, PROP_DEFAULTS[name] || {})]);
+  };
+  const setPropParams = (name, patch) => f('properties', propList().map(x => {
+    const pp = parseProperty(x);
+    return pp.name === name ? serializeProperty(name, { ...pp.params, ...patch }) : x;
+  }));
+  const unknownProps = propList().filter(x => !WEAPON_PROPERTIES.includes(parseProperty(x).name));
 
   const toggleArrayField = (key, val) => {
     setForm(prev => {
@@ -249,21 +299,44 @@ export default function Homebrew() {
 
   const save = (e) => {
     e.preventDefault();
-    const all = readAll();
+    setFormErrors({});
     const playerName = localStorage.getItem('ond-player-name') || '';
     const body = { ...form, createdBy: form.createdBy || playerName, updatedAt: new Date().toISOString() };
-    if (editing) {
-      const idx = all.findIndex(i => i._id === editing);
-      if (idx >= 0) all[idx] = { ...all[idx], ...body };
-    } else {
+    const { ok, errors } = validateHomebrew(body);
+    if (!ok) { setFormErrors(errors); return; }   // blocked: the form stays open
+    if (!editing) {
       body._id = 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       body.createdAt = new Date().toISOString();
-      all.push(body);
     }
-    writeAll(all);
+    // Raw read: a record the normalizer cannot understand must survive this save.
+    const all = upsertHomebrewRecord(readHomebrewRaw(), pruneToType(body), editing);
+    if (!writeHomebrew(all)) {
+      setFormErrors({ _save: "Could not save — your browser's storage is full." });
+      return;   // leave the form open with the user's input intact
+    }
     setCreating(false);
     setEditing(null);
     setForm({ ...EMPTY_FORM });
+    load();
+  };
+
+  const duplicateItem = (id) => {
+    // Raw read — same rule as every other mutation path.
+    const all = readHomebrewRaw();
+    const src = all.find(i => i._id === id);
+    if (!src) return;
+    const copy = {
+      ...JSON.parse(JSON.stringify(src)),
+      name: (src.name || 'Untitled') + ' (Copy)',
+      _id: 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (!writeHomebrew(appendImportedRecord(all, copy))) {
+      setStorageError("Could not duplicate — your browser's storage is full.");
+      return;
+    }
+    setStorageError('');
     load();
   };
 
@@ -275,39 +348,87 @@ export default function Homebrew() {
 
   const deleteItem = (id) => {
     if (!confirm('Delete this homebrew item?')) return;
-    const all = readAll().filter(i => i._id !== id);
-    writeAll(all);
+    // Raw read: deleting one item must not erase records the normalizer skips.
+    if (!writeHomebrew(removeHomebrewRecord(readHomebrewRaw(), id))) {
+      setStorageError("Could not delete — your browser's storage is full.");
+      return;
+    }
+    setStorageError('');
     load();
   };
 
-  const exportItem = (id) => {
-    const item = readAll().find(i => i._id === id);
+  const exportItem = async (id) => {
+    setShareError('');
+    const item = readHomebrewRaw().find(i => i._id === id);
     if (!item) return;
     const { _id, createdAt, updatedAt, ...data } = item;
-    const shareString = btoa(JSON.stringify(data));
-    navigator.clipboard.writeText(shareString);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    let code;
+    try {
+      code = encodeShareCode(data);
+    } catch {
+      setShareError('Could not build a share code for this item.');
+      return;
+    }
+    setShareCode({ id, code });            // always reveal it, clipboard or not
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      /* clipboard blocked (insecure context / denied) — the textarea is the fallback */
+    }
   };
 
   const doImport = () => {
     setImportError('');
+    let data;
     try {
-      const data = JSON.parse(atob(importStr.trim()));
-      if (!data.name || !data.type) throw new Error('Invalid item');
-      data._id = 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-      data.createdAt = new Date().toISOString();
-      data.updatedAt = new Date().toISOString();
-      const all = readAll();
-      all.push(data);
-      writeAll(all);
-      setShowImport(false);
-      setImportStr('');
-      load();
+      data = decodeShareCode(importStr);
     } catch {
-      setImportError('Invalid share code');
+      setImportError("That doesn't look like a valid share code.");
+      return;
     }
+    const result = sanitizeImported(data);
+    if (!result.ok) {
+      setImportError(result.error);
+      return;
+    }
+    const record = {
+      ...result.item,
+      _id: 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    // Raw read: importing must not erase records the normalizer skips.
+    if (!writeHomebrew(appendImportedRecord(readHomebrewRaw(), record))) {
+      setImportError("Could not import — your browser's storage is full.");
+      return;
+    }
+    setShowImport(false);
+    setImportStr('');
+    // Imported but incomplete: tell the user what to fix rather than silently accepting it.
+    const missing = result.warnings ? Object.values(result.warnings) : [];
+    setStorageError(missing.length
+      ? `Imported "${record.name}" — but it is missing: ${missing.join('; ')}. Open Edit to complete it.`
+      : '');
+    load();
   };
+
+  // Warnings are non-blocking, so they are shown live while the form is open —
+  // by the time save() succeeds the form is already closed.
+  const liveWarnings = (() => {
+    const w = { ...validateHomebrew(form).warnings };
+    const nm = (form.name || '').trim().toLowerCase();
+    if (nm) {
+      // Shadowing is sometimes deliberate, so this warns rather than blocking. It is
+      // factually what happens: CharacterSheet resolves the built-in name first.
+      const clash = readHomebrewRaw().some(i => i._id !== editing && String(i.name || '').toLowerCase() === nm)
+        || !!getLocalEquipmentByName(form.name.trim())
+        || getAllLocalSpells().some(sp => String(sp.name || '').toLowerCase() === nm);
+      if (clash) w._name = 'An item named ' + form.name.trim() + ' already exists — the character sheet will use the built-in one.';
+    }
+    return w;
+  })();
 
   const isSpell = form.type === 'spell';
   const isEquip = !isSpell;
@@ -363,7 +484,7 @@ export default function Homebrew() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '14px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Name *</label>
-              <input required value={form.name} onChange={e => f('name', e.target.value)} />
+              <input required value={form.name} onChange={e => f('name', e.target.value)} style={formErrors.name ? ERR_STYLE : undefined} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Rarity</label>
@@ -391,21 +512,21 @@ export default function Homebrew() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Subcategory</label>
-                  <select value={form.subcategory} onChange={e => f('subcategory', e.target.value)}>
+                  <select value={form.subcategory} onChange={e => f('subcategory', e.target.value)} style={formErrors.subcategory ? ERR_STYLE : undefined}>
                     <option value="">Select...</option>
                     {WEAPON_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Damage Type</label>
-                  <select value={form.damageType} onChange={e => f('damageType', e.target.value)}>
+                  <select value={form.damageType} onChange={e => f('damageType', e.target.value)} style={formErrors.damageType ? ERR_STYLE : undefined}>
                     <option value="">Select...</option>
-                    {DAMAGE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
+                    {DAMAGE_TYPES.map(d => <option key={d} value={d.toLowerCase()}>{d}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Bonus (+1/+2/+3)</label>
-                  <input type="number" min={0} max={3} value={form.bonus} onChange={e => f('bonus', parseInt(e.target.value) || 0)} />
+                  <NumInput min={0} max={3} value={form.bonus} onChange={v => f('bonus', v)} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Ammo Type</label>
@@ -414,12 +535,19 @@ export default function Homebrew() {
                     {AMMO_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Weapon Mastery (2024)</label>
+                  <select value={form.mastery || ''} onChange={e => f('mastery', e.target.value)}>
+                    <option value="">None</option>
+                    {Object.keys(WEAPON_MASTERIES).map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                     <input type="checkbox" checked={form.magical} onChange={e => f('magical', e.target.checked)} /> Magical
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                    <input type="checkbox" checked={form.requiresAttunement} onChange={e => f('requiresAttunement', e.target.checked)} /> Attunement
+                    <input type="checkbox" checked={attunementChecked(form)} onChange={e => setAttunement(f, e.target.checked)} /> Attunement
                   </label>
                 </div>
               </div>
@@ -435,13 +563,39 @@ export default function Homebrew() {
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Properties</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {PROPERTIES.map(p => (
-                  <button key={p} type="button" onClick={() => toggleArrayField('properties', p)}
-                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: form.properties.includes(p) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${form.properties.includes(p) ? 'var(--gold)' : 'var(--border)'}`, color: form.properties.includes(p) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                {WEAPON_PROPERTIES.map(p => (
+                  <button key={p} type="button" onClick={() => toggleProperty(p)}
+                    style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: hasProp(p) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${hasProp(p) ? 'var(--gold)' : 'var(--border)'}`, color: hasProp(p) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
                     {p}
                   </button>
                 ))}
+                {unknownProps.map(x => (
+                  <span key={x} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', background: 'var(--surface)', border: '1px dashed var(--border)', color: 'var(--text-dim)' }}>
+                    {x}
+                    <button type="button" onClick={() => f('properties', propList().filter(y => y !== x))}
+                      title="Remove this unrecognised property"
+                      style={{ marginLeft: '5px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: 0, fontSize: '11px' }}>✕</button>
+                  </span>
+                ))}
               </div>
+
+              {/* Parameterised properties — stored the way equipment.json stores them */}
+              {hasProp('Versatile') && (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Versatile two-handed die</span>
+                  <select value={propParams('Versatile').die || ''} onChange={e => setPropParams('Versatile', { die: e.target.value })} style={{ width: '90px' }}>
+                    {VERSATILE_DICE.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              )}
+              {['Thrown', 'Ammunition'].filter(hasProp).map(name => (
+                <div key={name} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{name} range (ft)</span>
+                  <NumInput min={0} value={propParams(name).normal ?? 0} onChange={v => setPropParams(name, { normal: v })} style={{ width: '80px' }} />
+                  <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>/</span>
+                  <NumInput min={0} value={propParams(name).long ?? 0} onChange={v => setPropParams(name, { long: v })} style={{ width: '80px' }} />
+                </div>
+              ))}
             </div>
           )}
 
@@ -450,29 +604,32 @@ export default function Homebrew() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Armor Type</label>
-                <select value={form.subcategory} onChange={e => f('subcategory', e.target.value)}>
+                <select value={form.subcategory} onChange={e => f('subcategory', e.target.value)} style={formErrors.subcategory ? ERR_STYLE : undefined}>
                   <option value="">Select...</option>
                   {ARMOR_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                  {AC_FORMULA[form.subcategory] || 'Pick an armor type — it decides how DEX applies.'}
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Base AC</label>
-                <input value={form.ac} onChange={e => f('ac', e.target.value)} placeholder="15" />
+                <NumInput min={0} max={30} value={form.ac} onChange={v => f('ac', v)} placeholder="15" style={formErrors.ac ? ERR_STYLE : undefined} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Bonus (+1/+2/+3)</label>
-                <input type="number" min={0} max={3} value={form.bonus} onChange={e => f('bonus', parseInt(e.target.value) || 0)} />
+                <NumInput min={0} max={3} value={form.bonus} onChange={v => f('bonus', v)} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>STR Requirement</label>
-                <input type="number" min={0} value={form.strReq} onChange={e => f('strReq', e.target.value)} placeholder="0" />
+                <NumInput min={0} value={form.strReq} onChange={v => f('strReq', v)} placeholder="0" />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                   <input type="checkbox" checked={form.magical} onChange={e => f('magical', e.target.checked)} /> Magical
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                  <input type="checkbox" checked={form.requiresAttunement} onChange={e => f('requiresAttunement', e.target.checked)} /> Attunement
+                  <input type="checkbox" checked={attunementChecked(form)} onChange={e => setAttunement(f, e.target.checked)} /> Attunement
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
                   <input type="checkbox" checked={form.stealthDisadvantage} onChange={e => f('stealthDisadvantage', e.target.checked)} /> Stealth Disadvantage
@@ -487,18 +644,18 @@ export default function Homebrew() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Ammo Type</label>
-                  <select value={form.ammoType} onChange={e => f('ammoType', e.target.value)}>
+                  <select value={form.ammoType} onChange={e => f('ammoType', e.target.value)} style={formErrors.ammoType ? ERR_STYLE : undefined}>
                     <option value="">Select...</option>
                     {AMMO_TYPES.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Stack Size</label>
-                  <input type="number" min={1} value={form.stackSize} onChange={e => f('stackSize', parseInt(e.target.value) || 1)} />
+                  <NumInput min={1} value={form.stackSize} onChange={v => f('stackSize', v)} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Bonus (+1/+2/+3)</label>
-                  <input type="number" min={0} max={3} value={form.bonus} onChange={e => f('bonus', parseInt(e.target.value) || 0)} />
+                  <NumInput min={0} max={3} value={form.bonus} onChange={v => f('bonus', v)} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '20px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
@@ -507,12 +664,10 @@ export default function Homebrew() {
                 </div>
               </div>
               {/* Extra damage for magical ammo */}
-              {form.damage !== undefined && (
-                <div style={{ marginBottom: '14px' }}>
-                  <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} label={`${form.name || 'Homebrew'} — Damage`} />
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Extra damage added when this ammo is used (e.g., +1d6 fire for flame arrows)</div>
-                </div>
-              )}
+              <div style={{ marginBottom: '14px' }}>
+                <DiceFormulaBuilder value={form.damage} onChange={v => f('damage', v)} label={`${form.name || 'Homebrew'} — Damage`} />
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Extra damage added when this ammo is used (e.g., +1d6 fire for flame arrows)</div>
+              </div>
             </>
           )}
 
@@ -531,7 +686,7 @@ export default function Homebrew() {
                   <input type="checkbox" checked={form.magical} onChange={e => f('magical', e.target.checked)} /> Magical
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                  <input type="checkbox" checked={form.requiresAttunement} onChange={e => f('requiresAttunement', e.target.checked)} /> Attunement
+                  <input type="checkbox" checked={attunementChecked(form)} onChange={e => setAttunement(f, e.target.checked)} /> Attunement
                 </label>
               </div>
             </div>
@@ -550,7 +705,7 @@ export default function Homebrew() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>School</label>
-                  <select value={form.school} onChange={e => f('school', e.target.value)}>
+                  <select value={form.school} onChange={e => f('school', e.target.value)} style={formErrors.school ? ERR_STYLE : undefined}>
                     <option value="">Select...</option>
                     {SCHOOLS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -571,7 +726,7 @@ export default function Homebrew() {
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Damage Type</label>
                   <select value={form.damageType} onChange={e => f('damageType', e.target.value)}>
                     <option value="">None</option>
-                    {DAMAGE_TYPES.map(d => <option key={d} value={d}>{d}</option>)}
+                    {DAMAGE_TYPES.map(d => <option key={d} value={d.toLowerCase()}>{d}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -602,7 +757,7 @@ export default function Homebrew() {
                     <input type="checkbox" checked={form.ritual} onChange={e => f('ritual', e.target.checked)} /> Ritual
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                    <input type="checkbox" checked={form.aoe} onChange={e => { f('aoe', e.target.checked); if (!e.target.checked) { f('aoeShape', ''); f('aoeSize', ''); } }} /> AOE
+                    <input type="checkbox" checked={form.aoe} onChange={e => { f('aoe', e.target.checked); if (!e.target.checked) { f('aoeShape', ''); f('aoeSize', 0); } }} /> AOE
                   </label>
                 </div>
               </div>
@@ -619,7 +774,7 @@ export default function Homebrew() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Size (ft)</label>
-                    <input type="number" value={form.aoeSize} onChange={e => f('aoeSize', e.target.value)} placeholder="20" style={{ width: '80px' }} />
+                    <NumInput min={0} value={form.aoeSize} onChange={v => f('aoeSize', v)} placeholder="20" style={{ width: '80px' }} />
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)', paddingBottom: '6px' }}>
                     {form.aoeShape && form.aoeSize ? `${form.aoeSize}-foot ${form.aoeShape.toLowerCase()}` : ''}
@@ -642,13 +797,13 @@ export default function Homebrew() {
                 </div>
               </div>
 
-              {/* Classes */}
+              {/* Spell Lists */}
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Classes</label>
+                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Spell Lists</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                   {CLASSES.map(c => (
                     <button key={c} type="button" onClick={() => toggleArrayField('classes', c)}
-                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: form.classes.includes(c) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${form.classes.includes(c) ? 'var(--gold)' : 'var(--border)'}`, color: form.classes.includes(c) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: (form.classes || []).includes(c) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${(form.classes || []).includes(c) ? 'var(--gold)' : 'var(--border)'}`, color: (form.classes || []).includes(c) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
                       {c}
                     </button>
                   ))}
@@ -675,19 +830,6 @@ export default function Homebrew() {
                 </div>
               )}
 
-              {/* Classes */}
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Spell Lists (Classes)</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                  {CLASSES.map(c => (
-                    <button key={c} type="button" onClick={() => toggleArrayField('classes', c)}
-                      style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer', background: (form.classes || []).includes(c) ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${(form.classes || []).includes(c) ? 'var(--gold)' : 'var(--border)'}`, color: (form.classes || []).includes(c) ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Higher Levels */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '14px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>At Higher Levels (description)</label>
@@ -701,6 +843,17 @@ export default function Homebrew() {
             <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Description *</label>
             <textarea required rows={4} value={form.description} onChange={e => f('description', e.target.value)} placeholder="Describe your creation..." style={{ resize: 'vertical' }} />
           </div>
+
+          {Object.keys(formErrors).length > 0 && (
+            <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '10px', padding: '8px 10px', border: '1px solid #f87171', borderRadius: '6px', background: 'rgba(248, 113, 113, 0.08)' }}>
+              {Object.entries(formErrors).map(([k, msg]) => <div key={k}>{msg}</div>)}
+            </div>
+          )}
+          {Object.keys(liveWarnings).length > 0 && (
+            <div style={{ color: '#fbbf24', fontSize: '13px', marginBottom: '10px', padding: '8px 10px', border: '1px solid #fbbf24', borderRadius: '6px', background: 'rgba(251, 191, 36, 0.08)' }}>
+              {Object.entries(liveWarnings).map(([k, msg]) => <div key={k}>{msg}</div>)}
+            </div>
+          )}
 
           <button type="submit" className="btn btn-primary">{editing ? 'Save Changes' : 'Create'}</button>
         </form>
@@ -716,6 +869,10 @@ export default function Homebrew() {
       </div>
 
       {/* Item List */}
+      {storageError && (
+        <div style={{ color: storageError.startsWith('Imported') ? 'var(--gold)' : '#f87171', fontSize: '13px', marginBottom: '10px' }}>{storageError}</div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-dim)' }}>Loading...</div>
       ) : items.length === 0 ? (
@@ -730,7 +887,7 @@ export default function Homebrew() {
             const isExpanded = expanded === item._id;
             return (
               <div key={item._id} className="card" style={{ padding: '12px 16px', borderLeft: `3px solid ${rc}`, cursor: 'pointer' }}
-                onClick={() => setExpanded(isExpanded ? null : item._id)}>
+                onClick={() => { setExpanded(isExpanded ? null : item._id); setShareError(''); }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontWeight: 600, color: rc, fontSize: '15px' }}>{item.name}</span>
@@ -775,8 +932,24 @@ export default function Homebrew() {
                         {copiedId === item._id ? '✓ Copied!' : 'Copy Share Code'}
                       </button>
                       <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 12px' }} onClick={() => startEdit(item)}>Edit</button>
+                      <button className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 12px' }} onClick={() => duplicateItem(item._id)}>Duplicate</button>
                       <button className="btn btn-danger" style={{ fontSize: '12px', padding: '4px 12px' }} onClick={() => deleteItem(item._id)}>Delete</button>
                     </div>
+
+                    {shareError && shareCode?.id !== item._id && (
+                      <div style={{ color: '#f87171', fontSize: '12px', marginTop: '8px' }}>{shareError}</div>
+                    )}
+
+                    {shareCode?.id === item._id && (
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                          {copiedId === item._id ? 'Copied to clipboard' : 'Select and copy this code'}
+                        </div>
+                        <textarea readOnly value={shareCode.code} rows={3}
+                          onFocus={e => e.target.select()}
+                          style={{ width: '100%', fontSize: '11px', fontFamily: 'monospace', padding: '8px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', resize: 'vertical' }} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

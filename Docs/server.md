@@ -246,6 +246,10 @@ Express entry point.
 }
 ```
 > The in-app Homebrewer page (`Homebrew.jsx`) is **100% localStorage** (`ond-homebrew` key) and does not call any of the `/api/homebrew` routes below. Those routes back the DB-side share/import flow only.
+>
+> **These routes stay dormant, deliberately.** Wiring them up would contradict the CLAUDE.md rule that equipment and spells use local JSON by default and characters are local-only; deleting them would remove the DB-mode counterpart that `/api/equipment` and `/api/spells` still have.
+>
+> Worth recording: `routes/homebrew.js` encodes and decodes its share strings with `Buffer.from(...).toString('base64')`, which is **UTF-8-correct**. The client was the broken side — it used `btoa` on a raw JS string, which throws on any codepoint above 255. The client's `decodeShareCode` (`utils/homebrew.js`) now decodes UTF-8 first, so codes produced by these routes are readable by the client.
 
 ---
 

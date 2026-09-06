@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useDice } from '../context/DiceContext';
 import { queryLocalEquipment } from '../data/localDataService';
+import { readHomebrew, matchesEquipCategory } from '../utils/homebrew';
 
 const CATEGORIES = [
   { value: '', label: 'All' },
@@ -30,10 +31,23 @@ const RARITY_COLORS = {
   artifact: '#e6cc80',
 };
 
+// All 13 damage types, matching the map in Spells.jsx. Extended from the three
+// physical types so a homebrew fire/radiant/psychic weapon actually picks up a
+// colour instead of falling back.
 const DMG_COLORS = {
   bludgeoning: '#a1887f',
   piercing: '#90a4ae',
   slashing: '#b0bec5',
+  acid: '#8bc34a',
+  cold: '#4fc3f7',
+  fire: '#e8652b',
+  force: '#7c4dff',
+  lightning: '#ffe066',
+  necrotic: '#78909c',
+  poison: '#66bb6a',
+  psychic: '#ec407a',
+  radiant: '#ffd54f',
+  thunder: '#b39ddb',
 };
 
 function rarityColor(rarity) {
@@ -106,14 +120,12 @@ export default function Equipment() {
           alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
-    // Load homebrew equipment from localStorage
-    try {
-      let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell');
-      if (filter.search) hb = hb.filter(i => i.name?.toLowerCase().includes(filter.search.toLowerCase()));
-      if (filter.category) hb = hb.filter(i => i.category === filter.category || i.type === filter.category);
-      if (filter.rarity) hb = hb.filter(i => i.rarity === filter.rarity);
-      setHomebrewItems(hb);
-    } catch { setHomebrewItems([]); }
+    // Load homebrew equipment (normalised on read by utils/homebrew.js)
+    let hb = readHomebrew({ notType: 'spell' });
+    if (filter.search) hb = hb.filter(i => i.name?.toLowerCase().includes(filter.search.toLowerCase()));
+    if (filter.category) hb = hb.filter(i => matchesEquipCategory(i, filter.category));
+    if (filter.rarity) hb = hb.filter(i => i.rarity === filter.rarity);
+    setHomebrewItems(hb);
   }, [filter, useLocal]);
 
   useEffect(() => { load(); }, [load]);
@@ -274,8 +286,15 @@ export default function Equipment() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <span style={{ fontWeight: 600, color: rc, fontSize: '14px' }}>{item.name}</span>
+                      {item.attunement && <span style={{ fontSize: '10px', marginLeft: '6px', color: 'var(--text-dim)', fontWeight: 400 }}>(A)</span>}
                       <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '8px' }}>
-                        {item.type} {item.damage ? `· ${item.damage} ${item.damageType || ''}` : ''} {item.ac ? `· AC ${item.ac}` : ''}
+                        {item.type}
+                        {item.damage && (
+                          <span style={{ color: DMG_COLORS[item.damageType] || 'var(--text-dim)' }}>
+                            {` · ${item.damage} ${item.damageType || ''}`}
+                          </span>
+                        )}
+                        {item.ac ? ` · AC ${item.ac}` : ''}
                       </span>
                       {item.createdBy && <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '8px' }}>by {item.createdBy}</span>}
                     </div>
@@ -287,6 +306,8 @@ export default function Equipment() {
                       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px' }}>
                         {item.cost && <span>Cost: {item.cost}</span>}
                         {item.weight && <span>Weight: {item.weight}</span>}
+                        {item.attunement && <span>(requires attunement)</span>}
+                        {item.strReq > 0 && <span>Strength Required: {item.strReq}</span>}
                         {item.properties?.length > 0 && <span>Properties: {item.properties.join(', ')}</span>}
                       </div>
                     </div>

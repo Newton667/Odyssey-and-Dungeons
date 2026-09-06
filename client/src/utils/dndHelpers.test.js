@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames } from './dndHelpers';
+import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames, weaponRangeText, cantripDamage, cantripTierBonus } from './dndHelpers';
 import { parseDiceFormula } from './diceFormula';
 
 // Seed test suite — also the reference pattern for tests written by /execute.
@@ -154,5 +154,113 @@ describe('normalizeFeatNames', () => {
 
   it('only ever returns strings', () => {
     expect(normalizeFeatNames([{ name: 'Alert' }]).every(f => typeof f === 'string')).toBe(true);
+  });
+});
+
+// The Actions-row range string. equipment.json stores ammunition weapons as
+// "ammunition (150/600)" — 14 entries carry an `ammunition (` property — and the
+// old predicate matched only 'range' or 'thrown', so the .find() always missed
+// and every bow, crossbow and sling fell through to the hardcoded '80/320 ft.'
+
+describe('weaponRangeText', () => {
+  it('finds the ammunition parenthetical instead of falling back', () => {
+    expect(weaponRangeText(['ammunition (150/600)', 'two-handed', 'heavy'], true)).toBe('ammunition (150/600)');
+    expect(weaponRangeText(['ammunition (30/120)'], true)).toBe('ammunition (30/120)');   // Sling
+  });
+
+  it('does not regress the thrown branch', () => {
+    expect(weaponRangeText(['thrown (20/60)', 'light'], false)).toBe('thrown (20/60)');   // Handaxe
+  });
+
+  it('falls back to melee reach for a weapon with no range property', () => {
+    expect(weaponRangeText(['finesse', 'light'], false)).toBe('5 ft.');                   // Shortsword
+    expect(weaponRangeText([], false)).toBe('5 ft.');                                     // Longsword
+  });
+
+  it('keeps the ranged fallback for a ranged weapon with no parenthetical', () => {
+    expect(weaponRangeText([], true)).toBe('80/320 ft.');
+  });
+
+  it('handles the optional-chain case where properties is undefined', () => {
+    expect(weaponRangeText(undefined, false)).toBe('5 ft.');
+    expect(weaponRangeText(undefined, true)).toBe('80/320 ft.');
+  });
+
+  it('matches case-insensitively but returns the string verbatim', () => {
+    expect(weaponRangeText(['Ammunition (80/320)'], true)).toBe('Ammunition (80/320)');
+  });
+});
+
+// Cantrip damage scales by CHARACTER level on the 5/11/17 tiers (PHB p.211,
+// Acid Splash), in both 2014 and 2024. It is not slot-based — neither edition
+// upcasts a cantrip with a slot. The exclusion list is what keeps this from
+// being a regression: a blanket "level-0 with dice scales" rule mis-scales at
+// least 19 spells.json entries (4 class cantrips and all 15 source: 'race').
+
+describe('cantripTierBonus', () => {
+  it('follows the 5/11/17 tiers at and between every boundary', () => {
+    expect(cantripTierBonus(1)).toBe(0);
+    expect(cantripTierBonus(4)).toBe(0);
+    expect(cantripTierBonus(5)).toBe(1);
+    expect(cantripTierBonus(10)).toBe(1);
+    expect(cantripTierBonus(11)).toBe(2);
+    expect(cantripTierBonus(16)).toBe(2);
+    expect(cantripTierBonus(17)).toBe(3);
+    expect(cantripTierBonus(20)).toBe(3);
+    expect(cantripTierBonus(undefined)).toBe(0);
+  });
+});
+
+describe('cantripDamage', () => {
+  it('adds a die at 5, 11 and 17 for an ordinary class cantrip', () => {
+    expect(cantripDamage({ level: 0, name: 'Fire Bolt', damage: '1d10', source: 'class' }, 1)).toBe('1d10');
+    expect(cantripDamage({ level: 0, name: 'Fire Bolt', damage: '1d10', source: 'class' }, 4)).toBe('1d10');
+    expect(cantripDamage({ level: 0, name: 'Fire Bolt', damage: '1d10', source: 'class' }, 5)).toBe('2d10');
+    expect(cantripDamage({ level: 0, name: 'Fire Bolt', damage: '1d10', source: 'class' }, 11)).toBe('3d10');
+    expect(cantripDamage({ level: 0, name: 'Fire Bolt', damage: '1d10', source: 'class' }, 17)).toBe('4d10');
+  });
+
+  it('excludes Eldritch Blast — the rule is more beams, not more dice', () => {
+    expect(cantripDamage({ level: 0, name: 'Eldritch Blast', damage: '1d10', source: 'class' }, 17)).toBe('1d10');
+  });
+
+  it('excludes Magic Stone — no level progression at all', () => {
+    expect(cantripDamage({ level: 0, name: 'Magic Stone', damage: '1d6', source: 'class' }, 17)).toBe('1d6');
+  });
+
+  it('excludes Shillelagh — a weapon buff, no level progression', () => {
+    expect(cantripDamage({ level: 0, name: 'Shillelagh', damage: '1d8', source: 'class' }, 17)).toBe('1d8');
+  });
+
+  it('excludes Green-Flame Blade — its stored 1d8 is already the 5th-level value', () => {
+    expect(cantripDamage({ level: 0, name: 'Green-Flame Blade', damage: '1d8', source: 'class' }, 17)).toBe('1d8');
+  });
+
+  it("excludes every source: 'race' pseudo-spell — Dragonborn breath uses 1/6/11/16", () => {
+    expect(cantripDamage({ level: 0, name: 'Breath Weapon (Red — Fire)', damage: '2d6', source: 'race' }, 17)).toBe('2d6');
+  });
+
+  it('does NOT exclude Booming Blade — a guard against over-broad exclusion', () => {
+    expect(cantripDamage({ level: 0, name: 'Booming Blade', damage: '1d8', source: 'class' }, 17)).toBe('4d8');
+  });
+
+  it('scales homebrew cantrips by design — a homebrew record has no source', () => {
+    expect(cantripDamage({ level: 0, name: 'Ashen Spark', damage: '1d6', homebrew: true }, 11)).toBe('3d6');
+  });
+
+  it('scales at mid-tier levels, not only at the boundaries', () => {
+    expect(cantripDamage({ level: 0, name: 'Acid Splash', damage: '1d6', source: 'class' }, 10)).toBe('2d6');
+    expect(cantripDamage({ level: 0, name: 'Acid Splash', damage: '1d6', source: 'class' }, 16)).toBe('3d6');
+  });
+
+  it('leaves non-cantrips, damageless cantrips and non-NdM strings alone', () => {
+    expect(cantripDamage({ level: 3, name: 'Fireball', damage: '8d6', source: 'class' }, 17)).toBe('8d6');
+    expect(cantripDamage({ level: 0, name: 'Guidance', damage: undefined, source: 'class' }, 17)).toBeUndefined();
+    expect(cantripDamage({ level: 0, name: 'X', damage: '1d6 + mod', source: 'class' }, 17)).toBe('1d6 + mod');
+  });
+
+  it('returns undefined for a missing spell', () => {
+    expect(cantripDamage(null, 17)).toBeUndefined();
+    expect(cantripDamage(undefined, 17)).toBeUndefined();
   });
 });

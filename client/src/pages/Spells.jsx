@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useDice } from '../context/DiceContext';
 import { queryLocalSpells } from '../data/localDataService';
+import { readHomebrew } from '../utils/homebrew';
+import { cantripDamage } from '../utils/dndHelpers';
 
 const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
 const ALL_CLASSES = ['Artificer', 'Bard', 'Cleric', 'Druid', 'Ranger', 'Sorcerer', 'Warlock', 'Wizard'];
@@ -47,22 +49,6 @@ function dmgColor(type) {
 function DmgIcon({ type, size = 14, color }) {
   const render = DMG_ICONS[type];
   return render ? render(size, color || dmgColor(type)) : null;
-}
-
-/* ── dice helpers ── */
-function parseDice(expr) {
-  const m = expr.match(/^(\d+)d(\d+)$/);
-  return m ? { count: Number(m[1]), sides: Number(m[2]) } : null;
-}
-
-function scaledDice(baseDice, charLevel) {
-  const d = parseDice(baseDice);
-  if (!d) return baseDice;
-  let extra = 0;
-  if (charLevel >= 17) extra = 3;
-  else if (charLevel >= 11) extra = 2;
-  else if (charLevel >= 5) extra = 1;
-  return `${d.count + extra}d${d.sides}`;
 }
 
 /* ── component ── */
@@ -113,15 +99,13 @@ export default function Spells() {
           alert('Database not connected. Switched to Local mode.\n\nTo use Database mode, add a MongoDB connection string in Settings.');
         });
     }
-    // Load homebrew spells from localStorage
-    try {
-      let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
-      if (filter.search) hb = hb.filter(s => s.name?.toLowerCase().includes(filter.search.toLowerCase()));
-      if (filter.level !== '') hb = hb.filter(s => s.level === Number(filter.level));
-      if (filter.school) hb = hb.filter(s => s.school === filter.school);
-      if (filter.cls) hb = hb.filter(s => s.classes?.some(c => c.toLowerCase() === filter.cls.toLowerCase()));
-      setHomebrewSpells(hb);
-    } catch { setHomebrewSpells([]); }
+    // Load homebrew spells (normalised on read by utils/homebrew.js)
+    let hb = readHomebrew({ type: 'spell' });
+    if (filter.search) hb = hb.filter(s => s.name?.toLowerCase().includes(filter.search.toLowerCase()));
+    if (filter.level !== '') hb = hb.filter(s => s.level === Number(filter.level));
+    if (filter.school) hb = hb.filter(s => s.school === filter.school);
+    if (filter.cls) hb = hb.filter(s => s.classes?.some(c => c.toLowerCase() === filter.cls.toLowerCase()));
+    setHomebrewSpells(hb);
   }, [filter, useLocal]);
 
   useEffect(() => { load(); }, [load]);
@@ -296,7 +280,7 @@ export default function Spells() {
             const hasDamage = !!s.damage;
             const hasAttack = !!s.attackType;
             const hasSave = !!s.savingThrow;
-            const dmgDice = (s.scaling === 'cantrip' && hasDamage) ? scaledDice(s.damage, charLevel) : s.damage;
+            const dmgDice = cantripDamage(s, charLevel) ?? s.damage;
             const hitRes = rollResults[s._id + '_hit'];
             const dmgRes = rollResults[s._id + '_damage'];
             const hitFresh = hitRes && (Date.now() - hitRes.ts) < 60000;

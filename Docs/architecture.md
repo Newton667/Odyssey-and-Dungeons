@@ -40,7 +40,7 @@ OND/
 ### Local-First Architecture
 1. **Characters**: Local only. The character list, sheet, and creation flow read/write `localStorage` and mirror to `server/data/characters/` JSON files when the server is reachable. There is **no MongoDB sync** for characters (see Sync Flow below).
 2. **Equipment & Spells**: Bundled as static JSON in `client/src/data/`, loaded at import time
-3. **Homebrew**: Saved to `localStorage` under `ond-homebrew` key
+3. **Homebrew**: Saved to `localStorage` under `ond-homebrew` key, accessed **only** through `client/src/utils/homebrew.js`. Consumers read via `readHomebrew()`, which normalises old records in memory (legacy field names, missing lists, text where a number belongs) and hides anything it cannot understand. Mutations (`save`/`delete`/`import`/`duplicate`) read via `readHomebrewRaw()` and rewrite only the record the user touched — everything else, including records the normaliser skips, is passed through untouched. There is no migration pass and no schema-version field.
 4. **Settings/Preferences**: All in `localStorage` (themes, layouts, widget positions)
 
 ### Sync Flow (useCharacterSync hook)

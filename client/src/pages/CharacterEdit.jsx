@@ -12,6 +12,7 @@ import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellL
 import { CLASSES, RACES, SAVING_THROWS_BY_CLASS } from '../utils/classData';
 import { getCharClasses, isMulticlass, syncPrimaryFromClasses, formatHitDice, formatClasses } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
+import { readHomebrew } from '../utils/homebrew';
 
 // Skill count by class
 const CLASS_NUM_SKILLS = {
@@ -1379,7 +1380,16 @@ export default function CharacterEdit() {
               {spellOverride && (() => {
                 const current = form.preparedSpells || [];
                 const addSpell = (n) => { const name = (n || '').trim(); if (name && !current.includes(name)) set('preparedSpells', [...current, name]); };
-                const results = overrideSpellSearch.trim() ? queryLocalSpells({ search: overrideSpellSearch.trim() }).slice(0, 40) : [];
+                const q = overrideSpellSearch.trim();
+                // Union homebrew spells in, de-duplicated by lowercased name so a
+                // homebrew spell shadowing a stock one does not appear twice.
+                const results = q ? (() => {
+                  const local = queryLocalSpells({ search: q });
+                  const seen = new Set(local.map(sp => sp.name.toLowerCase()));
+                  const hb = readHomebrew({ type: 'spell' })
+                    .filter(sp => sp.name.toLowerCase().includes(q.toLowerCase()) && !seen.has(sp.name.toLowerCase()));
+                  return [...local, ...hb].slice(0, 40);
+                })() : [];
                 return (
                   <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--gold-dim)', borderRadius: '6px' }}>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>

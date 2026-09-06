@@ -142,7 +142,7 @@ Static D&D 5e reference data.
 - `WEAPON_MASTERY_MAP` — Maps each base weapon name to its mastery type (e.g., Greatsword → Graze, Dagger → Nick)
 - `WEAPON_MASTERY_CLASSES` — Classes with Weapon Mastery feature and mastery slot progression per level (Fighter, Barbarian, Rogue, Paladin, Ranger, Monk)
 
-### dndHelpers.js (~106 lines)
+### dndHelpers.js (~230 lines)
 Calculation and formatting helpers.
 
 **Key Functions:**
@@ -161,6 +161,40 @@ Calculation and formatting helpers.
 - `normalizeFeatNames(feats)` — Feat arrays hold names **or** `{name, prereq, desc}` objects from old saves; returns names only, dropping nulls/nameless entries. Use before any `.includes('Feat Name')`.
 - `weaponDamageDice(damage)` — Strips the flat modifier baked into a weapon's damage string (`'1d8+1'` → `'1d8'`), keeping multi-group damage intact (`'1d8 + 2d6 fire'` unchanged). Returns `null` when there are no dice (`'1'`, `'—'`). Needed because `equipment.json` stores a magic bonus in **both** `damage` and `bonus`.
 - `weaponDamageFormula(damage, dmgBonus, riderSuffix='')` — Builds the sheet's damage-button roll string from the sanitized dice + the modifier + any weapon-rider die. Returns `null` when the weapon has no rollable damage (the Net's `'—'` is truthy but is not damage). The button's label must render this same string.
+- `weaponRangeText(properties, isRanged)` — The Actions-row range string. Matches `range`, `thrown` **or `ammunition`** inside the property list and returns the stored string verbatim, falling back to `'80/320 ft.'` / `'5 ft.'`. The missing `ammunition` term is why every bow, crossbow and sling used to display `80/320 ft.`
+- `cantripTierBonus(charLevel)` — Extra cantrip damage dice at character level: `>=17 → 3`, `>=11 → 2`, `>=5 → 1`, else `0`.
+- `cantripDamage(spell, charLevel)` — A cantrip's damage at a given **character** level (not slot level — neither edition upcasts a cantrip). Keys on `level === 0` plus an exclusion list, deliberately **not** on `scaling`. Returns `spell.damage` unchanged for non-cantrips, damageless cantrips, non-`NdM` strings, `source: 'race'` pseudo-spells, and anything in `CANTRIP_NO_SCALE`.
+- `CANTRIP_NO_SCALE` — `Set` of `Eldritch Blast` (gains *beams*, not dice: 1/2/3/4 separate attack rolls at 5/11/17), `Magic Stone` and `Shillelagh` (no level progression at all), and `Green-Flame Blade` (its stored `1d8` is already the 5th-level value, so scaling would run one die high). **Booming Blade is deliberately not in the set** — its `1d8` really does go 1d8/2d8/3d8/4d8. Racial pseudo-spells are excluded separately by `source === 'race'`, because the Dragonborn breath weapons use 1/6/11/16, a different tier set. Homebrew cantrips have no `source` and so scale by design.
+
+### homebrew.js (~380 lines)
+The single door to the `ond-homebrew` localStorage key, plus the pure logic the Homebrewer page used to keep inside its component. **Which function you use depends on whether you are reading or writing, and this is a safety property, not a style choice** — see known-patterns-and-gotchas.md → "Homebrew: normalise on read".
+
+**Reading — for display and consumption:**
+- `readHomebrew(opts)` — `readHomebrewRaw()` → `normalizeHomebrewItem` → drop nulls, then optional `opts.type` / `opts.notType`. Never throws. **Every consumer uses this**: `CharacterSheet.jsx` (×4), `Spells.jsx`, `Equipment.jsx`, `CharacterEdit.jsx`.
+
+**Reading — for mutation only:**
+- `readHomebrewRaw()` — `JSON.parse` in a `try`, non-array coerced to `[]`, **no normalisation, no dropping**. `save`, `deleteItem`, `doImport` and Duplicate all read through this.
+
+**Writing:**
+- `writeHomebrew(items)` — returns `false` on a quota failure instead of throwing, so the caller can tell the user and keep their input.
+- `upsertHomebrewRecord(all, record, editingId)` / `removeHomebrewRecord(all, id)` / `appendImportedRecord(all, record)` — pure array transforms that touch only the targeted record and pass everything else through untouched. They are exported (rather than inlined in the page) precisely so the preservation property is unit-testable in a repo with no DOM.
+
+**Normalisation and schema:**
+- `normalizeHomebrewItem(raw)` — tolerant, never throws, returns `null` when `type` is not in `HOMEBREW_TYPES` or `name` is not a non-empty string. Coerces `properties`/`components`/`classes` to string arrays (they may hold `{name}` objects from old saves), canonicalises `requiresAttunement` → `attunement` (keeping both), lowercases `damageType`, and coerces numbers with `parseInt` and an explicit fallback — `bonus: 0`, `level: 0`, `strReq: 0`, `stackSize: 20`, `aoeSize: 0`, and **`ac: ''`** (a blank armor AC must stay blank, not become 0). Sets `homebrew: true`. Does **not** prune keys.
+- `HOMEBREW_TYPES`, `TYPE_FIELDS` — the per-type field table (one data-driven map, no `if` chains).
+- `pruneToType(item)` — keeps only `TYPE_FIELDS[type]` plus `_id`/`createdAt`/`updatedAt`. Used **only on save**, so a type switch actually cleans up. Writes `attunement` and `requiresAttunement` in sync.
+- `validateHomebrew(item)` → `{ ok, errors, warnings }`. Blocking only where the sheet mis-computes; the `M`-component and duplicate-name cases are warnings.
+- `sanitizeImported(data)` → `{ ok: true, item }` or `{ ok: false, error }`. Rejects non-objects, arrays, unknown types and blobs over 64 KB; prunes hostile extra keys rather than storing them.
+
+**Share codes:**
+- `encodeShareCode(obj)` / `decodeShareCode(code)` — UTF-8-safe base64. Decode strips whitespace, throws on empty or malformed input, and tries **UTF-8 first, Latin-1 second**. That order is load-bearing; see the gotchas doc.
+
+**Form and consumer helpers:**
+- `resetFormForType(prevForm, type, emptyForm)` — what the type buttons call. Resets fields the new type does not use to their `emptyForm` values (keeping every key, so unguarded `form.properties.includes(...)` cannot throw) while preserving `name`/`description`/`rarity`. `categoryForType(type)` gives the `category` value consumers key on.
+- `WEAPON_PROPERTIES` / `serializeProperty(name, params)` / `parseProperty(str)` — round-trip the parameterised properties in the exact form `equipment.json` uses (`versatile (1d10)`, `thrown (20/60)`, `ammunition (150/600)`); everything else is plain lowercase. An unrecognised stored property passes through unchanged.
+- `matchesEquipCategory(item, cat)` / `HB_CATEGORY_ALIASES` — the category test for both equipment browsers. Homebrew writes `category: 'item'` / `'ammo'`, but the dropdowns offer `adventuring-gear` / `tool` / `pack`, so the plain equality test never matched.
+- `defaultAmmoCount(name, item)` — starting rounds for a stack: a `(N)` group in the **name** wins (that is how `equipment.json` ships ammo), then `item.stackSize` when it is a positive integer, then `20`.
+- `WEAPON_SUBS` / `ARMOR_SUBS` / `SCHOOLS` — shared by the Homebrewer's pickers and `validateHomebrew` so the two cannot drift apart.
 
 ### diceFormula.js
 - `parseDiceFormula(formula)` → `{ dice: [{die, sides}], staticBonus, hasDice, d1Count }`. The single dice-string parser, used by `DiceContext.rollDice3D` and by the sheet's advantage/disadvantage bonus (a regex there used to drop negative modifiers, since a negative renders as `1d20+-2`). Sums **all** modifiers including negatives; folds `d1` dice into `staticBonus` (`d1Count` lets a caller rebuild the d1-only result shape); with no dice groups it still sums bare integers, so `'1'` → 1 and `'—'` → 0. A non-string input passes straight through, so the array form of `rollDice3D` keeps working. **A countless die is one die** — the regex is `/(\d*)d(\d+)/g` with `count = m[1] || 1`, so `'d10'` (the shape of `CLASSES[cls].hitDice`) parses as a single d10 rather than a flat +10; reading it as a modifier is what made level-up HP always roll maximum. See known-patterns-and-gotchas.md → "`CLASSES[cls].hitDice` is a bare `'d10'`".

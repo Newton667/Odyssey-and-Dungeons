@@ -88,42 +88,51 @@ Edit form for existing characters with tabbed sections:
 - ImageCropper for portrait editing
 - **Data flow:** CharacterEdit is server-oriented — it `fetch`es the character from `/api/characters/:id` on load and `PUT`s the object back on save — but falls back to `localStorage` (`ond-char-{id}`) when the server has no copy, so local-only characters (`local-` id) can be edited and saved offline. Saves write the merged local copy first, then hit the server for non-local ids. Portrait uploads go through `POST /api/upload`. See `known-patterns-and-gotchas.md` → "CharacterEdit Server + Local Fallback."
 
-## Spells.jsx (~599 lines)
+## Spells.jsx (~585 lines)
 Spell browser/reference page.
 - Filters: level, school, class, search text
 - Uses local JSON data from `client/src/data/spells.json`
-- Shows homebrew spells from localStorage
+- Shows homebrew spells, read through `readHomebrew({ type: 'spell' })` (`utils/homebrew.js`), which normalises old records on the way out
+- Cantrip damage scales with the level box (5/11/17) via the shared `cantripDamage` helper — the page's local `scaledDice` is gone
 - Expandable spell cards with full details
 - Roll buttons for damage/healing spells (3D dice)
 - Rarity coloring for magical spells
 - Blue AOE badge showing shape and size (e.g., "AOE: 20ft Sphere")
 
-## Equipment.jsx (~621 lines)
+## Equipment.jsx (~644 lines)
 Equipment browser/reference page.
 - Filters: category (weapons/armor/gear/tools), rarity, search
 - Uses local JSON data from `client/src/data/equipment.json`
-- Shows homebrew items from localStorage
+- Shows homebrew items, read through `readHomebrew({ notType: 'spell' })` (`utils/homebrew.js`)
+- The category filter uses `matchesEquipCategory`, so homebrew Item/Gear and Ammo appear under "Adventuring Gear" / "Tool" / "Pack" (they store `category: 'item'` / `'ammo'`)
+- Homebrew rows render attunement (`(A)` badge and "(requires attunement)" when expanded), "Strength Required: N", and damage coloured by `DMG_COLORS` — which now covers all 13 damage types, not just the three physical ones
 - Expandable cards with properties, damage, weight, cost
 - Roll buttons for weapon damage
 - Rarity color coding (common→artifact)
 
-## Homebrew.jsx (~788 lines)
+## Homebrew.jsx (~943 lines)
 Custom content creator.
 - Create: spells, weapons, armor, items, ammo
-- **DiceFormulaBuilder** — Visual dice formula creator (choose die type + count + modifier) with "Test Roll" button that rolls the formula using 3D dice and shows the full equation inline
-- **Share System** — Export to base64 string, import from pasted string. All fields included automatically.
+- **DiceFormulaBuilder** — Visual dice formula creator (choose die type + count + modifier) with "Test Roll" button that rolls the formula using 3D dice and shows the full equation inline. Module scope, not defined inside the page component.
+- **Share System** — UTF-8-safe base64 via `encodeShareCode` / `decodeShareCode` (`utils/homebrew.js`). The code is always shown in a read-only, select-on-focus textarea under the item, so a blocked clipboard is not a dead end. Import decodes UTF-8 first and legacy Latin-1 second, then runs `sanitizeImported` and reports why a code was rejected.
+- **All storage goes through `utils/homebrew.js`.** The page reads its list with `readHomebrew()` (normalising) but every mutation — save, delete, import, duplicate — reads `readHomebrewRaw()`, so a record the normaliser cannot understand is hidden from lists but never written out of existence.
+- **Per-type validation** (`validateHomebrew`) blocks a save only where the sheet would otherwise mis-compute: name; weapon category/damage/damage type; armor type and base AC (1-30, shields 1-5); ammo type; spell level 0-9, school, and upcast scaling only on levelled spells. An `M` component with no material text is an **amber warning**, not a block, as is a name that collides with an existing item.
+- **Type switching clears the old type's fields** (`resetFormForType`); `pruneToType` on save means junk keys from an earlier type cannot survive an edit.
+- **Duplicate** button next to Edit; the list is sorted by type then name.
+- A failed write (storage full) keeps the form open with the user's input and says so.
 - All data saved to localStorage (`ond-homebrew` key)
-- Homebrew items appear in Spells/Equipment browsers and character sheet
+- Homebrew items appear in Spells/Equipment browsers, the character sheet, and the character editor's spell override search
 
 **Spell fields:** Level, school, casting time, range, duration, damage type, attack type (melee/ranged), saving throw (STR-CHA) + save effect, concentration, ritual, AOE (shape + size), components (V/S/M + material), classes (multi-select), damage formula + scaling, higher levels description
 
-**Weapon fields:** Subcategory (Simple/Martial Melee/Ranged), damage formula + type, bonus (+1/+2/+3), ammo type, properties (Finesse/Heavy/Light/etc.), magical, attunement
+**Weapon fields:** Subcategory (Simple/Martial Melee/Ranged), damage formula + type, bonus (+1/+2/+3), ammo type, **Weapon Mastery (2024)**, properties, magical, attunement.
+Properties are the ten real PHB entries (Ammunition, Finesse, Heavy, Light, Loading, Reach, Special, Thrown, Two-Handed, Versatile) — **"Range" was removed**, it is a glossary heading, not a property. Versatile, Thrown and Ammunition carry their parameters and are stored exactly as `equipment.json` stores them (`versatile (1d10)`, `thrown (20/60)`, `ammunition (80/320)`), which is what the sheet parses. An unrecognised property from an old save is shown as a read-only chip with an ✕.
 
-**Armor fields:** Type (Light/Medium/Heavy/Shield), base AC, bonus (+1/+2/+3), STR requirement, stealth disadvantage, magical, attunement
+**Armor fields:** Type (Light/Medium/Heavy/Shield), base AC, bonus (+1/+2/+3), STR requirement, stealth disadvantage, magical, attunement. The armor type shows its AC formula live (`Light → AC + DEX`, `Medium → AC + DEX (max 2)`, `Heavy → AC (no DEX)`, `Shield → +AC`).
 
 **Item/Gear fields:** Subcategory (Adventuring Gear/Potion/Scroll/Wondrous Item/etc.), magical, attunement
 
-**Ammo fields:** Ammo type, stack size, bonus, magical, extra damage formula
+**Ammo fields:** Ammo type, stack size, bonus, magical, extra damage formula. Stack size now sets the starting count on the sheet (via `defaultAmmoCount`, unless the item name carries its own `(N)`), and the extra damage dice are added to the weapon's damage roll.
 
 ## Campaigns.jsx (~156 lines)
 Campaign list page.

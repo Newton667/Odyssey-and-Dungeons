@@ -13,10 +13,11 @@ import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
 import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
-import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageFormula } from '../utils/dndHelpers';
+import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageDice, weaponDamageFormula, weaponRangeText, cantripDamage } from '../utils/dndHelpers';
 import { parseDiceFormula } from '../utils/diceFormula';
 import { allowedSpellClasses, spellMatchesClasses } from '../utils/spellAccess';
 import { queryLocalEquipment, queryLocalSpells, getLocalEquipmentByName, getAllLocalSpells } from '../data/localDataService';
+import { readHomebrew, matchesEquipCategory, defaultAmmoCount } from '../utils/homebrew';
 
 const SKILLS = SKILLS_WITH_ABILITY;
 
@@ -110,12 +111,6 @@ export default function CharacterSheet() {
   const equipCache = useRef({});
   const [useLocalData, setUseLocalData] = useState(() => localStorage.getItem('ond-data-source') !== 'db');
 
-  // Parse default ammo count from item name, e.g. "Bolts +3 (10)" → 10
-  const defaultAmmoCount = (name) => {
-    const m = name?.match(/\((\d+)\)/);
-    return m ? parseInt(m[1]) : 20;
-  };
-
   // ── Ammunition helpers (shared by weapon attacks + item panel; handle homebrew) ──
   const isAmmoName = (name) => {
     const cached = equipCache.current[name];
@@ -198,10 +193,7 @@ export default function CharacterSheet() {
     const names = new Set(char.preparedSpells);
     const all = getAllLocalSpells();
     // Also include homebrew spells
-    try {
-      const hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
-      all.push(...hb);
-    } catch { /* ignore */ }
+    all.push(...readHomebrew({ type: 'spell' }));
     setSpellData(all.filter(s => names.has(s.name)));
     setLoadingSpells(false);
   }, [char?.preparedSpells]);
@@ -214,10 +206,7 @@ export default function CharacterSheet() {
     spellBrowserTimer.current = setTimeout(() => {
       const all = getAllLocalSpells();
       // Include homebrew spells
-      try {
-        const hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type === 'spell');
-        all.push(...hb);
-      } catch { /* ignore */ }
+      all.push(...readHomebrew({ type: 'spell' }));
       let filtered = all;
       if (spellBrowserSearch) {
         const q = spellBrowserSearch.toLowerCase();
@@ -245,12 +234,10 @@ export default function CharacterSheet() {
       {
         const data = queryLocalEquipment({ search: invSearch || undefined, category: invCategory || undefined });
         // Merge homebrew equipment
-        try {
-          let hb = JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell');
-          if (invSearch) hb = hb.filter(i => i.name?.toLowerCase().includes(invSearch.toLowerCase()));
-          if (invCategory) hb = hb.filter(i => i.category === invCategory || i.type === invCategory);
-          data.push(...hb);
-        } catch { /* ignore */ }
+        let hb = readHomebrew({ notType: 'spell' });
+        if (invSearch) hb = hb.filter(i => i.name?.toLowerCase().includes(invSearch.toLowerCase()));
+        if (invCategory) hb = hb.filter(i => matchesEquipCategory(i, invCategory));
+        data.push(...hb);
         data.sort((a, b) => (RARITY_ORDER[a.rarity] || 0) - (RARITY_ORDER[b.rarity] || 0));
         setInvResults(data);
         setInvLoading(false);
@@ -268,7 +255,7 @@ export default function CharacterSheet() {
     const uncached = items.filter(name => !equipCache.current[name]);
     if (uncached.length === 0) { setEquipDataLoaded(true); return; }
     // Check local data + homebrew
-    const hbItems = (() => { try { return JSON.parse(localStorage.getItem('ond-homebrew') || '[]').filter(i => i.type !== 'spell'); } catch { return []; } })();
+    const hbItems = readHomebrew({ notType: 'spell' });
     uncached.forEach(name => {
       const match = getLocalEquipmentByName(name) || hbItems.find(h => h.name === name);
       if (match) equipCache.current[name] = match;
@@ -1002,7 +989,7 @@ export default function CharacterSheet() {
     const isRacial = spell.source === 'race';
     const canUpcast = spell.level > 0 && spell.damage && spell.scaling;
     const castLevel = upcastLevels[spell.name] || spell.level;
-    const effectiveDamage = canUpcast ? getUpcastDamage(spell, castLevel) : spell.damage;
+    const effectiveDamage = canUpcast ? getUpcastDamage(spell, castLevel) : cantripDamage(spell, char.level || 1);
     const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
     return (
       <div onClick={() => onClick(spell)}
@@ -1849,17 +1836,21 @@ export default function CharacterSheet() {
             const isFinesse = wpn.properties?.some(p => p.toLowerCase().includes('finesse'));
             const isRanged = (wpn.subcategory || '').toLowerCase().includes('ranged');
             const needsAmmo = weaponNeedsAmmo(wpn);
-            const rangeText = wpn.properties?.find(p => p.toLowerCase().includes('range') || p.toLowerCase().includes('thrown'))
-              || (isRanged ? '80/320 ft.' : '5 ft.');
+            const rangeText = weaponRangeText(wpn.properties, isRanged);
 
             // Find EQUIPPED ammo items compatible with this weapon (handles homebrew ammoType)
             const equippedAmmo = needsAmmo ? (char.equippedItems || []).filter(name => ammoMatchesWeapon(name, wpn)) : [];
             // Selected ammo for this weapon (or first equipped)
             const selectedAmmo = (char.ammo?.selected?.[wpn.name]) || equippedAmmo[0] || null;
-            const ammoCount = selectedAmmo ? (char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo)) : 0;
+            const ammoCount = selectedAmmo ? (char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo, equipCache.current[selectedAmmo])) : 0;
             // Ammo bonus (from +1/+2/+3 magical ammo)
             const ammoCached = selectedAmmo ? equipCache.current[selectedAmmo] : null;
             const ammoBonus = ammoCached?.bonus || 0;
+            // The ammo's own dice ride along with the weapon's damage. Routed through
+            // weaponDamageDice because ammoCached.bonus is ALREADY folded into dmgBonus —
+            // raw concatenation would make magical ammo double-count its +N.
+            const ammoDice = (needsAmmo && selectedAmmo && ammoCached?.damage) ? weaponDamageDice(ammoCached.damage) : null;
+            const ammoSuffix = ammoDice ? `+${ammoDice}` : '';
 
             // Calculate hit/damage with weapon + ammo + fighting-style bonuses
             const abilityMod = isRanged ? dexMod : (isFinesse ? Math.max(strMod, dexMod) : strMod);
@@ -1885,7 +1876,7 @@ export default function CharacterSheet() {
             // Active weapon-rider spell buffs add their die to weapon damage.
             // weaponDamageFormula strips the magic +N baked into wpn.damage —
             // it is already counted in dmgBonus via wpn.bonus.
-            const dmgFormula = weaponDamageFormula(wpn.damage, dmgBonus, riderDamageSuffix);
+            const dmgFormula = weaponDamageFormula(wpn.damage, dmgBonus, riderDamageSuffix + ammoSuffix);
             const activeStyles = [
               archeryBonus && 'Archery', duelingBonus && 'Dueling',
               (gwfStyle && (isTwoHanded || isVersatile)) && 'Great Weapon', twfApplies && 'Two-Weapon',
@@ -1893,7 +1884,7 @@ export default function CharacterSheet() {
 
             const useAmmo = () => {
               if (!needsAmmo || char.trackAmmo === false || !selectedAmmo) return;
-              const current = char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo);
+              const current = char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo, equipCache.current[selectedAmmo]);
               if (current <= 0) return;
               const newCount = current - 1;
               const newAmmo = { ...(char.ammo || {}), [selectedAmmo]: newCount };
@@ -1926,7 +1917,9 @@ export default function CharacterSheet() {
                     {(() => {
                       const baseName = wpn.name.replace(/^\+\d\s+/, '');
                       const mastery = wpn.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[wpn.name];
-                      const hasMastery = mastery && WEAPON_MASTERY_CLASSES[char.class];
+                      // Weapon Mastery is a 2024-only feature; without this rider a 2014
+                      // Fighter also sees the badge.
+                      const hasMastery = mastery && WEAPON_MASTERY_CLASSES[char.class] && char.ruleset === '2024';
                       if (!hasMastery) return null;
                       const masteryData = WEAPON_MASTERIES[mastery];
                       return (
@@ -1957,7 +1950,7 @@ export default function CharacterSheet() {
                             onChange={(e) => selectAmmoForWeapon(e, e.target.value)}
                             style={{ fontSize: '11px', padding: '1px 4px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '3px', color: 'var(--text)', maxWidth: '140px' }}>
                             {equippedAmmo.map(a => (
-                              <option key={a} value={a}>{a} ({char.ammo?.[a] ?? defaultAmmoCount(a)})</option>
+                              <option key={a} value={a}>{a} ({char.ammo?.[a] ?? defaultAmmoCount(a, equipCache.current[a])})</option>
                             ))}
                           </select>
                         ) : (() => {
@@ -1986,13 +1979,13 @@ export default function CharacterSheet() {
                 </span>
                 <span style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                   {dmgFormula && (
-                    <RollBtn label={`${wpn.name} Damage${versatileDie ? ' (1H)' : ''}`} formula={dmgFormula} type="damage" rerollLow={gwf1H}>
+                    <RollBtn label={`${wpn.name}${ammoDice ? ` + ${selectedAmmo}` : ''} Damage${versatileDie ? ' (1H)' : ''}`} formula={dmgFormula} type="damage" rerollLow={gwf1H}>
                       {versatileDie ? '1H: ' : ''}{dmgFormula}
                     </RollBtn>
                   )}
                   {versatileDie && (
-                    <RollBtn label={`${wpn.name} Damage (2H)`} formula={`${versatileDie}+${dmgBonus2H}${riderDamageSuffix}`} type="damage" rerollLow={gwf2H}>
-                      2H: {versatileDie}+{dmgBonus2H}{riderDamageSuffix}
+                    <RollBtn label={`${wpn.name}${ammoDice ? ` + ${selectedAmmo}` : ''} Damage (2H)`} formula={`${versatileDie}+${dmgBonus2H}${riderDamageSuffix}${ammoSuffix}`} type="damage" rerollLow={gwf2H}>
+                      2H: {versatileDie}+{dmgBonus2H}{riderDamageSuffix}{ammoSuffix}
                     </RollBtn>
                   )}
                   {wpn.damageType && <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>{wpn.damageType}</span>}
@@ -2099,7 +2092,7 @@ export default function CharacterSheet() {
               const saveDC = sp.savingThrow ? 8 + spellMod + profBonus : null;
               const canUpcast = sp.level > 0 && sp.damage && sp.scaling;
               const castLevel = upcastLevels[sp.name] || sp.level;
-              const effectiveDamage = canUpcast ? getUpcastDamage(sp, castLevel) : sp.damage;
+              const effectiveDamage = canUpcast ? getUpcastDamage(sp, castLevel) : cantripDamage(sp, char.level || 1);
               // Max spell slot level available
               const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
               return (
@@ -2526,7 +2519,7 @@ export default function CharacterSheet() {
               // Detect ammo items
               const low = item.toLowerCase();
               const isAmmoItem = isAmmoName(item) || low.includes('dart');
-              const ammoLeft = isAmmoItem ? (char.ammo?.[item] ?? defaultAmmoCount(item)) : null;
+              const ammoLeft = isAmmoItem ? (char.ammo?.[item] ?? defaultAmmoCount(item, equipCache.current[item])) : null;
               return (
                 <div key={i} className="cc-skill" style={{
                   padding: '8px 12px', borderRadius: '4px',
@@ -3675,12 +3668,15 @@ export default function CharacterSheet() {
                         </div>
                       );
                     })()}
-                    {sidePanel.data.damage && (
-                      <RollBtn label={`${sidePanel.data.name} Damage`} formula={sidePanel.data.damage} type="damage"
-                        style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', background: 'var(--accent)', border: '1px solid var(--gold-dim)' }}>
-                        Damage: {sidePanel.data.damage} {sidePanel.data.damageType || ''}
-                      </RollBtn>
-                    )}
+                    {sidePanel.data.damage && (() => {
+                      const panelDamage = cantripDamage(sidePanel.data, char.level || 1);
+                      return (
+                        <RollBtn label={`${sidePanel.data.name} Damage`} formula={panelDamage} type="damage"
+                          style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', background: 'var(--accent)', border: '1px solid var(--gold-dim)' }}>
+                          Damage: {panelDamage} {sidePanel.data.damageType || ''}
+                        </RollBtn>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -3760,7 +3756,7 @@ export default function CharacterSheet() {
                         <span style={{ color: 'var(--text-dim)' }}>Uses {ammoLabel}</span>
                       </div>
                       {matchingAmmo.length > 0 ? matchingAmmo.map(a => {
-                        const count = char.ammo?.[a] ?? defaultAmmoCount(a);
+                        const count = char.ammo?.[a] ?? defaultAmmoCount(a, equipCache.current[a]);
                         return (
                           <div key={a} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0' }}>
                             <span style={{ color: 'var(--text-dim)' }}>{a}</span>

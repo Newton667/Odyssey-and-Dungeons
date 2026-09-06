@@ -1,5 +1,24 @@
 # Known Patterns and Gotchas
 
+
+## A two-key alias makes a control inert unless it writes BOTH keys
+
+Homebrew attunement is stored under two names: `attunement` (canonical, matching
+`equipment.json`) and `requiresAttunement` (legacy, still written so a downgrade doesn't
+lose the flag). `pruneToType` resolves them as `attunement ?? requiresAttunement`, and
+`normalizeHomebrewItem` puts `attunement` on **every** record.
+
+That combination is a trap. A checkbox bound to `requiresAttunement` alone works on a
+brand-new item (no `attunement` key yet, so the `??` falls through) and is **completely
+inert** on every subsequent edit, because `startEdit` spreads a normalized item whose stale
+`attunement` always wins. It fails in both directions — unticking can't clear it, ticking
+can't set it — and `??` only falls through on `null`/`undefined`, so `false` still wins.
+
+Use `attunementChecked(form)` / `setAttunement(f, on)` from `utils/homebrew.js`; they read
+the canonical key first and write both. The general rule: **when a stored value has an alias,
+the UI must write every key the resolver reads** — testing only the both-agree case will not
+catch this, so assert the disagreement case explicitly.
+
 ## Critical Bugs (Fixed) — Don't Reintroduce These
 
 ### 1. Widget Component Inside Render (FOCUS LOSS BUG)
@@ -262,6 +281,38 @@ Multiclass characters carry a canonical `char.classes = [{class, subclass, level
 
 ### Ruleset (2014 / 2024)
 Characters carry a `ruleset` field (`'2014'` default, or `'2024'`). Class-derived data must flow through the ruleset-aware helpers so revised-rules characters compute correctly: use `getClassLevels(cls, ruleset)` (not `CLASS_LEVELS[cls]` directly) for features/progression, `getSubclassLevel(cls, ruleset)` (not `CLASSES[cls].subclassLevel`) for when a subclass unlocks, and pass `ruleset` to `getSpellSlots(cls, level, ruleset)` / `getMulticlassSpellSlots(classes, ruleset)`. 2024 level-1 additions live in the `RULESET_2024_ADD` table (classData); descriptions for the new feature names live in `featureDescriptions.js`. Current 2024 coverage: Weapon Mastery at L1 (Barbarian/Fighter/Monk/Paladin/Ranger/Rogue), Spellcasting at L1 (Paladin/Ranger with L1 slots), Divine Order/Primal Order/Innate Sorcery/Eldritch Invocations@1/Ritual Adept, and subclass choice at level 3 for all classes. Extend `RULESET_2024_ADD` (and `RULESET_2024_ADD` descriptions) to add more; keep 2014 behavior untouched and write feature text in the app's own words.
+
+**Weapon Mastery is 2024-only and the gate belongs on the consumer.** The Actions-row mastery badge checks `mastery && WEAPON_MASTERY_CLASSES[char.class] && char.ruleset === '2024'`; without that last term a **2014** Fighter also saw the badge. The Homebrewer itself is deliberately **not** ruleset-aware — it has no character in context, `ond-homebrew` is global across every character on the browser, and the same custom weapon may be used by a 2014 and a 2024 character at the same table. Homebrew weapons therefore always offer the mastery field; the consumer decides whether to honour it.
+
+### `btoa`/`atob` are Latin-1 — never base64 user text directly
+`btoa` throws `InvalidCharacterError` on any codepoint above 255, and `atob` returns Latin-1 code units. The Homebrewer's "Copy Share Code" was `btoa(JSON.stringify(data))` with no `try/catch`, so it threw inside the `onClick` and **did nothing at all** for any spell whose description contained an em dash, a curly quote, a bullet or an ellipsis — which is exactly what a pasted description contains. Use `encodeShareCode` / `decodeShareCode` in `utils/homebrew.js`.
+
+**The decode order is load-bearing: UTF-8 first, Latin-1 second.** A legacy Latin-1 code containing e.g. `é` (0xE9) is a lone high byte, which `TextDecoder('utf-8', { fatal: true })` rejects, so it correctly falls through to `JSON.parse(bin)`. A pure-ASCII code decodes identically either way. **Reversing the order would silently mojibake every newly generated code.** Two tests guard this: a legacy fixture and an em-dash round trip on a *freshly generated* code.
+
+Related: **a clipboard write is not a guarantee.** `navigator.clipboard.writeText` rejects outside a secure context (`http://` on a LAN IP is a real deployment shape here) and when permission is denied. Always give the user the text as well — the Homebrewer reveals the code in a read-only, select-on-focus textarea before it even tries the clipboard.
+
+### Homebrew: normalise on read, and never let a normaliser run on a write path
+`utils/homebrew.js` has **two** read functions and the split is a safety property:
+- `readHomebrew(opts)` — normalises and **drops** records it cannot understand. For consumers only.
+- `readHomebrewRaw()` — parses, coerces a non-array to `[]`, and does nothing else. For `save`, `deleteItem`, `doImport` and Duplicate **only**.
+
+Every mutation rewrites the **whole array**, so a null-dropping read on a write path is a silent delete: saving or deleting one item would erase every record with an unrecognised `type` or a non-string `name` — exactly the records a hand-edited or badly imported share code creates. The correct statement of the policy is *"normalise on read; on write, rewrite only the record the user touched and pass everything else through untouched"*. An unrecognised record is hidden from every list and left on disk; **there is no repair UI, and it should not be "helpfully" surfaced or cleaned**.
+
+The array-level mutations (`upsertHomebrewRecord`, `removeHomebrewRecord`, `appendImportedRecord`) are exported pure functions rather than inline component logic, so the preservation property can actually be asserted — this repo has no jsdom and no testing-library, and a test cannot render the page or "perform a save". `charSync.js`'s `resolveLoadAction` is the same pattern.
+
+`requiresAttunement` is the legacy key; `attunement` (the `equipment.json` name) is canonical. `normalizeHomebrewItem` reads either and writes both, and `requiresAttunement` stays in `TYPE_FIELDS`' equipment list on purpose — `pruneToType` runs on every save, so removing it would strip the legacy key on the first re-save and break the downgrade path the alias exists to protect.
+
+**A field rename is not a fix if nothing renders the field.** `Equipment.jsx` has two item lists and homebrew items only ever render through the thin one; canonicalising the attunement key was invisible until that block actually rendered it. Check *which* list reads a field before claiming a fix is user-visible.
+
+### Cantrips scale by character level, with exceptions
+Cantrip damage scales on the **5/11/17** tiers by **character** level, in both 2014 and 2024 (PHB p.211, Acid Splash). It is not slot-based — neither edition upcasts a cantrip with a slot, so `getUpcastDamage` correctly returns early on level 0. Use `cantripDamage(spell, char.level || 1)` (`dndHelpers.js`); `char.level` is the **total** level, kept in sync by `syncPrimaryFromClasses`.
+
+**A blanket "any level-0 spell with dice damage scales" rule is wrong** and mis-scales at least 19 `spells.json` entries. The exclusions:
+- **`CANTRIP_NO_SCALE`** — Eldritch Blast (gains *beams*: 1/2/3/4 separate attack rolls at 5/11/17, each still 1d10 — a blanket rule makes it one 4d10 hit), Magic Stone and Shillelagh (no level progression at all), Green-Flame Blade (its stored `1d8` is already the 5th-level value, so scaling runs one die high at every tier). **Booming Blade is deliberately not excluded** — its `1d8` is the movement damage and really does go 1d8/2d8/3d8/4d8.
+- **`source: 'race'`** — all 15 racial pseudo-spells with level-0 damage, including the ten Dragonborn Breath Weapons, which progress 2d6/3d6/4d6/5d6 at levels **1/6/11/16**, a different tier set entirely.
+- Homebrew cantrips have no `source`, so they scale by design. Corollary, accepted: because the set is name-keyed, a homebrew spell *named* "Eldritch Blast" is excluded too.
+
+**Do not key cantrip scaling on `scaling`.** Measured in `spells.json`: `scaling` is `''` on 382 entries, absent on 68, and a dice string on 71. There is **no** `"None"` value anywhere in the file — that string is only the label of an `<option value="">` in `Spells.jsx`. The DB seeds (`server/seed-cantrips.js`) additionally write the sentinel `scaling: 'cantrip'`, which never appears in the local JSON; `Spells.jsx`'s own "+ Add Spell" form still offers it, so do not delete that option without changing the form.
 
 ### Active Weapon-Buff Spells
 `SPELL_WEAPON_RIDERS` (dndConstants) maps spells like Hunter's Mark/Hex to `{ die, type }`. `char.activeBuffs` holds the currently-active ones; the Spells tab's Activate toggle spends a slot and adds the name, `doLongRest` clears them, and the Actions tab appends `+die` to weapon damage formulas and shows a badge. To add a spell, add it to `SPELL_WEAPON_RIDERS` — no other change needed.
