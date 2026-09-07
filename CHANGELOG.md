@@ -28,6 +28,11 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.6.1 — 2026-09-06
+
+### Fixed
+- **Weapon Mastery no longer shows up for 2014 characters.** The mastery badge on the Actions tab was correctly hidden for a 2014 character, but the weapon's detail panel still displayed "Mastery: Sap" and its full rule text — a 2024-only mechanic presented as though it applied. Both places now agree.
+
 ## v1.6.0 — 2026-09-06
 
 ### Added

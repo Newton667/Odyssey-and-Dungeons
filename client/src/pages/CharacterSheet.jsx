@@ -3777,7 +3777,10 @@ export default function CharacterSheet() {
                   const baseName = sidePanel.data.name.replace(/^\+\d\s+/, '');
                   const mastery = sidePanel.data.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[sidePanel.data.name];
                   const hasMasteryClass = WEAPON_MASTERY_CLASSES[char.class];
-                  if (!mastery) return null;
+                  // Weapon Mastery is a 2024-only mechanic — same gate as the Actions-tab badge
+                  // (see the `hasMastery` check above). Without this the panel would advertise a
+                  // rule that does not exist for a 2014 character while the badge stayed hidden.
+                  if (!mastery || char.ruleset !== '2024') return null;
                   const masteryData = WEAPON_MASTERIES[mastery];
                   return (
                     <div style={{ marginBottom: '12px', padding: '10px 12px', background: 'rgba(168, 85, 247, 0.08)', borderRadius: '6px', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
