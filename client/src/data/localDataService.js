@@ -28,10 +28,15 @@ export function getLocalEquipmentByName(name) {
   return equipmentData.find(i => i.name === name) || null;
 }
 
+// These return a SHALLOW COPY, never the imported array itself.
+// Handing out the module's own array let a caller do `getAllLocalSpells().push(...)`
+// and permanently append to the shared list — every later call saw the extra entries,
+// and a caller that ran on a timer or an effect accumulated a fresh duplicate each run.
+// That is exactly how homebrew spells ended up listed ten times. Keep the spread.
 export function getAllLocalSpells() {
-  return spellsData;
+  return [...spellsData];
 }
 
 export function getAllLocalEquipment() {
-  return equipmentData;
+  return [...equipmentData];
 }

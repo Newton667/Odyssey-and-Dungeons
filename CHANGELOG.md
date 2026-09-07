@@ -28,6 +28,11 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.6.2 — 2026-09-06
+
+### Fixed
+- **Custom spells were listed over and over on the character sheet.** A homebrew spell could appear ten or more times in the spell list and browser. The helper that returns the built-in spell list was handing out the actual shared list rather than a copy, and the sheet appended your homebrew spells onto it — so every time the list was rebuilt (each spell-browser keystroke, each change to your prepared spells) another copy of every custom spell was added, and it kept growing until you reloaded the page. The built-in spell and equipment lists are now protected from being modified by anything that reads them.
+
 ## v1.6.1 — 2026-09-06
 
 ### Fixed

@@ -191,9 +191,8 @@ export default function CharacterSheet() {
     if (!char?.preparedSpells?.length) { setSpellData([]); return; }
     setLoadingSpells(true);
     const names = new Set(char.preparedSpells);
-    const all = getAllLocalSpells();
-    // Also include homebrew spells
-    all.push(...readHomebrew({ type: 'spell' }));
+    // concat, never push — `all` must not be mutated even though the getter now copies.
+    const all = getAllLocalSpells().concat(readHomebrew({ type: 'spell' }));
     setSpellData(all.filter(s => names.has(s.name)));
     setLoadingSpells(false);
   }, [char?.preparedSpells]);
@@ -204,9 +203,9 @@ export default function CharacterSheet() {
     if (!spellBrowserSearch && spellBrowserLevel === '') { setSpellBrowserResults([]); return; }
     if (spellBrowserTimer.current) clearTimeout(spellBrowserTimer.current);
     spellBrowserTimer.current = setTimeout(() => {
-      const all = getAllLocalSpells();
-      // Include homebrew spells
-      all.push(...readHomebrew({ type: 'spell' }));
+      // concat, never push — this effect is debounced and re-runs on every keystroke,
+      // so a mutation here duplicated every homebrew spell once per search.
+      const all = getAllLocalSpells().concat(readHomebrew({ type: 'spell' }));
       let filtered = all;
       if (spellBrowserSearch) {
         const q = spellBrowserSearch.toLowerCase();

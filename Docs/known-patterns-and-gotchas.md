@@ -1,6 +1,31 @@
 # Known Patterns and Gotchas
 
 
+
+## Never hand out a module's own data array — return a copy
+
+`localDataService`'s `getAllLocalSpells()` / `getAllLocalEquipment()` used to `return spellsData`
+— the imported JSON array itself. `CharacterSheet` then did:
+
+```js
+const all = getAllLocalSpells();
+all.push(...readHomebrew({ type: 'spell' }));   // mutates the SHARED list, permanently
+```
+
+Because the effect re-ran on every debounced spell-browser keystroke and on every change to
+prepared spells, each run appended the homebrew spells again. Custom spells showed up ten or
+more times and kept climbing until a page reload. It also leaked across pages — the Spells page
+imports the same module.
+
+Two rules:
+
+1. **A getter that exposes module state returns a shallow copy** (`[...data]`). `queryLocalEquipment`
+   and `queryLocalSpells` already did this, which is why only the `getAll*` path was affected.
+2. **Merge with `concat`, never `push`**, when combining built-in data with homebrew — the intent is
+   a new list, not a mutation of someone else's.
+
+Regression tests live in `client/src/data/localDataService.test.js`; they fail if the spread is removed.
+
 ## A two-key alias makes a control inert unless it writes BOTH keys
 
 Homebrew attunement is stored under two names: `attunement` (canonical, matching
