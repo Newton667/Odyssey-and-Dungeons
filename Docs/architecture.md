@@ -5,7 +5,7 @@
 - **Backend**: Express.js + Mongoose
 - **Database**: MongoDB Atlas (optional, app works fully offline)
 - **3D Dice**: Three.js + Cannon.js physics engine
-- **Deployment**: Windows start.bat launcher with git auto-updates
+- **Deployment**: `start.bat` (Windows) / `start.sh` (Linux) launchers with git auto-updates; `scripts/ensure-deps.js` keeps `node_modules` matched to the running platform
 
 ## Project Structure
 ```
@@ -31,7 +31,11 @@ OND/
 │   ├── build-local-json.js  # Export DB data to local JSON
 │   └── server.js            # Express entry point
 ├── Docs/                    # Documentation
-├── start.bat                # Windows launcher
+├── scripts/
+│   └── ensure-deps.js       # Platform-aware dependency install (used by both launchers + root postinstall)
+├── start.bat                # Launcher (Windows)
+├── start.sh                 # Launcher (Linux)
+├── .gitattributes           # Pins start.sh to LF and start.bat to CRLF on checkout
 └── package.json             # Root workspace config
 ```
 

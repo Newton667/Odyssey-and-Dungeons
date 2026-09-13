@@ -1,19 +1,19 @@
 # Workflow Cheatsheet
 
-Six commands take a feature from idea to committed code — each runs in its own agent,
-writes a file you can read, and hands off to the next. A seventh, `/ond-execute-ultra`,
-runs the whole chain unattended.
+Seven commands take a feature from idea to a pushed release — each runs in its own agent,
+writes a file you can read, and hands off to the next. An eighth, `/ond-execute-ultra`,
+runs the build half of the chain unattended.
 
 ```
-/ond-research → /ond-plan → /ond-plan-review → /ond-increment → /ond-execute → /ond-review → commit
-      ↓             ↓              ↓                  ↓               ↓              ↓
-    Docs/         Docs/       (findings)            Docs/           (code)         Docs/
-  research/       plans/                         increments/       + tests        reviews/
+/ond-research → /ond-plan → /ond-plan-review → /ond-increment → /ond-execute → /ond-review → /ond-push-update
+      ↓             ↓              ↓                  ↓               ↓              ↓               ↓
+    Docs/         Docs/       (findings)            Docs/           (code)         Docs/        version bump
+  research/       plans/                         increments/       + tests        reviews/     + commit + push
 ```
 
 Every command is prefixed `ond-` so none of them collide with Claude Code's built-ins
 (`/plan` enters plan mode, `/review` is the built-in code review). Type `/ond` to see
-all seven.
+all eight.
 
 You review between every stage. Nothing advances on its own — except inside
 `/ond-execute-ultra`, which is the whole point of that command.
@@ -35,8 +35,36 @@ build it"). Typing the command yourself still does exactly the same thing.
 | `/ond-execute [plan]` | Builds it — **test first (red), then code (green)**, one increment at a time. | code + tests | **Yes** |
 | `/ond-review [scope]` | Runs **all** review agents at once — code + D&D rules — and merges the findings. | `Docs/reviews/` | No |
 | `/ond-execute-ultra [plan or request]` | **All of the above in one shot** — plan, plan review, increments, build, review. Stops on the first failure. | all of them | **Yes** |
+| `/ond-push-update [major\|minor\|patch\|vX.Y.Z\|summary]` | **Releases** — checks the suite, build and open HIGH findings, **always bumps the version** (renames the Unreleased changelog section with the version + date, updates `client/src/version.js`, re-adds a fresh Unreleased), commits, **backs up the old version to `backup/vX.Y.Z`** (max 3 branches on GitHub), pushes to `origin/main`, drafts the Discord announcement. | `CHANGELOG.md`, `version.js`, git | version + changelog only |
 
-Only `/ond-execute` (and `/ond-execute-ultra`, which wraps it) can change code. The rest are read-only.
+Only `/ond-execute` (and `/ond-execute-ultra`, which wraps it) can change application code.
+`/ond-push-update` touches only the version file and the changelog, then commits and pushes.
+The rest are read-only.
+
+### `/ond-push-update` — the release rules
+
+This is the only command that commits or pushes, and it follows `CLAUDE.md`'s push rule
+to the letter. **The version number always changes.** It refuses to push if:
+
+- you are not on `main`, or there is nothing to release
+- the `## vX.X.X — Unreleased` section of `CHANGELOG.md` is empty (a release with no notes is not a release)
+- `cd client && npm test` or `npx vite build` is red
+- the newest file in `Docs/reviews/` is newer than the last commit and still lists an unfixed **HIGH** finding
+- `client/src/version.js` and the newest released changelog heading disagree
+- anything gitignored (`.env`, character JSON, `node_modules/`, `dist/`) shows up staged
+
+The bump is chosen from the Unreleased content — any `### Added` entry → **minor**
+(`x.Y.0`), fixes/changes only → **patch** (`x.y.Z`) — unless you pass `major`, `minor`,
+`patch` or an exact `vX.Y.Z`. It never picks **major** on its own. The commit message keeps
+the repo's form, `vN.N.N: <summary>`. It never force-pushes and never runs `git reset --hard`.
+
+**Backup branches.** Before `main` moves, the commit GitHub's `main` currently points at is
+pushed to `backup/<old version>` (e.g. `backup/v1.6.2`). GitHub then holds **at most 3
+branches**: `main` plus the two newest backups; older `backup/v*` branches are deleted from
+the remote, oldest first. Only `backup/v*` branches are ever deleted — if any other branch
+exists on the remote, the command stops and asks rather than guessing. The backup push
+happens first, so a release that fails halfway never loses the old version. To roll back:
+`git checkout backup/v1.6.2` (or point `main` at it).
 
 ---
 
@@ -268,8 +296,8 @@ Preloaded with this project's rules, so you don't have to repeat them:
   since that's where the test specs live.
 - **Old plans won't execute.** Plans predating the increment format have no
   `## Increments` section — re-run `/ond-plan`.
-- **Nothing commits or pushes automatically.** Every command leaves changes in the
-  working tree for you to inspect.
+- **Nothing commits or pushes automatically — except `/ond-push-update`, and only when you
+  run it.** Every other command leaves changes in the working tree for you to inspect.
 - **Agents can be wrong.** `/ond-review` spot-checks HIGH findings before repeating them,
   but treat a PLAUSIBLE finding as a lead, not a verdict. `/ond-plan-review` exists for the
   same reason one step earlier — the planner is an agent too, and states things about the

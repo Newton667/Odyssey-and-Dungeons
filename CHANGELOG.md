@@ -28,6 +28,19 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.7.0 — 2026-09-13
+
+### Added
+- **Linux launcher (`start.sh`).** The same one-file bootstrap as `start.bat`: checks for Node.js and Git, clones the app into `OND-App/` when run on its own, offers updates, installs dependencies, starts both servers in one terminal and opens the browser. Ctrl+C stops everything.
+- **One checkout now runs on both Windows and Linux.** Installed dependencies are platform-specific (Vite's bundler ships a native binary per OS), so a folder set up on Windows could not run `vite`, `vitest` or a build on Linux, and vice versa. A new `scripts/ensure-deps.js` — used by both launchers and by `npm install` at the repo root — records which platform the dependencies were installed for and rebuilds them when the platform changes. The first launch after this update rebuilds dependencies once.
+
+### Changed
+- **`start.bat` restarts itself after you accept an update.** Saying "y" to "New version available" now opens a fresh launcher window running the updated file and closes the old one, instead of continuing to run a file that was just rewritten underneath it (which could print a stray "not recognized" line, or worse after a future change).
+- **New `/ond-push-update` command in the dev workflow.** The one command that commits and pushes. It checks the test suite, the build and any open HIGH review findings first, then always bumps the version (renaming the Unreleased changelog section with the version and date, updating `client/src/version.js`, re-adding a fresh Unreleased section), commits in the repo's `vN.N.N: summary` form, backs up the version being replaced to a `backup/vX.Y.Z` branch (GitHub keeps at most 3 branches: `main` plus the two newest backups; older backups are pruned), pushes to `origin/main`, and drafts the Discord announcement. Refuses to push without a version change. `Docs/WORKFLOW.md` updated.
+
+### Fixed
+- **`start.bat` no longer floods the terminal with download errors after downloading the app.** When only `start.bat` was downloaded, it cloned the app into `OND-App` correctly and then looped forever printing "Downloading…" and "Download complete!" — the relaunch jumped back to the original folder, tried to clone again, and never noticed the clone had failed. It now opens the real launcher inside `OND-App` in its own window, and the original window repeats one clear message instead: "The app has been downloaded — you can delete this start.bat now." That repetition is on purpose, so the window can't be mistaken for a stuck download; close it whenever you like. Double-clicking the outer `start.bat` again just hands off to `OND-App` without re-downloading. If you already have an older standalone `start.bat`, download it again once; the copy inside `OND-App` is updated automatically.
+
 ## v1.6.2 — 2026-09-06
 
 ### Fixed

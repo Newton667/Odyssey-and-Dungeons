@@ -18,7 +18,7 @@ A local-first D&D 5e companion web app: character sheets, a spell/equipment refe
 - **Backend**: Express.js + Mongoose
 - **Database**: MongoDB Atlas — optional; the app runs fully offline without it
 - **3D Dice**: Three.js + cannon-es physics engine
-- **Deployment**: Windows `start.bat` launcher with git auto-updates
+- **Deployment**: `start.bat` (Windows) / `start.sh` (Linux) launchers with git auto-updates; `scripts/ensure-deps.js` keeps `node_modules` matched to the running platform
 
 ## Getting Started
 
@@ -26,12 +26,25 @@ A local-first D&D 5e companion web app: character sheets, a spell/equipment refe
 
 Double-click `start.bat`. It checks for Node.js and Git (offering to install them if missing), clones the repo on first run, checks GitHub for updates, installs dependencies in both `server/` and `client/`, then starts the backend and frontend and opens `http://localhost:5173` in your browser.
 
+If you downloaded only `start.bat`, it clones the app into `OND-App\` and opens the real launcher from there in a new window; the first window then keeps repeating "you can delete this start.bat now" until you close it — that is expected. From then on, run `OND-App\start.bat`.
+
+### Linux
+
+```bash
+chmod +x start.sh && ./start.sh
+# or simply
+bash start.sh
+```
+
+Same behaviour as Windows: checks for Node.js and Git, clones the app into `OND-App/` on first run, checks for updates, installs dependencies, then starts both servers **in the one terminal** and opens the browser. **Ctrl+C stops both servers.**
+
 ### Manual setup (any OS)
 
 Requires [Node.js](https://nodejs.org/) and npm.
 
 ```bash
 # from the repo root — installs root, server, and client dependencies
+# (also rebuilds server/ and client/ node_modules if they were installed on another OS)
 npm install
 
 # runs the Express server and Vite dev server together
@@ -44,6 +57,7 @@ This starts:
 
 Other root scripts:
 - `npm run build:client` — builds the production client bundle (`client/dist`)
+- `npm run deps` — runs `scripts/ensure-deps.js` on its own: installs `server/` and `client/` dependencies, wiping and reinstalling them first if the checkout was last used on a different OS/arch
 
 No `.env` or database setup is required to run the app — see below.
 
@@ -75,7 +89,10 @@ OND/
 │   ├── data/characters/     # Local character JSON files
 │   └── server.js            # Express entry point
 ├── Docs/                    # Documentation
-├── start.bat                # Windows launcher
+├── scripts/
+│   └── ensure-deps.js       # Platform-aware dependency install
+├── start.bat                # Launcher (Windows)
+├── start.sh                 # Launcher (Linux)
 └── package.json             # Root workspace config
 ```
 
@@ -90,7 +107,7 @@ For deeper reference, see the [`Docs/`](Docs/) folder:
 - [`server.md`](Docs/server.md) — API endpoints, models, routes, and seed scripts
 - [`styles-and-theming.md`](Docs/styles-and-theming.md) — CSS variables and theme system
 - [`known-patterns-and-gotchas.md`](Docs/known-patterns-and-gotchas.md) — known bug patterns and coding rules
-- [`start-bat.md`](Docs/start-bat.md) — launcher script reference
+- [`start-bat.md`](Docs/start-bat.md) — launcher script reference (Windows and Linux)
 - [`CHANGELOG.md`](CHANGELOG.md) — version history
 
 Repository: https://github.com/Newton667/Odyssey-and-Dungeons

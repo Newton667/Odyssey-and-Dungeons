@@ -1,6 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 title OND Launcher
+set "REPO_URL=https://github.com/Newton667/Odyssey-and-Dungeons.git"
+if defined OND_REPO_URL set "REPO_URL=%OND_REPO_URL%"
 echo.
 echo  ========================================
 echo    OND - Odyssey and Dragons
@@ -37,23 +39,38 @@ if %ERRORLEVEL% neq 0 (
 
 :: ─── Check if app files exist ───────────────────────
 cd /d "%~dp0"
-if not exist "%~dp0client" if not exist "%~dp0server" (
-    echo  [SETUP] App files not found. Downloading...
+if exist "%~dp0client" goto APP_PRESENT
+if exist "%~dp0server" goto APP_PRESENT
+if exist "%~dp0OND-App\client" goto HANDOFF
+echo  [SETUP] App files not found. Downloading...
+echo.
+git clone "!REPO_URL!" "%~dp0OND-App"
+if !ERRORLEVEL! neq 0 (
     echo.
-    git clone https://github.com/Newton667/Odyssey-and-Dungeons.git "%~dp0OND-App"
-    if %ERRORLEVEL% neq 0 (
-        echo.
-        echo  [ERROR] Download failed. Check your internet.
-        echo  Press any key to retry...
-        pause
-        goto START
-    )
-    copy "%~f0" "%~dp0OND-App\start.bat" >nul 2>nul
-    echo.
-    echo  Download complete! Launching from OND-App...
-    cd /d "%~dp0OND-App"
+    echo  [ERROR] Download failed. Check your internet.
+    echo  Press any key to retry...
+    pause >nul
     goto START
 )
+:HANDOFF
+if not exist "%~dp0OND-App\start.bat" copy "%~f0" "%~dp0OND-App\start.bat" >nul 2>nul
+echo.
+echo  Launching the app from OND-App...
+start "OND Launcher" /D "%~dp0OND-App" "%~dp0OND-App\start.bat"
+:DELETE_ME
+echo.
+echo  ========================================
+echo    The app has been downloaded to:
+echo    %~dp0OND-App
+echo.
+echo    You can delete this start.bat now.
+echo    From now on, run OND-App\start.bat
+echo.
+echo    (Close this window when you're done.)
+echo  ========================================
+timeout /t 3 /nobreak >nul
+goto DELETE_ME
+:APP_PRESENT
 
 :: ─── Mark directory as safe for git ────────────────
 cd /d "%~dp0"
@@ -89,19 +106,25 @@ if "!LOCAL!"=="!REMOTE!" (
     if /i "!DOUPDATE!"=="y" (
         git reset --hard origin/main >nul 2>nul
         git pull origin main
+        :: The update just rewrote THIS file. cmd.exe resumes a running .bat by byte offset, so
+        :: continuing here would execute whatever now sits at the old offset. Relaunch the fresh
+        :: file from the top and let this window close instead.
+        echo.
+        echo  Updated. Restarting the launcher...
+        start "OND Launcher" /D "%~dp0" "%~f0"
+        exit
     )
 )
 
 :: ─── Install dependencies ───────────────────────────
 echo.
 echo  [2/4] Installing dependencies...
-echo  Server...
-cd /d "%~dp0server"
-call npm install --silent 2>nul
-echo  Client...
-cd /d "%~dp0client"
-call npm install --silent 2>nul
-cd /d "%~dp0"
+call node "%~dp0scripts\ensure-deps.js"
+if !ERRORLEVEL! neq 0 (
+    echo  [ERROR] Dependency install failed. See messages above.
+    pause
+    exit /b 1
+)
 echo  Dependencies ready.
 
 :: ─── Start server ───────────────────────────────────
