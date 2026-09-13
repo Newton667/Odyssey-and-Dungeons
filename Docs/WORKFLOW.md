@@ -2,7 +2,8 @@
 
 Seven commands take a feature from idea to a pushed release — each runs in its own agent,
 writes a file you can read, and hands off to the next. An eighth, `/ond-execute-ultra`,
-runs the build half of the chain unattended.
+runs the build half of the chain unattended. A ninth, `/ond-init`, comes before all of
+them: it is how a new session gets oriented.
 
 ```
 /ond-research → /ond-plan → /ond-plan-review → /ond-increment → /ond-execute → /ond-review → /ond-push-update
@@ -13,7 +14,7 @@ runs the build half of the chain unattended.
 
 Every command is prefixed `ond-` so none of them collide with Claude Code's built-ins
 (`/plan` enters plan mode, `/review` is the built-in code review). Type `/ond` to see
-all eight.
+all nine.
 
 You review between every stage. Nothing advances on its own — except inside
 `/ond-execute-ultra`, which is the whole point of that command.
@@ -28,6 +29,7 @@ build it"). Typing the command yourself still does exactly the same thing.
 
 | Command | Does | Writes to | Touches code? |
 |---|---|---|---|
+| `/ond-init [focus]` | **Starts a session.** Reads `CLAUDE.md`, the gotchas file, this workflow and the architecture doc into context; reports branch, dirty files, unreleased changelog, version drift, dependency platform, running servers, test baseline, and any interrupted increments, unprepared plans or open HIGH findings; recommends the next command. Runs in the main conversation, not an agent, so what it reads stays loaded. | (reports back) | No — may run `scripts/ensure-deps.js` if `node_modules` is for another OS |
 | `/ond-research <topic>` | Investigates the codebase, the D&D rulebooks, and the web. Ends with options + a recommendation. | `Docs/research/` | No |
 | `/ond-plan <what to build>` | Turns a direction into ordered **increments**. | `Docs/plans/` | No |
 | `/ond-plan-review [plan]` | Checks the plan **before code exists** — verifies its claims against the real code, stress-tests the slicing and the test gates. | (reports back) | No |
@@ -71,6 +73,7 @@ happens first, so a release that fails halfway never loses the old version. To r
 ## Typical run
 
 ```bash
+/ond-init                       # new session: rules loaded, repo state reported
 /ond-research how should we track concentration on spells
 #  → reads the PHB, the codebase, the web
 #  → Docs/research/2026-08-16-concentration.md  · recommends an approach
@@ -267,7 +270,9 @@ into one report. Findings are marked **CONFIRMED** (traced, definitely breaks) o
 **PLAUSIBLE** (looks wrong, unverified).
 
 All seven live in `.claude/` — **project-local and gitignored**, so they exist only in this
-repo on this machine. The `Docs/` output folders *are* committed.
+repo on this machine. The `Docs/` output folders *are* committed. `/ond-init` has no agent
+of its own: it is a plain skill in `.claude/skills/ond-init/` that runs in the main
+conversation, since its output is context you want to keep.
 
 ---
 

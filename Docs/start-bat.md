@@ -71,6 +71,13 @@ User runs start.bat (double-click) / start.sh (./start.sh)
 - The bootstrap message shows once, then `exec` replaces the outer script with `OND-App/start.sh`.
 - Distro hints for missing tools: `sudo dnf install nodejs npm` / `sudo apt install nodejs npm`.
 
+## Linux desktop entry (`OND.desktop`)
+- `OND.desktop` at the repo root opens a terminal (`Terminal=true`, so KDE uses Konsole) and runs `scripts/ond-desktop.sh`. Double-click it in the file manager, or copy/symlink it into `~/.local/share/applications/` to get it in the app menu.
+- `scripts/ond-desktop.sh` exists because a desktop entry is started by the session, not a login shell: nothing from `~/.bashrc` is on PATH, so nvm's Node.js is missing and `start.sh` would loop on "Node.js is not installed". The wrapper sources `$NVM_DIR/nvm.sh` when `node` is not already on PATH, `cd`s to the repo root (found relative to itself, so the script is relocatable), then `exec`s `start.sh`. From there the flow is exactly the Linux launcher above, including the update prompt.
+- The `.desktop` file itself holds **absolute paths** (`Path=`, `Exec=`, `Icon=`) — the desktop entry spec resolves `Exec` against PATH, not against the file's own folder, so they cannot be relative. If the checkout moves, edit those three lines. `desktop-file-validate OND.desktop` checks the syntax.
+- Icon: `client/public/assets/ond-icon.png` (a d20, 256px). The same file is the app's favicon (`<link rel="icon">` in `client/index.html`), so Windows users see the logo in the browser tab even though `start.bat` itself cannot carry an icon. The SVG next to it is the editable source; KDE showed a blank icon when `Icon=` pointed at the SVG directly, even though the file renders fine in Inkscape, so the `.desktop` uses the PNG. Regenerate after editing the SVG: `python3 -c "import cairosvg; cairosvg.svg2png(url='client/public/assets/ond-icon.svg', write_to='client/public/assets/ond-icon.png', output_width=256, output_height=256)"`.
+- Both `OND.desktop` and `scripts/ond-desktop.sh` have their executable bit set in the index (`git update-index --chmod=+x`), same as `start.sh`.
+
 ## For Users
 1. Download `start.bat` (Windows) or `start.sh` (Linux) from the repo (or receive from DM)
 2. Run it

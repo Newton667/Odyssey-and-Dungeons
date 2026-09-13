@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b2a5a"/>
+      <stop offset="1" stop-color="#1c1430"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8c56a"/>
+      <stop offset="1" stop-color="#b8892c"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <!-- d20 outline: outer hexagon -->
+  <polygon points="64,14 106,38 106,90 64,114 22,90 22,38" fill="#5a4380" stroke="#f2dc9a" stroke-width="3" stroke-linejoin="round"/>
+  <!-- front face -->
+  <polygon points="64,30 96,84 32,84" fill="url(#face)" stroke="#f2dc9a" stroke-width="3" stroke-linejoin="round"/>
+  <!-- edges from the front face to the outer corners -->
+  <g stroke="#f2dc9a" stroke-width="3" stroke-linecap="round">
+    <line x1="64" y1="30" x2="64" y2="14"/>
+    <line x1="64" y1="30" x2="22" y2="38"/>
+    <line x1="64" y1="30" x2="106" y2="38"/>
+    <line x1="96" y1="84" x2="106" y2="90"/>
+    <line x1="96" y1="84" x2="64" y2="114"/>
+    <line x1="32" y1="84" x2="22" y2="90"/>
+    <line x1="32" y1="84" x2="64" y2="114"/>
+    <line x1="32" y1="84" x2="22" y2="38"/>
+    <line x1="96" y1="84" x2="106" y2="38"/>
+    <line x1="106" y1="90" x2="106" y2="38"/>
+    <line x1="22" y1="90" x2="22" y2="38"/>
+  </g>
+  <text x="64" y="74" text-anchor="middle" font-family="Cinzel, Georgia, serif" font-weight="700" font-size="30" fill="#2a1d45">20</text>
+</svg>

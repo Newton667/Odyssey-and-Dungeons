@@ -32,9 +32,11 @@ OND/
 │   └── server.js            # Express entry point
 ├── Docs/                    # Documentation
 ├── scripts/
-│   └── ensure-deps.js       # Platform-aware dependency install (used by both launchers + root postinstall)
+│   ├── ensure-deps.js       # Platform-aware dependency install (used by both launchers + root postinstall)
+│   └── ond-desktop.sh       # Loads nvm, then runs start.sh — what OND.desktop executes
 ├── start.bat                # Launcher (Windows)
 ├── start.sh                 # Launcher (Linux)
+├── OND.desktop              # Linux desktop entry: terminal + scripts/ond-desktop.sh (absolute paths)
 ├── .gitattributes           # Pins start.sh to LF and start.bat to CRLF on checkout
 └── package.json             # Root workspace config
 ```

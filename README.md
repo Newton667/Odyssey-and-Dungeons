@@ -38,6 +38,8 @@ bash start.sh
 
 Same behaviour as Windows: checks for Node.js and Git, clones the app into `OND-App/` on first run, checks for updates, installs dependencies, then starts both servers **in the one terminal** and opens the browser. **Ctrl+C stops both servers.**
 
+On a desktop, `OND.desktop` does the same from a double-click (or from the app menu once copied into `~/.local/share/applications/`). It runs `scripts/ond-desktop.sh`, which loads nvm's Node.js before calling `start.sh`. The entry uses absolute paths, so edit its `Path=`, `Exec=` and `Icon=` lines if the checkout lives somewhere other than `/mnt/Stuff/Stuff/DND/OND`.
+
 ### Manual setup (any OS)
 
 Requires [Node.js](https://nodejs.org/) and npm.

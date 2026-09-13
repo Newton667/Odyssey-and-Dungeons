@@ -1,0 +1,14 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=OND
+GenericName=D&D Companion
+Comment=Odyssey and Dragons - start the local D&D companion and open it in the browser
+Path=/mnt/Stuff/Stuff/DND/OND
+Exec=/mnt/Stuff/Stuff/DND/OND/scripts/ond-desktop.sh
+Icon=/mnt/Stuff/Stuff/DND/OND/client/public/assets/ond-icon.png
+Terminal=true
+Categories=Game;RolePlaying;
+Keywords=dnd;dungeons;dragons;character;sheet;
+StartupNotify=true

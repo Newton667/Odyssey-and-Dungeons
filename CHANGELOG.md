@@ -28,6 +28,13 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.8.0 — 2026-09-13
+
+### Added
+- **`OND.desktop` launcher for Linux desktops.** A desktop entry at the repo root that opens a terminal and runs `start.sh` — the same update check, dependency install, both servers and browser open as the launcher, and Ctrl+C stops everything. It goes through the new `scripts/ond-desktop.sh`, which loads nvm first (a desktop entry does not get the PATH from `~/.bashrc`, so nvm's Node.js would otherwise be missing) and then hands off to `start.sh`. Comes with a d20 icon (`client/public/assets/ond-icon.png`, SVG source alongside it).
+- **The app now has a favicon.** The same d20 logo shows in the browser tab and in bookmarks on every OS, via a `<link rel="icon">` in `client/index.html` pointing at `/assets/ond-icon.png`.
+- **New `/ond-init` command in the dev workflow.** Starts a Claude Code session on this repo: reads `CLAUDE.md`, the gotchas file, the workflow and the architecture doc, takes stock of the repo (branch, dirty files, unreleased changelog, version drift, dependency platform, running servers, test baseline) and of any in-flight plans, increments and reviews, then gives a short briefing and the recommended next command. `Docs/WORKFLOW.md` updated.
+
 ## v1.7.0 — 2026-09-13
 
 ### Added
