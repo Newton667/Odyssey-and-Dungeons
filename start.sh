@@ -106,11 +106,20 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 # ─── Check for updates ──────────────────────────────
+# Only offer an update when HEAD is strictly BEHIND origin/main. When HEAD is ahead or has
+# diverged, `git reset --hard origin/main` would silently drop local commits that are not on GitHub.
 echo "  [1/4] Checking for updates..."
 git fetch origin main >/dev/null 2>&1
-LOCAL="$(git rev-parse HEAD 2>/dev/null)"
-REMOTE="$(git rev-parse origin/main 2>/dev/null)"
-if [ -n "$LOCAL" ] && [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+LOCAL="$(git rev-parse --verify --quiet HEAD 2>/dev/null)"
+REMOTE="$(git rev-parse --verify --quiet origin/main 2>/dev/null)"
+BEHIND=0
+if [ -n "$LOCAL" ] && [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ] \
+   && git merge-base --is-ancestor HEAD origin/main >/dev/null 2>&1; then
+  BEHIND="$(git rev-list --count HEAD..origin/main 2>/dev/null)"
+fi
+if [ -n "$LOCAL" ] && [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ] && [ "${BEHIND:-0}" = 0 ]; then
+  echo "  [UPDATE] Skipped: this folder has local commits that are not on GitHub."
+elif [ "${BEHIND:-0}" != 0 ]; then
   echo "  [UPDATE] New version available!"
   echo
   DOUPDATE=""

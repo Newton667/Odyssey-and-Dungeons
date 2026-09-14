@@ -2,6 +2,76 @@
 
 
 
+## Never build a RegExp from text the user typed
+
+`queryLocalEquipment`/`queryLocalSpells` did `new RegExp(search, 'i')`, and the server's spell and
+equipment routes did the same. Typing `+` (the start of "+1 Longsword"), `(` or `?` threw
+"Invalid regular expression" **inside a load effect**, so the error boundary replaced the whole
+page; in database mode the 500 also made the client flip the user to Local mode. `.` matched every
+name. **Rule:** filter text is matched literally — `String(value).toLowerCase().includes(needle)` on
+the client, and an escaped pattern (`s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')`) wherever a Mongo
+query needs a regex. Regression tests in `localDataService.test.js`.
+
+## A one-element `classes` array is not authoritative
+
+`getCharClasses(char)` used to prefer `char.classes` whenever it existed. The sheet's Level Up
+writes through `syncPrimaryFromClasses`, which always returned `classes`, so a **single-class**
+character levelled on the sheet left with `classes: [{…}]` — and from then on the editor's Lv Up,
+a class change, and the Progression tab's subclass pick (which all write only
+`class`/`level`/`subclass`) were silently ignored by every class-derived number on the sheet.
+
+**Rules:**
+- Only a real multiclass array (2+ entries with a class) wins; for one class the top-level fields
+  are the source of truth. `getCharClasses` enforces this, which also repairs existing saves.
+- Don't persist a one-element array: `applyLevelUp` sets `patch.classes = undefined` for a single
+  class, and the editor drops a leftover one on save.
+- The editor must carry a real multiclass array in its form (conditional spread — a plain
+  `classes: data.classes` key would write `undefined` and delete it), and class/subclass edits must
+  update `classes[0]` as well as the summary fields.
+
+## Progression picks belong to the card's own level
+
+`getLevelChoices` only stamped `level` on totem and hunter-option choices; everything else was stored
+under `choice.level || currentLevel`, so every ASI card on a Fighter 8 read and wrote key `"8"`. And
+`getSelected` fell back to *any* level's value for the same choice type, so `selectOption` "undid" a
+different level's pick as if it were the previous one — two ASIs taken, one bonus left. Re-clicking
+the selected ASI also re-applied it.
+
+**Rules:**
+- `getLevelChoices(cls, level, subclass, ruleset)` stamps `level` on **every** choice and places the
+  subclass choice at `getSubclassLevel(cls, ruleset)`. Pass `char.ruleset`.
+- Borrowing another level's pick is only allowed for once-per-class choices (`subclass`,
+  `pact-boon`, `land-terrain`). Never for ASI, invocations, maneuvers, metamagic, expertise, favored
+  enemy/terrain or totems.
+- ASI/feat effects go through `asiChoiceEffect(selection, featAbility)` (`levelChoices.js`), which
+  reads the shared `FEAT_ABILITY_BONUSES` — the sheet used to keep its own copy that always gave the
+  first listed ability and never granted Resilient's save. The chosen ability is stored as
+  `levelChoices[key].asiAbility`. Picks saved before that field existed are undone with the old
+  behaviour (Resilient = +1 CON, no save).
+- Going from one class to two, `migrateSingleClassChoices(char, cls)` re-keys bare level keys to
+  `${cls}:${level}` and `Fighting Style: X` to `Fighting Style (${cls}): X`, or the multiclass
+  sheet can't see them.
+- **Old saves** hold picks under the level the class had when they were made. The sheet repairs them
+  once on load with `relocateOrphanedChoices` (a pick whose key level has no choice of that type
+  moves to the nearest free card of that type at or below it, else above). Without that, removing
+  the cross-level fallback made those picks look unchosen and re-picking applied the ASI twice.
+
+## Store the whole value where the reader looks — `spellcastingAbility` is not saved by the creator
+
+The creator never writes `char.spellcastingAbility`, so every reader that used it alone was wrong
+for new characters: the Actions tab and spell side panel fell back to INT for every caster, and
+the editor's prepared-spell limit used a modifier of 0. **Rule:** derive the ability from the class —
+`getSpellcastingClasses(char)[0]?.ability` on the sheet, `CLASS_SPELL_ABILITY[class]` in the editor —
+and treat the stored field as an override. Same family: `getSpellcastingClasses` now skips a 2014
+Paladin/Ranger below class level 2 (`spellcastingStartLevel`); a limit of 0 from a caster class that
+hasn't started casting is a real cap, not "uncapped".
+
+## Built-in magic armour bakes its bonus into `ac`; homebrew keeps it separate
+
+`equipment.json`'s `+1 Chain Mail` is `{ ac: '17', bonus: 1 }` — the +1 is **already** in `ac`. The
+Homebrewer stores the base AC and the +N separately. `calcAC` therefore adds `bonus` only for
+`item.homebrew` records. Adding it for every item double-counts built-in magic armour.
+
 ## Never hand out a module's own data array — return a copy
 
 `localDataService`'s `getAllLocalSpells()` / `getAllLocalEquipment()` used to `return spellsData`
@@ -53,12 +123,14 @@ catch this, so assert the disagreement case explicitly.
 
 **Fix:** Converted `Widget` from an inline component to a plain `wrapWidget()` function that returns JSX directly.
 
+The same mistake survived in `RollBtn`, `ProfDot`, `SkillRow`, `SaveRow` and `SpellCard` (an open upcast `<select>` snapped shut on every toast or roll). They now live at **module scope** in `CharacterSheet.jsx` and read the sheet's per-render values from `SheetCtx` (a context provided around the sheet's returned tree). Add any new value they need to the `sheetCtx` object, not a closure.
+
 **Rule:** NEVER define React components inside other components' render functions.
 
 ### 2. NumInput — Controlled Number Input Deselection
 **Problem:** Standard pattern `onChange={e => setValue(parseInt(e.target.value))}` causes the input to deselect because parsing empty string or partial input produces NaN/0, which differs from the raw text, causing React to re-render with a different value.
 
-**Fix:** `NumInput` component stores raw text string while focused, only parses on blur.
+**Fix:** `NumInput` component stores raw text string while focused, only parses on blur — **and on Enter**. Committing only on blur meant Enter submitted the enclosing form with the previous value; Enter now commits and prevents the implicit submit.
 
 **Rule:** For number inputs, always use `NumInput` or the same raw-text-while-focused pattern.
 
@@ -174,7 +246,9 @@ These are written by the character sheet and are **not** part of the editor's fo
 
 `rollDice3D` now guards on a `rollingRef` and returns `Promise.resolve(null)` while dice are in the air. **Rule:** every caller must guard — `const r = await rollDice3D(...); if (!r) return;` — before touching the result. Never `const { total } = await rollDice3D(...)`; that throws `TypeError: Cannot destructure property … of 'null'`. There are 12 call sites across `CharacterSheet`, `DiceRoller`, `Equipment`, `Homebrew` and `Spells`; grep for `= await rollDice3D` after any change. Callers with their own local `rolling` state must also clear it on the null path, or their button latches. Note the build does **not** catch this class of error.
 
-The guard needs a **watchdog** to be safe. `rollingRef` is cleared inside `onDiceSettled`, and `Dice3D` arms its own 6 s safety timeout — but only *after* the `THREE.WebGLRenderer` is constructed. If that setup throws or bails (no canvas, WebGL unavailable, context lost on a GPU switch), `onDiceSettled` never fires, the guard is never released, and **every subsequent roll in the session returns `null`** until a page reload. `DiceContext` therefore arms a 10 s watchdog alongside the promise (comfortably past Dice3D's 6 s) that releases the guard and resolves `null`, cleared at the top of `onDiceSettled`. **Rule:** any code path that sets `rollingRef.current = true` must have a guaranteed release — don't rely on the renderer's own timeout.
+The guard needs a **watchdog** to be safe. `rollingRef` is cleared inside `onDiceSettled`, and `Dice3D` arms its own 6 s safety timeout — but only *after* the `THREE.WebGLRenderer` is constructed. If that setup bails (no canvas, context lost on a GPU switch), `onDiceSettled` never fires, the guard is never released, and **every subsequent roll in the session returns `null`** until a page reload. `DiceContext` therefore arms a 10 s watchdog alongside the promise (comfortably past Dice3D's 6 s) that releases the guard and resolves `null`, cleared at the top of `onDiceSettled`. **Rule:** any code path that sets `rollingRef.current = true` must have a guaranteed release — don't rely on the renderer's own timeout.
+
+**A renderer that throws is a different failure, and the watchdog does not cover it.** `new THREE.WebGLRenderer()` *throws* when WebGL is unavailable (hardware acceleration off, VMs, remote desktops), inside a `useEffect`. `Dice3D` is rendered by `DiceProvider`, which used to sit **outside** the `ErrorBoundary`, so React unmounted the whole app on the first roll. Now the constructor is in a `try/catch` that leaves `stateRef` null, the launch effect settles the roll with fair random values and no animation, and `ErrorBoundary` wraps `DiceProvider`. `Dice3D` remounts for every roll, so its cleanup must dispose scene resources and `mesh.clear()` each die (the glow `pulse()` loop runs until its label loses its parent). **Never call `renderer.forceContextLoss()` in that cleanup:** in dev, StrictMode runs the cleanup and then mounts again on the *same* canvas, which gets the lost context back — three.js then throws (`reading 'precision'`) and every roll silently falls back to no animation. The launchers run the dev server, so that is what every user sees.
 
 ### `CLASSES[cls].hitDice` is a bare `'d10'` — always add an explicit count
 Hit dice are stored **without** a leading count: `hitDice: 'd10'`, and `HIT_DICE[cls]` is the same shape. A formula built by interpolating one directly (`` rollDice3D(hd) ``) is not a valid dice string.
@@ -209,6 +283,19 @@ The navbar had the same failure (`⚙ Settings` clipped, document overflowing 18
 - `minWidth: 0` lets a flex child shrink **below its content** — good for a text block that should wrap, wrong for a row of buttons, where it produces overlap.
 - Verify by measuring **and** by eye, in the state a real user is in (conditional links present, on a page where they render). `document.body.scrollWidth` must equal `document.documentElement.clientWidth`, and no element's `getBoundingClientRect().right` may exceed it. Check the breakpoint boundaries too — the width *just above* a `max-width` media query is the worst case, since everything it hides is back.
 - **Rect maths alone gives false positives** once a scroll container is involved: a child scrolled out of an `overflow-x: auto` row still reports an unclipped rect that appears to overlap its neighbours, while painting nothing. Confirm with a screenshot before believing an overlap.
+
+### Server: ids from the URL never become paths unchecked; state-changing requests must be same-site
+`routes/characters.js` built ``path.join(LOCAL_DIR, `${id}.json`)`` straight from `req.params.id`, and Express decodes `%2F` — so `GET/PUT/DELETE /api/characters/..%2F..%2Fpackage` read, rewrote or deleted arbitrary `.json` files. Ids are now validated with `router.param` (`/^[A-Za-z0-9_-]+$/`, which fits UUIDs and `local-<ts>-<rand>`) **and** the resolved path must stay inside `LOCAL_DIR`.
+
+`cors()` is open and the server listens on every interface, so any web page in the user's browser could POST `/api/pull-update` or `/api/config/database`. A guard in `server.js` refuses state-changing `/api` requests whose `Origin` is neither the request's own host nor this machine's own address. **The Vite proxy shorthand `'/api': 'http://localhost:3001'` turns on `changeOrigin`** — a dev request arrives with `Origin: http://localhost:5173` but `Host: localhost:3001` — which is why "this machine" is allowed and a strict Origin == Host check would break every write in dev.
+
+Related: an `async` Express 4 handler that throws outside its `try` is an unhandled rejection, and Node exits on those — validate `req.body` fields' **types** inside the `try` (`{"mongoUri":123}` used to kill the server). `server.js` also logs `unhandledRejection` as a backstop. MongoDB-backed routers sit behind a `requireDb` guard that answers 503 at once instead of letting mongoose buffer for 10 s.
+
+### Updates: only when strictly behind `origin/main`
+`/api/check-update`, `/api/pull-update`, `start.sh` and `start.bat` all compared `HEAD != origin/main` and then offered `git reset --hard origin/main` — which, on a checkout with unpushed commits (a developer's), silently threw them away. An update is offered only when `git merge-base --is-ancestor HEAD origin/main` succeeds **and** `git rev-list --count HEAD..origin/main` > 0. Use `git rev-parse --verify --quiet origin/main`: without `--verify`, a missing ref prints the literal string `origin/main`, so the "no remote" branch never ran.
+
+### Seed scripts delete only their own records (by name)
+Beyond "never `deleteMany({})`": a category or level filter still overlaps other scripts. `seed-equipment.js` inserts ten `magical: true` ammunition items that `seed-magic-items.js`'s `magical: true` delete wiped, and `deleteMany({ level: N })` in the spell seeds removed racial abilities and `seed-missing.js` spells at that level. Every delete is now scoped to `name: { $in: <this script's names> }`.
 
 ### Express JSON Limit
 `express.json({ limit: '10mb' })` is required because character data includes base64 portrait images. Default 100KB limit causes `PayloadTooLargeError`.
@@ -305,12 +392,12 @@ The `type: 'action'` side panel is reused for weapon-style actions **and** for c
 Multiclass characters carry a canonical `char.classes = [{class, subclass, level}]` (per-class levels); `char.class/subclass` = primary (classes[0]) and `char.level` = **total** level. Single-class characters have **no** `classes` array.
 
 **Rules:**
-- Never read `char.class`/`char.level` directly for class-derived math — go through `getCharClasses(char)` (from `utils/multiclass.js`), which synthesizes a one-element array for single-class characters. This keeps existing single-class saves working and all code uniform.
+- Never read `char.class`/`char.level` directly for class-derived math — go through `getCharClasses(char)` (from `utils/multiclass.js`), which synthesizes a one-element array for single-class characters (and ignores a *stored* one-element array — see "A one-element `classes` array is not authoritative"). This keeps existing single-class saves working and all code uniform.
 - **Spell slots:** use `getMulticlassSpellSlots(getCharClasses(char))` → `{ standard, pact }`. A single standard caster uses its own class table (a pure Paladin 5 has 2nd-level slots — the combined formula would be wrong); 2+ casters use the combined-caster-level multiclass table. Warlock Pact Magic is **always** separate (`pactData`), and can coexist with standard slots — render both blocks independently, never `spellSlotData.pact`.
 - **Extra Attack does not stack** across classes — use `getMulticlassExtraAttacks` (max, not sum).
 - **Hit dice** are per-class pools (`getHitDicePools` / `formatHitDice`), not a single `NdX` string. `char.hitDice` is a display fallback only.
 - After any level change, run `syncPrimaryFromClasses(classes)` to keep `class/subclass/level/proficiencyBonus` consistent with the `classes` array. Proficiency bonus is based on **total** level.
-- The sheet's **Level Up modal** advances an existing class or adds a new one (enforcing `MULTICLASS_REQS`, applying `MULTICLASS_PROFICIENCIES`), and **prompts for a subclass** when the advanced/added class hits its `subclassLevel` without one. CharacterEdit's simple "Lv Up" advances the **primary** class only when multiclass, and disables the raw total-level input to avoid desyncing from `classes`.
+- The sheet's **Level Up modal** (header button for milestone characters, XP bar when ready in XP mode) advances an existing class or adds a new one (enforcing `MULTICLASS_REQS` for the new class **and every current class**, against effective scores; applying `MULTICLASS_PROFICIENCIES`), and **prompts for a subclass** when the advanced/added class hits its `subclassLevel` without one. Levelling raises current HP by the HP gained (it does not heal to full) and adds one hit die. CharacterEdit's simple "Lv Up" advances the **primary** class only when multiclass, and disables the raw total-level input to avoid desyncing from `classes`.
 - **Progression tab** renders one `renderClassSection(ctx)` per class from `charClasses`. When multiclass, level-choice storage (`char.levelChoices`) and expand-state keys are **namespaced by class** (`${cls}:${level}` / `${cls}-...`) so two classes never collide; `getSelected` scopes its scan to the current class. Subclass picks update the matching entry in `char.classes` via `syncPrimaryFromClasses`; fighting styles are stored per-class as `Fighting Style (Cls): X` features. Single-class characters keep the original un-namespaced keys — do not change that or existing saves lose their choices.
 
 ### Fighting Styles

@@ -6,6 +6,44 @@ import { parseDiceFormula } from './diceFormula';   // no imports of its own —
 export function modVal(score) { return Math.floor((score - 10) / 2); }
 export function modStr(score) { const m = modVal(score); return m >= 0 ? `+${m}` : `${m}`; }
 export function profBonus(lvl) { return Math.ceil(lvl / 4) + 1; }
+
+// Hit dice left after a long rest: regain spent dice up to half the total, minimum 1
+// (PHB p.186; unchanged in 2024). `remaining` undefined = nothing spent.
+export function hitDiceAfterLongRest(total, remaining) {
+  const max = Math.max(1, total || 1);
+  const current = Math.min(max, Math.max(0, remaining ?? max));
+  return Math.min(max, current + Math.max(1, Math.floor(max / 2)));
+}
+
+// Base AC with no armor on. Unarmored Defense: Barbarian 10 + DEX + CON (a shield
+// still allowed), Monk 10 + DEX + WIS (only without a shield). Alternative AC
+// formulas don't stack — use the best one available. The shield's +2 is added by the caller.
+export function unarmoredBaseAC(classNames, { dex = 0, con = 0, wis = 0 } = {}, hasShield = false) {
+  let ac = 10 + dex;
+  if (classNames.includes('Barbarian')) ac = Math.max(ac, 10 + dex + con);
+  if (classNames.includes('Monk') && !hasShield) ac = Math.max(ac, 10 + dex + wis);
+  return ac;
+}
+
+// Spell picks the character creator may actually save: on the current class list, cantrips
+// as cantrips and leveled spells within `spellInfo.maxLevel`, capped at the allowed counts
+// (earliest picks win). `spellInfo` is getSpellInfo's result — null means no spellcasting.
+export function trimSpellPicks({ cantrips = [], spells = [], available = [], spellInfo }) {
+  if (!spellInfo) return { cantrips: [], spells: [] };
+  const byName = new Map(available.map(s => [s.name, s]));
+  const keep = (names, ok, max) => [...new Set(names)].filter(n => ok(byName.get(n))).slice(0, Math.max(0, max || 0));
+  return {
+    cantrips: keep(cantrips, sp => sp && sp.level === 0, spellInfo.cantrips),
+    spells: keep(spells, sp => sp && sp.level >= 1 && sp.level <= (spellInfo.maxLevel || 0), spellInfo.spellsKnown || spellInfo.prepareCount),
+  };
+}
+
+// Martial Arts damage die by Monk class level. 2014: d4 → d6 at 5 → d8 at 11 → d10 at 17.
+// 2024: one size larger at every tier (d6 → d8 → d10 → d12).
+export function martialArtsDie(monkLevel, ruleset = '2014') {
+  const dice = ruleset === '2024' ? ['1d6', '1d8', '1d10', '1d12'] : ['1d4', '1d6', '1d8', '1d10'];
+  return dice[monkLevel >= 17 ? 3 : monkLevel >= 11 ? 2 : monkLevel >= 5 ? 1 : 0];
+}
 export function xpForLevel(lvl) { return XP_THRESHOLDS[Math.min(Math.max(lvl - 1, 0), 19)] || 0; }
 
 // ─── Rarity ──────────────────────────────────────────────────────────

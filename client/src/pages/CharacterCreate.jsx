@@ -4,6 +4,7 @@ import { createCharacter } from '../hooks/useCharacterSync';
 import ImageCropper from '../components/ImageCropper';
 import Tip from '../components/Tip';
 import Field from '../components/Field';
+import NumInput from '../components/NumInput';
 import {
   ABILITIES, ABBR, ALIGNMENTS, STANDARD_ARRAY, ALL_SKILLS, TOOL_OPTIONS, FEATS, FEAT_PROFICIENCY_GRANTS,
   FEAT_ABILITY_BONUSES, FEAT_HP_PER_LEVEL,
@@ -12,8 +13,9 @@ import {
   SPELLS_KNOWN, CLASS_RECOMMENDED_GEAR, ALL_LANGUAGES, ARMORS, BACKGROUNDS, RARITY_COLORS,
   PB_COSTS, MAGIC_INITIATE_CLASSES,
 } from '../utils/dndConstants';
-import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras } from '../utils/dndHelpers';
-import { RACES, CLASS_LEVELS, CLASSES } from '../utils/classData';
+import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras, trimSpellPicks } from '../utils/dndHelpers';
+import { RACES, CLASSES, getClassLevels, getSubclassLevel } from '../utils/classData';
+import { formatHitDice } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 
 const STEPS = ['Race', 'Class', 'Background', 'Abilities', 'Skills', 'Details', 'Combat', 'Equipment', 'Spells', 'Extras', 'Review'];
@@ -183,7 +185,9 @@ export default function CharacterCreate() {
   const finalScores = useMemo(() => {
     const s = {};
     ABILITIES.forEach(ab => {
-      const pre = (baseScores[ab] || 10) + (racialBonuses[ab] || 0);
+      const base = baseScores[ab] || 10;
+      // Racial increases stop at 20 (manual entry allows a base of 20).
+      const pre = Math.max(base, Math.min(20, base + (racialBonuses[ab] || 0)));
       const fb = featAbilityBonuses.bonus[ab] || 0;
       // Half-feats can't raise a score above 20; never reduce an already-high score.
       s[ab] = pre + Math.min(fb, Math.max(0, 20 - pre));
@@ -303,24 +307,37 @@ export default function CharacterCreate() {
     return n;
   }, [bgToolProfs, cls]);
 
+  // Multiclass rows that actually count: a class chosen, not the main class, not a
+  // repeat. A blank "+ Add Class" row used to inflate the saved level, and switching the
+  // main class to one already listed saved the same class twice.
+  const cleanExtraClasses = useMemo(() => (multiclassEnabled
+    ? extraClasses.filter((ec, i) => ec.class && CLASSES[ec.class] && ec.class !== cls
+      && extraClasses.findIndex(x => x.class === ec.class) === i)
+    : []), [multiclassEnabled, extraClasses, cls]);
+
   // Total character level including multiclass
-  const totalLevel = useMemo(() => {
-    if (!multiclassEnabled) return level;
-    return level + extraClasses.reduce((s, ec) => s + (ec.level || 0), 0);
-  }, [level, multiclassEnabled, extraClasses]);
+  const totalLevel = useMemo(
+    () => level + cleanExtraClasses.reduce((s, ec) => s + (ec.level || 0), 0),
+    [level, cleanExtraClasses],
+  );
 
   // Number of ASIs (based on main class level)
   const asiCount = useMemo(() => {
     if (!cls) return 0;
     let count = 0;
-    const lvls = CLASS_LEVELS[cls];
-    if (!lvls) return 0;
+    const lvls = getClassLevels(cls, ruleset);
     for (let i = 1; i <= Math.min(level, 20); i++) {
       if (lvls[i]?.some(f => f === 'ASI')) count++;
     }
     // Fighter gets extras at 6,14; Rogue at 10
     return count;
-  }, [cls, level]);
+  }, [cls, level, ruleset]);
+  const maxFeats = asiCount + (race === 'Human' && subrace === 'Variant' ? 1 : 0);
+  // Picks beyond the current allowance (level lowered, Variant Human deselected) are
+  // dropped, together with the ability bonus and save proficiency they carried.
+  useEffect(() => {
+    if (selectedFeats.length > maxFeats) setSelectedFeats(prev => prev.slice(0, maxFeats));
+  }, [maxFeats, selectedFeats.length]);
 
   // HP calculation — supports multi-level average or rolled
   const computedHp = useMemo(() => {
@@ -333,31 +350,26 @@ export default function CharacterCreate() {
       const avg = Math.floor(dieMax / 2) + 1; // average rounded up
       for (let i = 2; i <= level; i++) {
         if (hpMethod === 'rolled' && rolledHpPerLevel[i]) {
-          hp += rolledHpPerLevel[i] + conMod;
+          hp += Math.min(dieMax, Math.max(1, rolledHpPerLevel[i])) + conMod;
         } else {
           hp += avg + conMod;
         }
       }
     }
     // Add multiclass levels with their hit dice
-    if (multiclassEnabled) {
-      extraClasses.forEach(ec => {
-        if (ec.class && CLASSES[ec.class]) {
-          const ecDie = CLASSES[ec.class].hpBase;
-          const avg = Math.floor(ecDie / 2) + 1;
-          for (let i = 1; i <= (ec.level || 0); i++) {
-            hp += avg + conMod;
-          }
-        }
-      });
-    }
+    cleanExtraClasses.forEach(ec => {
+      const ecDie = CLASSES[ec.class].hpBase;
+      const avg = Math.floor(ecDie / 2) + 1;
+      for (let i = 1; i <= (ec.level || 0); i++) {
+        hp += avg + conMod;
+      }
+    });
     // Flat max-HP feats (Tough: +2 per character level)
-    const totalLvl = multiclassEnabled ? (level + extraClasses.reduce((n, ec) => n + (ec.level || 0), 0)) : level;
     for (const feat of selectedFeats) {
-      if (FEAT_HP_PER_LEVEL[feat]) hp += FEAT_HP_PER_LEVEL[feat] * totalLvl;
+      if (FEAT_HP_PER_LEVEL[feat]) hp += FEAT_HP_PER_LEVEL[feat] * totalLevel;
     }
     return Math.max(1, hp);
-  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, multiclassEnabled, extraClasses, selectedFeats]);
+  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, cleanExtraClasses, totalLevel, selectedFeats]);
 
   // Spell info for current class/level
   const spellInfo = useMemo(() => {
@@ -367,9 +379,12 @@ export default function CharacterCreate() {
     return getSpellInfo(cls, level, abilityMod, CLASSES, ruleset);
   }, [cls, level, finalScores, ruleset]);
 
-  // Fetch spells when class changes
+  // Fetch spells when the class changes OR starts casting. Level and ruleset are set on
+  // later steps, so a Paladin/Ranger passes through here at 2014 level 1 (no Spellcasting);
+  // keyed on `cls` alone, the list never loaded once the level was raised.
+  const canCast = !!spellInfo;
   useEffect(() => {
-    if (!cls || !spellInfo) {
+    if (!cls || !canCast) {
       setAvailableSpells([]);
       return;
     }
@@ -377,7 +392,24 @@ export default function CharacterCreate() {
     const data = queryLocalSpells({ cls });
     setAvailableSpells(data);
     setLoadingSpells(false);
-  }, [cls]);
+  }, [cls, canCast]);
+
+  // What the character will actually be saved with — picks that went stale when an earlier
+  // choice changed (another class, a lower level) are dropped here, and the Review shows the same.
+  const spellPicks = useMemo(
+    () => trimSpellPicks({ cantrips: selectedCantrips, spells: selectedSpells, available: availableSpells, spellInfo }),
+    [selectedCantrips, selectedSpells, availableSpells, spellInfo],
+  );
+  const subclassUnlocked = !!cls && level >= getSubclassLevel(cls, ruleset);
+  const savedFightingStyle = fightingStyle && FIGHTING_STYLE_CLASSES[cls]?.styles.includes(fightingStyle)
+    && level >= FIGHTING_STYLE_CLASSES[cls].level ? fightingStyle : '';
+
+  // Skills granted by something other than the class list (background, race, Skilled).
+  // Picking one of these as a class skill silently wasted the pick.
+  const otherGrantedSkills = useMemo(() => new Set([
+    ...bgSkills, ...halfElfSkills, variantHumanSkill, ...racialSkills, koboldCraftSkill, ...featGrantedProfs.skills,
+  ].filter(Boolean)), [bgSkills, halfElfSkills, variantHumanSkill, racialSkills, koboldCraftSkill, featGrantedProfs]);
+  const classSkillPicks = useMemo(() => selectedSkills.filter(s => !otherGrantedSkills.has(s)), [selectedSkills, otherGrantedSkills]);
 
   // Fetch wizard cantrips for High Elf
   useEffect(() => {
@@ -443,25 +475,30 @@ export default function CharacterCreate() {
       if (abilityMethod === 'standard') return ABILITIES.every(ab => stdAssign[ab] !== '');
       return true;
     }
-    if (step === 4) return selectedSkills.length === numClassSkills;
+    if (step === 4) return classSkillPicks.length === numClassSkills;
     if (step === 5) return !!name; // Details
     if (step === 6) return true;   // Combat
     if (step === 7) return true;   // Equipment
     if (step === 8) return true;   // Spells
     if (step === 9) return true;   // Extras
     return true;
-  }, [step, race, cls, background, abilityMethod, stdAssign, selectedSkills, numClassSkills, name]);
+  }, [step, race, cls, background, abilityMethod, stdAssign, classSkillPicks, numClassSkills, name]);
 
   const submit = async () => {
     setSaving(true);
     const hp = computedHp;
-    const allLanguages = [...fixedRaceLangs, ...extraLanguages.filter(Boolean)];
-    const allToolProfs = [...new Set([...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.filter(Boolean)])];
+    // Trim to the current allowances — a language or tool chosen for a background or race
+    // the user then switched away from must not be saved (nor a language twice).
+    const allLanguages = [...new Set([...fixedRaceLangs, ...extraLanguages.slice(0, totalLangExtras).filter(Boolean)])];
+    const allToolProfs = [...new Set([...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.slice(0, toolChoiceCount).filter(Boolean)])];
+    const savedSubclass = subclassUnlocked ? subclass : '';
+    const multiclassRows = cleanExtraClasses.map(ec => ({ class: ec.class, subclass: ec.subclass || '', level: Math.max(1, ec.level || 1) }));
+    const savedClasses = multiclassRows.length > 0 ? [{ class: cls, subclass: savedSubclass, level }, ...multiclassRows] : null;
     try {
       const { ok, data } = await createCharacter({
         name,
         race: subrace ? `${race} (${subrace})` : race,
-        class: cls, subclass, level: multiclassEnabled ? totalLevel : level, background, alignment,
+        class: cls, subclass: savedSubclass, level: totalLevel, background, alignment,
         ruleset,
         faith,
         languages: allLanguages,
@@ -470,8 +507,8 @@ export default function CharacterCreate() {
         savingThrowProficiencies: [...new Set([...savingThrows, ...featAbilityBonuses.saves])],
         maxHp: hp, currentHp: hp,
         armorClass, speed,
-        hitDice: `${level}${classData?.hitDice || 'd8'}`,
-        proficiencyBonus: profBonus(multiclassEnabled ? totalLevel : level),
+        hitDice: savedClasses ? formatHitDice({ classes: savedClasses }) : `${level}${classData?.hitDice || 'd8'}`,
+        proficiencyBonus: profBonus(totalLevel),
         notes,
         levelingMethod,
         experiencePoints: levelingMethod === 'xp' ? experiencePoints : 0,
@@ -480,16 +517,15 @@ export default function CharacterCreate() {
         feats: selectedFeats,
         toolProficiencies: [...new Set([...allToolProfs, ...(warforgedTool ? [warforgedTool] : []), ...featGrantedProfs.tools])],
         avatarUrl: portrait,
-        ...(multiclassEnabled && extraClasses.length > 0 && {
-          classes: [{ class: cls, subclass, level }, ...extraClasses],
-        }),
+        ...(savedClasses && { classes: savedClasses }),
         equipment: selectedEquipmentList,
-        preparedSpells: [...new Set([...racialSpellNames, ...(highElfCantrip ? [highElfCantrip] : []), ...(koboldCantrip ? [koboldCantrip] : []), ...selectedCantrips, ...selectedSpells, ...(selectedFeats.includes('Magic Initiate') ? [...miCantrips, miSpell].filter(Boolean) : [])])],
+        preparedSpells: [...new Set([...racialSpellNames, ...(highElfCantrip ? [highElfCantrip] : []), ...(koboldCantrip ? [koboldCantrip] : []), ...spellPicks.cantrips, ...spellPicks.spells, ...(selectedFeats.includes('Magic Initiate') ? [...miCantrips, miSpell].filter(Boolean) : [])])],
         // Persist which spell list Magic Initiate drew from, so the sheet's and
         // editor's spell browsers can offer it. Array-valued — the 2024 feat is
         // repeatable, and this avoids a data migration later.
         ...(miClass && selectedFeats.includes('Magic Initiate') && { featSpellLists: { 'Magic Initiate': [miClass] } }),
-        ...(fightingStyle && { features: [...(classData?.features?.map(f => f.split(' — ')[0]) || []), `Fighting Style: ${fightingStyle}`] }),
+        // The sheet's Progression tab reads `fightingStyle`; combat bonuses read the feature row.
+        ...(savedFightingStyle && { fightingStyle: savedFightingStyle, features: [...(classData?.features?.map(f => f.split(' — ')[0]) || []), `Fighting Style: ${savedFightingStyle}`] }),
         ...(Object.keys(homebrewLevels).length > 0 && { homebrewLevels }),
       });
       if (ok) navigate(`/characters/${data._id}`);
@@ -498,8 +534,8 @@ export default function CharacterCreate() {
   };
 
   // ── helpers ──────────────────────────────────────────────
-  const badge = (text, style = {}) => (
-    <span style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', borderRadius: '4px', ...style }}>{text}</span>
+  const badge = (text, style = {}, key) => (
+    <span key={key} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', borderRadius: '4px', ...style }}>{text}</span>
   );
 
   return (
@@ -540,7 +576,7 @@ export default function CharacterCreate() {
                   <h4 style={{ fontSize: '15px', marginBottom: '6px' }}>{rName}</h4>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '8px' }}>Speed: {rData.speed}ft</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                    {Object.entries(rData.bonuses).map(([ab, v]) => badge(`+${v} ${ABBR[ab]}`))}
+                    {Object.entries(rData.bonuses).map(([ab, v]) => badge(`+${v} ${ABBR[ab]}`, {}, ab))}
                     {rData.halfElfExtra && badge('+1 to 2')}
                   </div>
                 </div>
@@ -827,7 +863,10 @@ export default function CharacterCreate() {
           <div className="grid-3">
             {Object.entries(CLASSES).map(([cName, cData]) => (
               <Tip key={cName} text={cData.desc}>
-                <div className="card cc-card" onClick={() => { setCls(cName); setSelectedSkills([]); setSubclass(''); setFightingStyle(''); }}
+                <div className="card cc-card" onClick={() => {
+                  if (cName !== cls) { setSelectedCantrips([]); setSelectedSpells([]); setRolledHpPerLevel({}); }
+                  setCls(cName); setSelectedSkills([]); setSubclass(''); setFightingStyle('');
+                }}
                   style={{ cursor: 'pointer', border: cls === cName ? '2px solid var(--gold)' : '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <h4 style={{ fontSize: '15px' }}>{cName}</h4>
@@ -874,7 +913,7 @@ export default function CharacterCreate() {
                 </div>
               )}
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>Subclasses (lvl {classData.subclassLevel || 3})</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>Subclasses (lvl {getSubclassLevel(cls, ruleset)})</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {classData.subclasses?.map(sc => (
                     <Tip key={sc} text={classData.subclassDescs?.[sc]}>
@@ -884,7 +923,7 @@ export default function CharacterCreate() {
                 </div>
               </div>
               {/* Level Progression Table */}
-              {CLASS_LEVELS[cls] && (
+              {CLASSES[cls] && (
                 <div style={{ marginTop: '14px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px', textTransform: 'uppercase' }}>Level Progression</div>
                   <div style={{ maxHeight: '320px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px' }}>
@@ -899,7 +938,7 @@ export default function CharacterCreate() {
                       <tbody>
                         {Array.from({ length: Math.max(20, level) }, (_, i) => i + 1).map(lvl => {
                           const isHomebrew = lvl > 20;
-                          const feats = isHomebrew ? (homebrewLevels[lvl] || []).filter(Boolean) : (CLASS_LEVELS[cls][lvl] || []);
+                          const feats = isHomebrew ? (homebrewLevels[lvl] || []).filter(Boolean) : (getClassLevels(cls, ruleset)[lvl] || []);
                           const prof = lvl <= 4 ? '+2' : lvl <= 8 ? '+3' : lvl <= 12 ? '+4' : lvl <= 16 ? '+5' : '+6';
                           return (
                             <tr key={lvl} style={{ borderBottom: '1px solid var(--border)', background: isHomebrew ? 'var(--accent)' : lvl % 2 === 0 ? 'var(--bg-card)' : 'transparent' }}>
@@ -920,11 +959,14 @@ export default function CharacterCreate() {
           )}
 
           {/* ── Fighting Style ── */}
-          {cls && FIGHTING_STYLE_CLASSES[cls] && level >= FIGHTING_STYLE_CLASSES[cls].level && (
+          {/* Shown whatever the level: level is set on the Details step, so gating here hid the
+              picker from every Paladin and Ranger. Saved only once the level reaches the feature. */}
+          {cls && FIGHTING_STYLE_CLASSES[cls] && (
             <div className="card" style={{ marginTop: '20px' }}>
               <h4 style={{ fontSize: '14px', marginBottom: '4px', color: 'var(--gold)' }}>Fighting Style</h4>
               <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '12px' }}>
                 Choose a fighting style. You can't take a style more than once.
+                {FIGHTING_STYLE_CLASSES[cls].level > 1 && ` ${cls}s gain this at level ${FIGHTING_STYLE_CLASSES[cls].level} — it's saved if your level on the Details step is ${FIGHTING_STYLE_CLASSES[cls].level} or higher.`}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {FIGHTING_STYLE_CLASSES[cls].styles.map(style => {
@@ -1070,8 +1112,8 @@ export default function CharacterCreate() {
                 {ABILITIES.map(ab => (
                   <div key={ab} style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                     <label style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{ABBR[ab]}</label>
-                    <input type="number" min={1} max={20} value={manualScores[ab]}
-                      onChange={e => setManualScores(p => ({ ...p, [ab]: Number(e.target.value) }))}
+                    <NumInput min={1} max={20} value={manualScores[ab]}
+                      onChange={v => setManualScores(p => ({ ...p, [ab]: v }))}
                       style={{ width: '72px', textAlign: 'center', fontSize: '20px', fontWeight: 700 }} />
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
                       +{racialBonuses[ab] || 0} = <strong style={{ color: 'var(--gold)' }}>{manualScores[ab] + (racialBonuses[ab] || 0)}</strong> ({modStr(manualScores[ab] + (racialBonuses[ab] || 0))})
@@ -1112,28 +1154,29 @@ export default function CharacterCreate() {
           </div>
           <div className="card">
             <h4 style={{ fontSize: '12px', marginBottom: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
-              Class Skill Choices — {selectedSkills.length}/{numClassSkills}
+              Class Skill Choices — {classSkillPicks.length}/{numClassSkills}
             </h4>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px' }}>
               {classSkillChoices.map(skill => {
-                const fromBg = bgSkills.includes(skill);
+                // Already granted by background/race/feat: not pickable, but a stale pick can
+                // still be cleared (it no longer counts toward the class allowance).
+                const fromBg = otherGrantedSkills.has(skill);
                 const sel = selectedSkills.includes(skill);
                 return (
                   <div key={skill} className={!fromBg ? 'cc-skill' : ''} onClick={() => {
-                    if (fromBg) return;
                     if (sel) setSelectedSkills(p => p.filter(s => s !== skill));
-                    else if (selectedSkills.length < numClassSkills) setSelectedSkills(p => [...p, skill]);
+                    else if (!fromBg && classSkillPicks.length < numClassSkills) setSelectedSkills(p => [...p, skill]);
                   }} style={{
                     display: 'flex', alignItems: 'center', gap: '10px',
                     padding: '8px 10px', borderRadius: '4px',
                     cursor: fromBg ? 'default' : 'pointer',
                     background: fromBg ? 'var(--surface)' : sel ? 'var(--accent)' : 'var(--input-bg)',
                     border: fromBg ? '1px solid var(--green-light, #27ae60)' : sel ? '1px solid var(--gold-dim)' : '1px solid var(--border)',
-                    opacity: !fromBg && !sel && selectedSkills.length >= numClassSkills ? 0.4 : 1,
+                    opacity: !fromBg && !sel && classSkillPicks.length >= numClassSkills ? 0.4 : 1,
                   }}>
                     <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, background: fromBg ? 'var(--green-light, #27ae60)' : sel ? 'var(--gold)' : 'transparent', border: `2px solid ${fromBg ? 'var(--green-light, #27ae60)' : sel ? 'var(--gold)' : 'var(--border)'}` }} />
                     <span style={{ fontSize: '13px' }}>{skill}</span>
-                    {fromBg && <span style={{ fontSize: '10px', color: 'var(--green-light, #27ae60)', marginLeft: 'auto' }}>BG</span>}
+                    {fromBg && <span style={{ fontSize: '10px', color: 'var(--green-light, #27ae60)', marginLeft: 'auto' }}>{bgSkills.includes(skill) ? 'BG' : 'HAVE'}</span>}
                   </div>
                 );
               })}
@@ -1157,7 +1200,7 @@ export default function CharacterCreate() {
                 </select>
               </Field>
               <Field label={`${cls} Level`}>
-                <input type="number" min={1} max={30} value={level} onChange={e => setLevel(Math.min(30, Math.max(1, Number(e.target.value) || 1)))} />
+                <NumInput min={1} max={30} value={level} onChange={setLevel} />
               </Field>
               <Field label="Leveling">
                 <select value={levelingMethod} onChange={e => setLevelingMethod(e.target.value)}>
@@ -1165,9 +1208,9 @@ export default function CharacterCreate() {
                   <option value="xp">XP</option>
                 </select>
               </Field>
-              <Field label={`Subclass${classData && level < (classData.subclassLevel || 3) ? ` (lvl ${classData.subclassLevel || 3}+)` : ''}`}>
-                <select value={subclass} onChange={e => setSubclass(e.target.value)}>
-                  <option value="">— Choose {classData && level >= (classData.subclassLevel || 3) ? 'subclass' : 'later'} —</option>
+              <Field label={`Subclass${classData && !subclassUnlocked ? ` (lvl ${getSubclassLevel(cls, ruleset)}+)` : ''}`}>
+                <select value={subclass} onChange={e => setSubclass(e.target.value)} disabled={!subclassUnlocked}>
+                  <option value="">— Choose {subclassUnlocked ? 'subclass' : 'later'} —</option>
                   {classData?.subclasses.map(sc => <option key={sc}>{sc}</option>)}
                 </select>
               </Field>
@@ -1180,8 +1223,8 @@ export default function CharacterCreate() {
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-dim)', display: 'block', marginBottom: '4px' }}>Experience Points</label>
-                    <input type="number" min={0} value={experiencePoints}
-                      onChange={e => setExperiencePoints(parseInt(e.target.value) || 0)}
+                    <NumInput min={0} value={experiencePoints}
+                      onChange={setExperiencePoints}
                       style={{ width: '100%', fontSize: '13px', padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }} />
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)', flex: 1 }}>
@@ -1312,10 +1355,11 @@ export default function CharacterCreate() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {Array.from({ length: level - 1 }, (_, i) => i + 2).map(lvl => (
                       <Field key={lvl} label={`Lvl ${lvl} (${classData.hitDice})`}>
-                        <input type="number" min={1} max={classData.hpBase}
-                          value={rolledHpPerLevel[lvl] || ''}
-                          placeholder={String(Math.floor(classData.hpBase / 2) + 1)}
-                          onChange={e => setRolledHpPerLevel(prev => ({ ...prev, [lvl]: Number(e.target.value) || 0 }))}
+                        {/* 0 (or blank) means "use the average"; anything else is kept on the die. */}
+                        <NumInput min={0} max={classData.hpBase}
+                          value={rolledHpPerLevel[lvl] || 0}
+                          title={`0 = average (${Math.floor(classData.hpBase / 2) + 1})`}
+                          onChange={v => setRolledHpPerLevel(prev => ({ ...prev, [lvl]: v }))}
                           style={{ width: '60px', textAlign: 'center' }} />
                       </Field>
                     ))}
@@ -1376,8 +1420,8 @@ export default function CharacterCreate() {
                           <option key={c}>{c}</option>
                         ))}
                       </select>
-                      <input type="number" min={1} max={20} value={ec.level || 1} style={{ width: '60px' }}
-                        onChange={e => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], level: Math.max(1, Number(e.target.value) || 1) }; return n; })} />
+                      <NumInput min={1} max={20} value={ec.level || 1} style={{ width: '60px' }}
+                        onChange={v => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], level: v }; return n; })} />
                       {ec.class && CLASSES[ec.class] && (
                         <select value={ec.subclass} onChange={e => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], subclass: e.target.value }; return n; })}>
                           <option value="">— Subclass —</option>
@@ -1926,7 +1970,6 @@ export default function CharacterCreate() {
           {/* ── Feats ── */}
           {(() => {
             const isVariantHuman = race === 'Human' && subrace === 'Variant';
-            const maxFeats = asiCount + (isVariantHuman ? 1 : 0);
             const featsFull = selectedFeats.length >= maxFeats;
             return (
               <div className="card">
@@ -2278,7 +2321,7 @@ export default function CharacterCreate() {
                 {selectedEquipmentList.map((e, i) => <div key={i} style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '2px' }}>• {e}</div>)}
               </div>
             )}
-            {(racialSpellNames.length > 0 || selectedCantrips.length > 0 || selectedSpells.length > 0) && (
+            {(racialSpellNames.length > 0 || spellPicks.cantrips.length > 0 || spellPicks.spells.length > 0) && (
               <div className="card" style={{ gridColumn: '1 / -1' }}>
                 <h4 style={{ fontSize: '12px', marginBottom: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Spells & Racial Abilities</h4>
                 {racialSpellNames.length > 0 && (
@@ -2289,19 +2332,19 @@ export default function CharacterCreate() {
                     </div>
                   </div>
                 )}
-                {selectedCantrips.length > 0 && (
+                {spellPicks.cantrips.length > 0 && (
                   <div style={{ marginBottom: '8px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Cantrips:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {selectedCantrips.map(s => <span key={s} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', borderRadius: '4px' }}>{s}</span>)}
+                      {spellPicks.cantrips.map(s => <span key={s} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', borderRadius: '4px' }}>{s}</span>)}
                     </div>
                   </div>
                 )}
-                {selectedSpells.length > 0 && (
+                {spellPicks.spells.length > 0 && (
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Spells:</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                      {selectedSpells.map(s => <span key={s} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '4px' }}>{s}</span>)}
+                      {spellPicks.spells.map(s => <span key={s} style={{ fontSize: '11px', padding: '2px 7px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: '4px' }}>{s}</span>)}
                     </div>
                   </div>
                 )}

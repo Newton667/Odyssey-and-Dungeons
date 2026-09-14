@@ -56,7 +56,11 @@ function DiceFormulaBuilder({ value, onChange, label }) {
     if (!value) return;
     const rolled = await rollDice3D(value, label || 'Test Roll');
     if (!rolled) return; // dice already in the air
-    setLastRoll({ results: rolled.results, total: rolled.total });
+    // Derive the flat modifier from the roll itself rather than trusting `rolled.bonus`:
+    // not every DiceContext return path carries it, and `undefined` rendered as "− NaN".
+    const results = rolled.results || [];
+    const bonus = rolled.total - results.reduce((s, r) => s + (r.value || 0), 0);
+    setLastRoll({ results, total: rolled.total, bonus });
   };
   // Parse existing formula like "2d8+3" into parts
   const parseFormula = (str) => {
@@ -323,7 +327,7 @@ export default function Homebrew() {
   const duplicateItem = (id) => {
     // Raw read — same rule as every other mutation path.
     const all = readHomebrewRaw();
-    const src = all.find(i => i._id === id);
+    const src = all.find(i => i && i._id === id);   // raw data may hold a null entry
     if (!src) return;
     const copy = {
       ...JSON.parse(JSON.stringify(src)),
@@ -359,7 +363,7 @@ export default function Homebrew() {
 
   const exportItem = async (id) => {
     setShareError('');
-    const item = readHomebrewRaw().find(i => i._id === id);
+    const item = readHomebrewRaw().find(i => i && i._id === id);
     if (!item) return;
     const { _id, createdAt, updatedAt, ...data } = item;
     let code;
@@ -422,7 +426,7 @@ export default function Homebrew() {
     if (nm) {
       // Shadowing is sometimes deliberate, so this warns rather than blocking. It is
       // factually what happens: CharacterSheet resolves the built-in name first.
-      const clash = readHomebrewRaw().some(i => i._id !== editing && String(i.name || '').toLowerCase() === nm)
+      const clash = readHomebrewRaw().some(i => i && i._id !== editing && String(i.name || '').toLowerCase() === nm)
         || !!getLocalEquipmentByName(form.name.trim())
         || getAllLocalSpells().some(sp => String(sp.name || '').toLowerCase() === nm);
       if (clash) w._name = 'An item named ' + form.name.trim() + ' already exists — the character sheet will use the built-in one.';
@@ -698,7 +702,14 @@ export default function Homebrew() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Level</label>
-                  <select value={form.level} onChange={e => f('level', parseInt(e.target.value))}>
+                  <select value={form.level} onChange={e => {
+                    const lvl = parseInt(e.target.value, 10);
+                    f('level', lvl);
+                    // validateHomebrew rejects any `scaling` below level 1, and the scaling
+                    // editor is hidden for cantrips — so clear it rather than leave a
+                    // spell that can never be saved.
+                    if (lvl === 0) f('scaling', '');
+                  }}>
                     <option value={0}>Cantrip</option>
                     {[1,2,3,4,5,6,7,8,9].map(l => <option key={l} value={l}>Level {l}</option>)}
                   </select>
@@ -816,17 +827,32 @@ export default function Homebrew() {
               </div>
 
               {/* Upcast scaling */}
-              {form.level > 0 && form.damage && (
-                <div style={{ marginBottom: '14px', padding: '12px', background: 'var(--bg-dark)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+              {/* Also shown whenever `scaling` is set, so a value the form can't otherwise
+                  reach (e.g. an imported cantrip carrying `scaling: 'cantrip'`) can be cleared. */}
+              {((form.level > 0 && form.damage) || form.scaling) && (
+                <div style={{ marginBottom: '14px', padding: '12px', background: 'var(--bg-dark)', borderRadius: '6px', border: `1px solid ${formErrors.scaling ? '#f87171' : 'var(--border)'}` }}>
                   <label style={{ fontSize: '12px', color: 'var(--gold)', textTransform: 'uppercase', display: 'block', marginBottom: '8px', fontWeight: 600 }}>Upcast Scaling (per level above base)</label>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Add</span>
-                    <DiceFormulaBuilder value={form.scaling} onChange={v => f('scaling', v)} label={`${form.name || 'Homebrew'} — Scaling`} />
-                    <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>per slot level above {form.level}</span>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '6px' }}>
-                    Example: Fireball base is 8d6 at level 3. Scaling is 1d6 — at level 4 it becomes 9d6, at level 5 it becomes 10d6.
-                  </div>
+                  {form.level > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Add</span>
+                        <DiceFormulaBuilder value={form.scaling} onChange={v => f('scaling', v)} label={`${form.name || 'Homebrew'} — Scaling`} />
+                        <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>per slot level above {form.level}</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '6px' }}>
+                        Example: Fireball base is 8d6 at level 3. Scaling is 1d6 — at level 4 it becomes 9d6, at level 5 it becomes 10d6.
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '12px', color: '#fbbf24', flex: 1, minWidth: 0 }}>
+                        Cantrips can't be upcast, so this spell's scaling value ({String(form.scaling)}) must be cleared before it can be saved. Cantrip damage already scales with character level.
+                      </span>
+                      <button type="button" className="btn btn-ghost" style={{ fontSize: '12px', padding: '4px 12px' }} onClick={() => f('scaling', '')}>
+                        Clear Scaling
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

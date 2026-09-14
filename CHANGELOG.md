@@ -28,6 +28,58 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.8.1 — 2026-09-13
+
+### Changed
+- **A long rest now regains half your Hit Dice (at least one), not all of them** — the rule in both the 2014 and 2024 books. The Long Rest tooltip already said "half"; the rest itself refilled every die.
+- **Levelling up no longer heals you to full or refills your Hit Dice.** Your current HP goes up by the HP you gained and you get the new level's Hit Die, the same as your maximum. This applies to the sheet's Level Up and the editor's Lv Up.
+- **Settings describes the database accurately.** The data-source setting only affects the Spells and Equipment browsers, and the shared-database card no longer claims characters are synced — characters always stay on your own device.
+
+### Fixed
+- **Search no longer crashes the page on `+`, `(` or `?`.** Typing the start of "+1 Longsword" into the Equipment, Spells or inventory search threw an error and replaced the page with "Something crashed"; in database mode it also switched you to Local mode. Search text is now matched literally, so "Acid (vial)" finds the vial too.
+- **The character sheet no longer freezes class, level and subclass after a level-up.** A single-class character levelled on the sheet stopped responding to the editor's Lv Up, a class change, or a subclass picked on the Progression tab — the sheet kept showing the old level's slots, features and hit dice. Existing characters are repaired automatically. The editor also now edits a multiclass character's classes properly.
+- **Progression choices are stored against the right level.** Picking the level-4 ASI on a level-8 character saved it as the level-8 pick; the level-6 card then showed it as its own and picking there undid the earlier bonus (two ASIs taken, one applied). Re-clicking the chosen ASI no longer applies it again, and multiclassing no longer hides your first class's earlier picks. Picks saved this way on existing characters are moved to the card they belong to when you open the sheet.
+- **Half-feats from the Progression tab use the ability you choose.** Resilient, Observant, Athlete and the armour feats always boosted the first listed ability, and Resilient never granted its saving-throw proficiency. The card now asks which ability, and Resilient adds that save.
+- **Barbarian and Monk Unarmored Defense now counts on the sheet** (10 + DEX + CON / 10 + DEX + WIS). The sheet was overwriting the correct AC from character creation with 10 + DEX.
+- **Monks use Dexterity for unarmed strikes and monk weapons, and the Martial Arts die follows your Monk level** — a multiclassed Monk no longer gets the die for their total level, and 2024 Monks get the larger 2024 dice (d6 up to d12).
+- **Spell attacks and save DCs on the Actions tab use your casting ability.** They used Intelligence for every class, so a new Cleric's Guiding Bolt was several points too low.
+- **Level-1 Paladins and Rangers (2014 rules) no longer show a spell save DC or allow prepared spells** — they gain Spellcasting at level 2. In the character creator, Paladins and Rangers above level 1 could never pick spells at all; they now can, and they get the Fighting Style picker too.
+- **Jack of All Trades now works** — Bards add half their proficiency bonus to skills they aren't proficient in, to passive scores and to initiative. Passive Perception, Investigation and Insight now also count expertise.
+- **Milestone characters can level up from the sheet.** The Level Up window was only reachable from the XP bar, so a milestone character could never add a class. There is now a Level Up button in the header.
+- **Finishing or cancelling a short rest while the die is rolling no longer crashes the sheet**, and cancelling Level Up mid-roll no longer levels you anyway. A short rest at full HP with no Hit Dice is no longer refused, so Warlock pact slots and short-rest features still come back.
+- **Hit-die healing and level-up HP include your CON bonus from items**, matching the "+ CON" shown on the button. Tough now adds its +2 HP when you level up on the sheet or in the editor.
+- **Homebrew armour's +1/+2/+3 now raises your AC.**
+- **Wild Shape uses:** a 2014 Archdruid (level 20) has no use limit, and 2024 Druids get 3 uses at level 6 and 4 at level 17.
+- **Multiclass requirements check the classes you already have**, as the rules require, using the scores shown on your sheet.
+- **Ammunition:** a weapon no longer keeps firing ammo you've unequipped or used up; picking up a stack you'd emptied starts full instead of at 0; and items like the Hammer of Thunderbolts or a crossbow bolt case are no longer spent as bolts.
+- **Switching the column count no longer makes widgets vanish.** Going from 4 columns to 2 used to hide anything in the far column, including the tabs, with no way back except Reset Layout.
+- **Weapon Mastery shows for any martial class in a 2024 multiclass**, not just the first class. Magic weapon names no longer repeat their bonus ("+1 Longsword +1").
+- **Character creator:** going back and changing your class, race, background or level no longer saves leftover picks — another class's spells, extra feats and their ability bonuses, tools, duplicate languages, or a subclass or fighting style you aren't high enough level for. A skill you already have from your background or race can't be wasted as a class pick. Blank multiclass rows no longer inflate your level, and the number fields no longer jump while you type.
+- **Character editor:**
+  - Uploaded portraits no longer show as broken images; they are stored with the character like the creator's.
+  - The Gold field now changes the gold shown on the sheet.
+  - "Track Ammunition" shows its real state.
+  - The standard-array and point-buy tabs no longer reset scores you didn't touch.
+  - Spell limits for a multiclass character use each caster class at its own level.
+  - Prepared-spell limits include your casting modifier.
+  - Saving no longer overwrites HP, equipment or ammo changed on the sheet in another tab.
+  - A save that couldn't be written (storage full) says so instead of "Saved!".
+- **3D dice:** on a computer without WebGL, the first roll blanked the whole app — rolls now resolve without the animation. A d100 can land on any number from 1 to 100, not only multiples of 10. Long sessions no longer slow down from dice animations that never stopped.
+- **Campaigns:** a campaign page no longer crashes when the server returns an error, and shows "Campaign not found" or "Database not connected" instead. Creating a campaign without a name, or with the database offline, now tells you why. A trailing space in your player name no longer hides the Link Character button, and the character picker no longer lists a blank entry.
+- **Spells page:** "+ Add Spell" works in the default Local mode, saving the spell as homebrew. Paladin is in the class filter, and slow database searches no longer overwrite newer results.
+- **Homebrewer:** Test Roll no longer shows "− NaN". A spell with upcast scaling can be turned into a cantrip.
+- **Number fields:** pressing Enter in a number field now keeps what you typed instead of saving the old value.
+- **Settings:** choosing a data source highlights it straight away. Saving a mistyped MongoDB address no longer throws away the working one.
+- **Deleting a character** also clears its saved layout and the navbar's "My Sheet" link to it.
+- **Server:**
+  - A crafted request could read, overwrite or delete files outside the characters folder. It is now refused.
+  - Web pages from other sites can no longer trigger updates, change the database setting or edit characters.
+  - A malformed settings request can no longer crash the server.
+  - Database pages answer immediately when no database is configured, instead of hanging for 10 seconds.
+  - A second copy of the server says the port is in use.
+- **Updates never discard your own work.** The launchers and the Home page's Check Updates only offer an update when your copy is behind GitHub — not when it has local commits that `git reset --hard` would have wiped. A failed dependency install after an update is reported instead of showing "Updated!".
+- **Database seed scripts no longer delete each other's data** (magic ammunition, racial abilities and extra spells were wiped when a related script was re-run).
+
 ## v1.8.0 — 2026-09-13
 
 ### Added

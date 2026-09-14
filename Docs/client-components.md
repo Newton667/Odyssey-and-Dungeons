@@ -13,6 +13,9 @@ Three.js 3D dice renderer with physics simulation.
 - Supports: d4, d6, d8, d10, d12, d20, d100 (percentile)
 - Theme-aware materials (colors from DiceContext)
 - Resolves a Promise with the roll result once die settles
+- **No WebGL:** the `WebGLRenderer` constructor throws when WebGL is unavailable; it is wrapped in `try/catch`, and the launch effect then calls `onSettled` with fair random values (no animation) so the roll still resolves
+- d100 results are uniform 1–100
+- Cleanup (it remounts per roll) disposes geometries/materials/textures and `mesh.clear()`s each die so the glow `pulse()` loop stops. It deliberately does **not** call `forceContextLoss()` — StrictMode remounts on the same canvas in dev and would get a dead context
 - Canvas renders in a fixed overlay
 - Multiple dice can roll simultaneously
 - **Force levels (1-4)** control physics behavior per roll:
@@ -61,7 +64,8 @@ Canvas-based image cropper for character portraits.
 ## NumInput.jsx (~24 lines)
 Number input that prevents the deselection bug.
 - Stores raw text in local state while focused
-- Only parses/clamps value on blur — empty/NaN becomes `0` (via `Number.isNaN`), **not** a falsy fallback to `min`, so `0` and negatives are valid entries (supports the misc-bonus boxes with negative `min`)
+- Only parses/clamps value on blur **or Enter** — empty/NaN becomes `0` (via `Number.isNaN`), **not** a falsy fallback to `min`, so `0` and negatives are valid entries (supports the misc-bonus boxes with negative `min`)
+- Enter commits and calls `preventDefault()`, so it never submits an enclosing form with the previous value; a passed `onKeyDown` still runs
 - Prevents React re-render from resetting cursor position
 
 ### Props:

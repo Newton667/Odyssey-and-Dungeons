@@ -49,9 +49,10 @@ export function DiceProvider({ children }) {
   // cancel the first roll's delivery timer, orphaning its promise forever.
   const rollingRef = useRef(false);
   // Watchdog for the rollingRef guard. Dice3D arms its own 6s safety timeout, but
-  // only AFTER the WebGLRenderer is built — if that setup throws or bails (no
-  // canvas, WebGL unavailable, context lost on a GPU switch) onDiceSettled never
-  // fires. Without this, every later roll would return null until a page reload.
+  // only AFTER the WebGLRenderer is built — if that setup bails (no canvas, context
+  // lost on a GPU switch) onDiceSettled never fires. Without this, every later roll
+  // would return null until a page reload. (A renderer that THROWS is caught inside
+  // Dice3D, which then settles the roll without animation.)
   const watchdogRef = useRef(null);
 
   const setDiceForce = useCallback((f) => {
@@ -80,11 +81,11 @@ export function DiceProvider({ children }) {
 
     if (!hasDice) {
       // Nothing to throw — a flat-damage weapon still scores its modifier.
-      return Promise.resolve({ results: [], total: staticBonus });
+      return Promise.resolve({ results: [], total: staticBonus, bonus: staticBonus });
     }
     // Only d1 dice (always 1) — nothing to render, resolve immediately.
     if (diceArray.length === 0) {
-      return Promise.resolve({ results: [{ die: 'd1', sides: 1, value: d1Count }], total: staticBonus });
+      return Promise.resolve({ results: [{ die: 'd1', sides: 1, value: d1Count }], total: staticBonus, bonus: staticBonus - d1Count });
     }
 
     return new Promise((resolve) => {

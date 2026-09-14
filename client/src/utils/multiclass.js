@@ -8,14 +8,20 @@ import { CLASSES, getExtraAttacks } from './classData';
 import { HIT_DICE } from './dndConstants';
 
 // Canonical per-class breakdown: [{ class, subclass, level }] (per-class levels).
+// Only a REAL multiclass array (2+ classes) is authoritative. A one-element
+// array is a leftover — older sheet level-ups persisted one — and the editor,
+// the Progression tab's subclass pick and CharacterEdit's Lv Up all write only
+// class/level/subclass, so for a single class those top-level fields are the
+// current values.
 export function getCharClasses(char) {
   if (!char) return [];
-  if (Array.isArray(char.classes) && char.classes.length > 0) {
-    return char.classes
-      .filter(c => c && c.class)
-      .map(c => ({ class: c.class, subclass: c.subclass || '', level: Math.max(1, c.level || 1) }));
+  const listed = Array.isArray(char.classes) ? char.classes.filter(c => c && c.class) : [];
+  if (listed.length > 1) {
+    return listed.map(c => ({ class: c.class, subclass: c.subclass || '', level: Math.max(1, c.level || 1) }));
   }
-  if (!char.class) return [];
+  if (!char.class) {
+    return listed.map(c => ({ class: c.class, subclass: c.subclass || '', level: Math.max(1, c.level || 1) }));
+  }
   return [{ class: char.class, subclass: char.subclass || '', level: Math.max(1, char.level || 1) }];
 }
 
@@ -65,12 +71,19 @@ export function getMulticlassExtraAttacks(char) {
   return best;
 }
 
+// Class level at which Spellcasting begins. 2014 Paladins and Rangers wait until
+// level 2; the 2024 revision grants it at level 1. Mirrors getSpellInfo/maxSpellLevel.
+export function spellcastingStartLevel(className, ruleset = '2014') {
+  return (className === 'Paladin' || className === 'Ranger') && ruleset !== '2024' ? 2 : 1;
+}
+
 // The spellcasting ability for each caster class the character has.
-// Returns [{ class, ability }] for classes that actually cast.
+// Returns [{ class, ability }] for classes that actually cast at their current level.
 export function getSpellcastingClasses(char) {
   const out = [];
   for (const c of getCharClasses(char)) {
     const info = CLASSES[c.class];
+    if (c.level < spellcastingStartLevel(c.class, char?.ruleset)) continue;
     if (info?.spellcasting && info.spellcastingAbility) {
       out.push({ class: c.class, subclass: c.subclass, level: c.level, ability: info.spellcastingAbility });
     }

@@ -1,6 +1,13 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Campaign = require('../models/Campaign');
+
+// A malformed ObjectId makes findById throw a CastError (500); it simply names nothing.
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.isValidObjectId(id)) return res.status(404).json({ error: 'Campaign not found' });
+  next();
+});
 
 // List all campaigns
 router.get('/', async (req, res) => {

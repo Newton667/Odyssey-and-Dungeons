@@ -1,15 +1,26 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Equipment = require('../models/Equipment');
+
+// Query strings are user input: escape them before building a RegExp, or `+1 Longsword` throws
+// "Nothing to repeat" (500) and a crafted pattern could be arbitrarily slow.
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// A malformed ObjectId makes findById throw a CastError (500); it simply names nothing.
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.isValidObjectId(id)) return res.status(404).json({ error: 'Item not found' });
+  next();
+});
 
 router.get('/', async (req, res) => {
   try {
     const { category, subcategory, search, rarity } = req.query;
     const filter = {};
-    if (category) filter.category = category;
-    if (subcategory) filter.subcategory = new RegExp(subcategory, 'i');
-    if (search) filter.name = new RegExp(search, 'i');
-    if (rarity) filter.rarity = rarity;
+    if (category) filter.category = String(category);
+    if (subcategory) filter.subcategory = new RegExp(escapeRegex(subcategory), 'i');
+    if (search) filter.name = new RegExp(escapeRegex(search), 'i');
+    if (rarity) filter.rarity = String(rarity);
 
     const items = await Equipment.find(filter).sort({ category: 1, subcategory: 1, name: 1 });
     res.json(items);

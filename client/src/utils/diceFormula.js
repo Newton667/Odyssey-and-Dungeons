@@ -22,7 +22,8 @@ export function parseDiceFormula(formula) {
   let staticBonus = 0;
   // `\d*` (not `\d+`) so a countless die like 'd10' — the shape of
   // `CLASSES[cls].hitDice` — parses as one die rather than a flat +10.
-  const groups = formula.match(/(\d*)d(\d+)/g);
+  // Case-insensitive: an imported share code may carry '1D8'.
+  const groups = formula.match(/(\d*)d(\d+)/gi);
 
   if (!groups || groups.length === 0) {
     // No dice — still sum the bare integers, so '1' → 1 and '1+3' → 4.
@@ -34,7 +35,7 @@ export function parseDiceFormula(formula) {
 
   let dice = [];
   for (const g of groups) {
-    const m = g.match(/(\d*)d(\d+)/);
+    const m = g.match(/(\d*)d(\d+)/i);
     const count = Number(m[1] || 1);   // 'd10' → 1
     const sides = Number(m[2]);
     const die = `d${sides}`;
@@ -43,7 +44,7 @@ export function parseDiceFormula(formula) {
 
   // Sum ALL static modifiers: +5+3-2 = +6. Strip the dice groups first so the
   // digits inside them are never mistaken for a modifier.
-  const stripped = formula.replace(/\d*d\d+/g, '');
+  const stripped = formula.replace(/\d*d\d+/gi, '');
   const modMatches = stripped.match(/[+-]\s*\d+/g);
   if (modMatches) {
     for (const mod of modMatches) staticBonus += parseInt(mod.replace(/\s/g, ''), 10);

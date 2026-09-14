@@ -7,7 +7,8 @@
 
 import { modVal } from './dndHelpers';
 
-const mod = (c, a) => modVal(c?.abilityScores?.[a] ?? 10);
+// Effective score = base + misc bonus, the same number the sheet displays.
+const mod = (c, a) => modVal((c?.abilityScores?.[a] ?? 10) + (c?.abilityBonuses?.[a] || 0));
 
 export const FEATURE_USES = {
   // Barbarian
@@ -18,7 +19,9 @@ export const FEATURE_USES = {
   'Channel Divinity': { recharge: 'short', max: (l, c, cls) => (cls === 'Cleric' ? (l >= 18 ? 3 : l >= 6 ? 2 : 1) : 1) },
   'Divine Intervention': { recharge: 'long', max: () => 1 },
   // Druid
-  'Wild Shape': { recharge: 'short', max: () => 2 },
+  // 2014: 2 uses; Archdruid (20) makes it unlimited — 0 means no counter, like Rage at 20.
+  // 2024: 2 uses, 3 at 6, 4 at 17, and the capstone no longer removes the limit.
+  'Wild Shape': { recharge: 'short', max: (l, c) => (c?.ruleset === '2024' ? (l >= 17 ? 4 : l >= 6 ? 3 : 2) : (l >= 20 ? 0 : 2)) },
   // Fighter
   'Second Wind': { recharge: 'short', max: () => 1 },
   'Action Surge': { recharge: 'short', max: (l) => (l >= 17 ? 2 : 1) },

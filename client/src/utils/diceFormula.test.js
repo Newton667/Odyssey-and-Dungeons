@@ -118,3 +118,21 @@ describe('parseDiceFormula — bare die strings', () => {
     expect(parseDiceFormula('2d6').dice).toHaveLength(2);
   });
 });
+
+// Share codes and hand-edited homebrew can carry an upper-case die ('1D8').
+// The dice regex was case-sensitive, so '1D8+2' fell to the flat branch and
+// scored a constant 10 without throwing anything.
+describe('parseDiceFormula — upper-case D', () => {
+  it('parses 1D8+2 as one d8 plus 2', () => {
+    const r = parseDiceFormula('1D8+2');
+    expect(r.hasDice).toBe(true);
+    expect(r.dice).toEqual([{ die: 'd8', sides: 8 }]);
+    expect(r.staticBonus).toBe(2);
+  });
+
+  it('handles mixed case across groups', () => {
+    const r = parseDiceFormula('2D6 + 1d4');
+    expect(r.dice).toHaveLength(3);
+    expect(r.staticBonus).toBe(0);
+  });
+});

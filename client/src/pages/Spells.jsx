@@ -1,11 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useDice } from '../context/DiceContext';
 import { queryLocalSpells } from '../data/localDataService';
-import { readHomebrew } from '../utils/homebrew';
+import {
+  readHomebrew, readHomebrewRaw, writeHomebrew, upsertHomebrewRecord, pruneToType, validateHomebrew,
+} from '../utils/homebrew';
 import { cantripDamage } from '../utils/dndHelpers';
+import NumInput from '../components/NumInput';
 
 const SCHOOLS = ['Abjuration', 'Conjuration', 'Divination', 'Enchantment', 'Evocation', 'Illusion', 'Necromancy', 'Transmutation'];
-const ALL_CLASSES = ['Artificer', 'Bard', 'Cleric', 'Druid', 'Ranger', 'Sorcerer', 'Warlock', 'Wizard'];
+const ALL_CLASSES = ['Artificer', 'Bard', 'Cleric', 'Druid', 'Paladin', 'Ranger', 'Sorcerer', 'Warlock', 'Wizard'];
+
+const EMPTY_SPELL_FORM = {
+  name: '', level: 0, school: '', castingTime: '1 action', range: '60 feet',
+  components: [], materialComponent: '', duration: 'Instantaneous',
+  concentration: false, ritual: false, description: '', higherLevels: '',
+  classes: [], attackType: '', damage: '', damageType: '', scaling: '', savingThrow: '', saveEffect: '',
+};
 
 /* ── damage type icons (inline SVG) ── */
 const DMG_ICONS = {
@@ -65,14 +75,17 @@ export default function Spells() {
   const [charLevel, setCharLevel] = useState(1);
   const [spellDC, setSpellDC] = useState(13);
   const [rollResults, setRollResults] = useState({});
-  const [form, setForm] = useState({
-    name: '', level: 0, school: '', castingTime: '1 action', range: '60 feet',
-    components: [], materialComponent: '', duration: 'Instantaneous',
-    concentration: false, ritual: false, description: '', higherLevels: '',
-    classes: [], attackType: '', damage: '', damageType: '', scaling: '', savingThrow: '', saveEffect: '',
-  });
+  const [form, setForm] = useState({ ...EMPTY_SPELL_FORM });
+  const [createError, setCreateError] = useState('');
+  // DB mode: each load() supersedes the previous one. Without this, a slow response to
+  // an earlier keystroke could land after a newer one and overwrite the list with stale
+  // results. The id marks the current request; the controller cancels the old fetch.
+  const requestIdRef = useRef(0);
+  const controllerRef = useRef(null);
 
   const load = useCallback(() => {
+    const reqId = ++requestIdRef.current;
+    if (controllerRef.current) { controllerRef.current.abort(); controllerRef.current = null; }
     setLoading(true);
     if (useLocal) {
       const data = queryLocalSpells({ level: filter.level !== '' ? Number(filter.level) : undefined, school: filter.school, search: filter.search, cls: filter.cls });
@@ -85,12 +98,23 @@ export default function Spells() {
       if (filter.search) params.set('search', filter.search);
       if (filter.cls) params.set('class', filter.cls);
       const controller = new AbortController();
+      controllerRef.current = controller;
       const timeout = setTimeout(() => controller.abort(), 5000);
       fetch(`/api/spells?${params}`, { signal: controller.signal })
         .then(r => { clearTimeout(timeout); if (!r.ok) throw new Error('Server error'); return r.json(); })
-        .then(data => { if (data.length === 0 && !filter.search && !filter.school && !filter.cls && filter.level === '') throw new Error('Empty'); setSpells(data); setLoading(false); })
+        .then(data => {
+          if (reqId !== requestIdRef.current) return;   // superseded by a newer load
+          if (!Array.isArray(data)) throw new Error('Bad response');
+          if (data.length === 0 && !filter.search && !filter.school && !filter.cls && filter.level === '') throw new Error('Empty');
+          setSpells(data);
+          setLoading(false);
+        })
         .catch(() => {
           clearTimeout(timeout);
+          // A superseded (aborted) request is not a connection failure — no fallback, no alert.
+          // The 5 s timeout also aborts, but its request is still the current one, so it falls through.
+          if (reqId !== requestIdRef.current) return;
+          controllerRef.current = null;
           const fallback = queryLocalSpells({ level: filter.level !== '' ? Number(filter.level) : undefined, school: filter.school, search: filter.search, cls: filter.cls });
           setSpells(fallback);
           setLoading(false);
@@ -109,11 +133,62 @@ export default function Spells() {
   }, [filter, useLocal]);
 
   useEffect(() => { load(); }, [load]);
+  // On unmount, cancel any in-flight DB request and invalidate it, so it can neither
+  // set state nor raise the "Database not connected" alert after the page is gone.
+  useEffect(() => () => {
+    requestIdRef.current++;
+    if (controllerRef.current) controllerRef.current.abort();
+  }, []);
 
   const create = async (e) => {
     e.preventDefault();
-    const res = await fetch('/api/spells', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-    if (res.ok) { setCreating(false); load(); }
+    setCreateError('');
+
+    if (useLocal) {
+      // Local mode (the default) has no server to POST to: save it as a homebrew spell,
+      // through the same write path the Homebrewer uses — raw read, prune to the spell
+      // type, upsert, write. Never a normalising read on a write path.
+      const now = new Date().toISOString();
+      const body = {
+        ...form,
+        type: 'spell',
+        // 'cantrip' is a DB-seed sentinel. Homebrew cantrips scale by character level
+        // without it, and validateHomebrew rejects any `scaling` on a level-0 spell, so
+        // storing it would leave a record the Homebrewer can never re-save.
+        scaling: form.scaling === 'cantrip' ? '' : form.scaling,
+        createdBy: localStorage.getItem('ond-player-name') || '',
+        _id: 'hb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const { ok, errors } = validateHomebrew(body);
+      if (!ok) { setCreateError(Object.values(errors).join(' · ')); return; }
+      const all = upsertHomebrewRecord(readHomebrewRaw(), pruneToType(body), null);
+      if (!writeHomebrew(all)) {
+        setCreateError("Could not save — your browser's storage is full.");
+        return;
+      }
+      setCreating(false);
+      setForm({ ...EMPTY_SPELL_FORM });
+      setShowHomebrew(true);   // the new spell lives in the Homebrew section; make sure it is visible
+      load();
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/spells', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON body */ }
+      if (!res.ok) {
+        setCreateError(data?.error || `Could not add the spell (server responded with ${res.status}).`);
+        return;
+      }
+      setCreating(false);
+      setForm({ ...EMPTY_SPELL_FORM });
+      load();
+    } catch {
+      setCreateError('Could not reach the server to add the spell.');
+    }
   };
 
   const doRoll = async (spellId, type, diceExpr, spellName) => {
@@ -159,13 +234,13 @@ export default function Spells() {
       <div className="page-header">
         <h2 style={{ fontSize: '28px' }}>Spells</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button className="btn btn-primary" onClick={() => setCreating(v => !v)}>
+          <button className="btn btn-primary" onClick={() => { setCreating(v => !v); setCreateError(''); }}>
             {creating ? '✕ Cancel' : '+ Add Spell'}
           </button>
         </div>
       </div>
 
-      {creating && <SpellForm form={form} setForm={setForm} onSubmit={create} />}
+      {creating && <SpellForm form={form} setForm={setForm} onSubmit={create} error={createError} useLocal={useLocal} />}
 
       {/* ── Filters ── */}
       <div style={{
@@ -215,16 +290,14 @@ export default function Spells() {
             <label style={{ fontSize: '13px', color: 'var(--text-dim)', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '0.5px', fontWeight: 600 }}>
               Lvl
             </label>
-            <input type="number" min={1} max={20} value={charLevel}
-              onChange={e => setCharLevel(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+            <NumInput min={1} max={20} value={charLevel} onChange={setCharLevel}
               style={{ width: '52px', textAlign: 'center', padding: '10px 8px', fontSize: '14px' }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <label style={{ fontSize: '13px', color: 'var(--text-dim)', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '0.5px', fontWeight: 600 }}>
               DC
             </label>
-            <input type="number" min={1} max={30} value={spellDC}
-              onChange={e => setSpellDC(Math.max(1, Math.min(30, Number(e.target.value) || 1)))}
+            <NumInput min={1} max={30} value={spellDC} onChange={setSpellDC}
               style={{ width: '52px', textAlign: 'center', padding: '10px 8px', fontSize: '14px' }} />
           </div>
         </div>
@@ -505,10 +578,15 @@ export default function Spells() {
 }
 
 /* ── Spell create form ── */
-function SpellForm({ form, setForm, onSubmit }) {
+function SpellForm({ form, setForm, onSubmit, error, useLocal }) {
   return (
     <form onSubmit={onSubmit} className="card" style={{ marginBottom: '20px' }}>
-      <h3 style={{ fontSize: '16px', marginBottom: '14px' }}>New Spell</h3>
+      <h3 style={{ fontSize: '16px', marginBottom: '4px' }}>New Spell</h3>
+      <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '14px' }}>
+        {useLocal
+          ? 'Saved on this browser as a homebrew spell — it appears under Homebrew and in the Homebrewer.'
+          : 'Saved to the shared database.'}
+      </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
         {[
           { key: 'name', label: 'Name *', required: true },
@@ -527,7 +605,8 @@ function SpellForm({ form, setForm, onSubmit }) {
         ))}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Level (0=Cantrip)</label>
-          <input type="number" min={0} max={9} value={form.level} onChange={e => setForm(f => ({ ...f, level: Number(e.target.value) }))} />
+          {/* 0 is a real value (cantrip): NumInput clamps to 0-9 and never falls back on falsy. */}
+          <NumInput min={0} max={9} value={form.level} onChange={v => setForm(f => ({ ...f, level: v }))} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>School</label>
@@ -579,6 +658,11 @@ function SpellForm({ form, setForm, onSubmit }) {
         <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>At Higher Levels</label>
         <textarea rows={2} value={form.higherLevels} onChange={e => setForm(f => ({ ...f, higherLevels: e.target.value }))} style={{ width: '100%', resize: 'vertical' }} />
       </div>
+      {error && (
+        <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '10px', padding: '8px 10px', border: '1px solid #f87171', borderRadius: '6px', background: 'rgba(248, 113, 113, 0.08)' }}>
+          {error}
+        </div>
+      )}
       <button type="submit" className="btn btn-primary">Add Spell</button>
     </form>
   );

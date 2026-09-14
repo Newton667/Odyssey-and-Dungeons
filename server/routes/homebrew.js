@@ -1,13 +1,24 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Homebrew = require('../models/Homebrew');
+
+// Query strings are user input: escape them before building a RegExp, or `+1 Longsword` throws
+// "Nothing to repeat" (500) and a crafted pattern could be arbitrarily slow.
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// A malformed ObjectId makes findById throw a CastError (500); it simply names nothing.
+router.param('id', (req, res, next, id) => {
+  if (!mongoose.isValidObjectId(id)) return res.status(404).json({ error: 'Not found' });
+  next();
+});
 
 // List all homebrew items (with optional type filter)
 router.get('/', async (req, res) => {
   try {
     const filter = {};
-    if (req.query.type) filter.type = req.query.type;
-    if (req.query.search) filter.name = { $regex: req.query.search, $options: 'i' };
+    if (req.query.type) filter.type = String(req.query.type);
+    if (req.query.search) filter.name = { $regex: escapeRegex(req.query.search), $options: 'i' };
     const items = await Homebrew.find(filter).sort({ updatedAt: -1 });
     res.json(items);
   } catch (err) {

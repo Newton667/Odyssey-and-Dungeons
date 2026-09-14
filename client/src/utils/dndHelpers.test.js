@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames, weaponRangeText, cantripDamage, cantripTierBonus } from './dndHelpers';
+import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames, weaponRangeText, cantripDamage, cantripTierBonus, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, trimSpellPicks } from './dndHelpers';
 import { parseDiceFormula } from './diceFormula';
 
 // Seed test suite — also the reference pattern for tests written by /execute.
@@ -262,5 +262,106 @@ describe('cantripDamage', () => {
   it('returns undefined for a missing spell', () => {
     expect(cantripDamage(null, 17)).toBeUndefined();
     expect(cantripDamage(undefined, 17)).toBeUndefined();
+  });
+});
+
+// PHB p.186 (unchanged in 2024): a long rest regains spent Hit Dice up to half the
+// character's total, minimum one. The sheet used to refill every die.
+describe('hitDiceAfterLongRest', () => {
+  it('regains half the total, rounded down', () => {
+    expect(hitDiceAfterLongRest(8, 0)).toBe(4);
+    expect(hitDiceAfterLongRest(9, 2)).toBe(6);
+  });
+  it('always regains at least one die', () => {
+    expect(hitDiceAfterLongRest(1, 0)).toBe(1);
+    expect(hitDiceAfterLongRest(3, 0)).toBe(1);
+  });
+  it('never exceeds the total', () => {
+    expect(hitDiceAfterLongRest(8, 7)).toBe(8);
+    expect(hitDiceAfterLongRest(8, 8)).toBe(8);
+  });
+  it('treats a missing or out-of-range remaining count sanely', () => {
+    expect(hitDiceAfterLongRest(6, undefined)).toBe(6);
+    expect(hitDiceAfterLongRest(6, -2)).toBe(3);
+    expect(hitDiceAfterLongRest(6, 99)).toBe(6);
+  });
+});
+
+// Barbarian (PHB p.48): 10 + DEX + CON, shield allowed. Monk (PHB p.78):
+// 10 + DEX + WIS, no shield. The sheet's calcAC ignored both.
+describe('unarmoredBaseAC', () => {
+  const mods = { dex: 2, con: 3, wis: 1 };
+  it('is 10 + DEX for everyone else', () => {
+    expect(unarmoredBaseAC(['Fighter'], mods, false)).toBe(12);
+  });
+  it('adds CON for a Barbarian, shield or not', () => {
+    expect(unarmoredBaseAC(['Barbarian'], mods, false)).toBe(15);
+    expect(unarmoredBaseAC(['Barbarian'], mods, true)).toBe(15);
+  });
+  it('adds WIS for a Monk only without a shield', () => {
+    expect(unarmoredBaseAC(['Monk'], mods, false)).toBe(13);
+    expect(unarmoredBaseAC(['Monk'], mods, true)).toBe(12);
+  });
+  it('takes the better formula when multiclassed — they never stack', () => {
+    expect(unarmoredBaseAC(['Monk', 'Barbarian'], mods, false)).toBe(15);
+    expect(unarmoredBaseAC(['Monk', 'Barbarian'], { dex: 2, con: 0, wis: 4 }, false)).toBe(16);
+  });
+  it('never drops below 10 + DEX even with negative CON/WIS', () => {
+    expect(unarmoredBaseAC(['Barbarian'], { dex: 2, con: -1, wis: 0 }, false)).toBe(12);
+  });
+});
+
+// Martial Arts die by MONK level (PHB p.76): d4 / d6 at 5 / d8 at 11 / d10 at 17.
+describe('martialArtsDie', () => {
+  it('steps at 5, 11 and 17', () => {
+    expect(martialArtsDie(1)).toBe('1d4');
+    expect(martialArtsDie(4)).toBe('1d4');
+    expect(martialArtsDie(5)).toBe('1d6');
+    expect(martialArtsDie(11)).toBe('1d8');
+    expect(martialArtsDie(17)).toBe('1d10');
+  });
+  it('defaults to the 2014 table', () => {
+    expect(martialArtsDie(1, '2014')).toBe('1d4');
+  });
+  // 2024 PHB Monk: the die is one size larger at every tier — d6 / d8 at 5 / d10 at 11 / d12 at 17.
+  it('uses the larger 2024 dice under the 2024 rules', () => {
+    expect(martialArtsDie(1, '2024')).toBe('1d6');
+    expect(martialArtsDie(5, '2024')).toBe('1d8');
+    expect(martialArtsDie(11, '2024')).toBe('1d10');
+    expect(martialArtsDie(17, '2024')).toBe('1d12');
+  });
+});
+
+// The creator's pickers stop offering spells when a limit shrinks, but never trimmed
+// what was already chosen — so a Wizard switched to Fighter was saved with Fire Bolt,
+// and lowering a Wizard 5 to level 1 kept its 3rd-level spells.
+describe('trimSpellPicks', () => {
+  const available = [
+    { name: 'Fire Bolt', level: 0 }, { name: 'Light', level: 0 }, { name: 'Mage Hand', level: 0 },
+    { name: 'Magic Missile', level: 1 }, { name: 'Shield', level: 1 }, { name: 'Fireball', level: 3 },
+  ];
+  it('drops everything when the class cannot cast', () => {
+    expect(trimSpellPicks({ cantrips: ['Fire Bolt'], spells: ['Shield'], available, spellInfo: null }))
+      .toEqual({ cantrips: [], spells: [] });
+  });
+  it('drops picks that are not on the current class list', () => {
+    const info = { cantrips: 3, spellsKnown: 6, maxLevel: 1 };
+    expect(trimSpellPicks({ cantrips: ['Eldritch Blast', 'Light'], spells: ['Cure Wounds', 'Shield'], available, spellInfo: info }))
+      .toEqual({ cantrips: ['Light'], spells: ['Shield'] });
+  });
+  it('drops spells above the maximum spell level', () => {
+    const info = { cantrips: 3, prepareCount: 5, maxLevel: 1 };
+    expect(trimSpellPicks({ cantrips: [], spells: ['Fireball', 'Magic Missile'], available, spellInfo: info }).spells)
+      .toEqual(['Magic Missile']);
+  });
+  it('keeps only as many as the counts allow, first picks first', () => {
+    const info = { cantrips: 2, spellsKnown: 1, maxLevel: 3 };
+    expect(trimSpellPicks({ cantrips: ['Fire Bolt', 'Light', 'Mage Hand'], spells: ['Shield', 'Fireball'], available, spellInfo: info }))
+      .toEqual({ cantrips: ['Fire Bolt', 'Light'], spells: ['Shield'] });
+  });
+  it('does not let a cantrip fill a leveled slot or vice versa, and removes duplicates', () => {
+    const info = { cantrips: 3, prepareCount: 3, maxLevel: 1 };
+    expect(trimSpellPicks({ cantrips: ['Shield', 'Light', 'Light'], spells: ['Light', 'Shield', 'Shield'], available, spellInfo: info }))
+      .toEqual({ cantrips: ['Light'], spells: ['Shield'] });
   });
 });

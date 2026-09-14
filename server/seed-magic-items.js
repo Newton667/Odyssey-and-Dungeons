@@ -222,11 +222,11 @@ async function seed() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB Atlas');
 
-  // Only insert magic items (don't touch existing mundane items)
-  const existingMagic = await Equipment.countDocuments({ magical: true });
-  if (existingMagic > 0) {
-    console.log(`Already have ${existingMagic} magic items. Removing and re-seeding magic items...`);
-    await Equipment.deleteMany({ magical: true });
+  // Only remove the items THIS script inserts (gotcha #6). A `magical: true` delete also wiped the
+  // magical ammunition that seed-equipment.js inserts.
+  const removed = await Equipment.deleteMany({ name: { $in: magicItems.map(i => i.name) } });
+  if (removed.deletedCount > 0) {
+    console.log(`Removed ${removed.deletedCount} existing magic items from this seed and re-seeding...`);
   }
 
   await Equipment.insertMany(magicItems);

@@ -222,9 +222,8 @@ function getTopFace(mesh, sides) {
       // Octahedron has 8 faces numbered 0-7, map to 1-10
       value = Math.floor(Math.random() * 10) + 1;
     } else if (sides === 100) {
-      // 8 faces numbered 0,10,...,70, map to 10,20,...,100
-      value = (Math.floor(Math.random() * 10)) * 10;
-      if (value === 0) value = 100;
+      // A d100 is 1–100. The old "random tens digit × 10" could only ever give 10, 20, … 100.
+      value = Math.floor(Math.random() * 100) + 1;
     }
     return { value, label: bestLabel };
   }
@@ -318,7 +317,17 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
     const H = window.innerHeight;
 
     /* ── Renderer (transparent!) ── */
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    // three.js THROWS when WebGL is unavailable (hardware acceleration off, some VMs and
+    // remote desktops). This component sits outside the page error boundary, so an uncaught
+    // throw here unmounted the whole app on the first roll. Leave stateRef null instead —
+    // the launch effect below then settles the roll without animation.
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    } catch (err) {
+      console.warn('3D dice unavailable (WebGL could not start) — rolling without animation.', err);
+      return;
+    }
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
@@ -395,6 +404,16 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
     return () => {
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(frameRef.current);
+      // Free GPU resources: this component remounts for every roll. Do NOT call
+      // renderer.forceContextLoss() here — in dev, StrictMode runs this cleanup and then
+      // mounts again on the SAME canvas, which would get the lost context back and fail
+      // (every roll silently fell back to "no animation"). On a real unmount the canvas
+      // leaves the DOM and its context is released with it.
+      scene.traverse(o => {
+        o.geometry?.dispose?.();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        mats.forEach(m => { m.map?.dispose?.(); m.dispose?.(); });
+      });
       renderer.dispose();
       stateRef.current = null;
     };
@@ -403,7 +422,13 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
   /* ── Launch dice when diceToRoll changes ── */
   useEffect(() => {
     const S = stateRef.current;
-    if (!S || !diceToRoll || diceToRoll.length === 0) return;
+    if (!diceToRoll || diceToRoll.length === 0) return;
+    if (!S) {
+      // No renderer (WebGL failed above): still deliver a fair result so the roll resolves
+      // and DiceContext releases its one-roll-at-a-time guard.
+      onSettled?.(diceToRoll.map(d => ({ die: d.die, sides: d.sides, value: 1 + Math.floor(Math.random() * d.sides) })));
+      return;
+    }
 
     // Read from refs so changing these doesn't re-trigger the effect
     const f = forceRef.current;
@@ -525,6 +550,9 @@ export default function Dice3D({ diceToRoll, onSettled, fading, force = 2, diceT
     return () => {
       cancelAnimationFrame(frameRef.current);
       clearTimeout(timeout);
+      // Detach the face labels so each die's glow `pulse()` loop (which runs until its label
+      // loses its parent) stops — otherwise every die of every roll kept animating forever.
+      S.dice.forEach(({ mesh }) => mesh.clear());
     };
   }, [diceToRoll, onSettled]);
 

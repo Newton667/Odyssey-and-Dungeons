@@ -27,7 +27,8 @@ User runs start.bat (double-click) / start.sh (./start.sh)
 ├─ Init git if the folder has no .git (clone-less download)
 │
 ├─ Check for updates (git fetch origin main)
-│  ├─ Update available → Ask user y/n
+│  ├─ HEAD ahead of / diverged from origin/main → "Skipped: local commits", no prompt
+│  ├─ Update available (HEAD strictly behind: merge-base --is-ancestor + rev-list count > 0) → Ask user y/n
 │  │  └─ Yes → git reset --hard origin/main, git pull, then
 │  │           (bat only) relaunch the fresh start.bat in a new window and exit —
 │  │           cmd.exe resumes a rewritten .bat by byte offset, so the old
@@ -51,7 +52,7 @@ User runs start.bat (double-click) / start.sh (./start.sh)
 
 ## Key Features
 - **Self-bootstrapping**: Can clone the entire repo from just the launcher file
-- **Auto-updates**: Checks GitHub for new commits on every launch
+- **Auto-updates**: Checks GitHub for new commits on every launch, and only offers one when this copy is strictly behind `origin/main` — a checkout with unpushed commits is never `reset --hard`. Refs are read with `git rev-parse --verify --quiet` (without `--verify` a missing ref echoes the literal `origin/main`). In `start.bat` each check is its own line with `goto` labels, so `ERRORLEVEL` is read at run time
 - **Platform-aware dependencies**: `scripts/ensure-deps.js` rebuilds `node_modules` when the OS/arch changes, so a folder set up on Windows works on Linux and back
 - **Safe directory**: Adds git safe.directory config to avoid "dubious ownership" errors (Windows permissions, FUSE-mounted NTFS on Linux)
 - **Never closes silently**: Every failure prints a message and waits, so the window stays open for debugging

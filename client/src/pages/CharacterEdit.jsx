@@ -106,6 +106,10 @@ export default function CharacterEdit() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  // HP gained by Lv Up since the last save — applied to the CURRENT local HP at save time, so
+  // damage taken on the sheet in another tab meanwhile isn't overwritten by a stale snapshot.
+  const [pendingHpGain, setPendingHpGain] = useState(0);
   const [section, setSection] = useState(0);
   const [char, setChar] = useState(null);
 
@@ -159,6 +163,11 @@ export default function CharacterEdit() {
         subclass: data.subclass || '',
         ruleset: data.ruleset || '2014',
         level: data.level || 1,
+        // A real multiclass array has to be in the form: the sheet reads class/level/subclass
+        // from it, so an editor that only changed the summary fields changed nothing there.
+        // Conditional — a plain `classes: undefined` key would delete the array on save.
+        ...(Array.isArray(data.classes) && data.classes.filter(c => c && c.class).length > 1
+          && { classes: data.classes.filter(c => c && c.class).map(c => ({ ...c })) }),
         background: data.background || '',
         alignment: data.alignment || '',
         faith: data.faith || '',
@@ -179,8 +188,10 @@ export default function CharacterEdit() {
         levelingMethod: data.levelingMethod || 'milestone',
         experiencePoints: data.experiencePoints || 0,
         equipment: [...(data.equipment || [])],
-        gold: data.gold || 0,
+        gold: data.currency?.gp ?? data.gold ?? 0,
         currency: data.currency || { cp: 0, sp: 0, ep: 0, gp: data.gold || 0, pp: 0 },
+        // Missing from the form, so the checkbox showed ticked for a character with tracking off.
+        trackAmmo: data.trackAmmo !== false,
         preparedSpells: [...(data.preparedSpells || [])],
         spellcastingAbility: data.spellcastingAbility || '',
         features: [...(data.features || [])],
@@ -209,6 +220,8 @@ export default function CharacterEdit() {
       // Try to detect if current scores match standard array
       const vals = ABILITIES.map(ab => s[ab] || 10).sort((a, b) => b - a);
       const isStdArray = JSON.stringify(vals) === JSON.stringify([...STANDARD_ARRAY]);
+      // Seed the dropdowns from the scores — empty ones made the first pick reset the rest to 10.
+      setStdAssign(isStdArray ? Object.fromEntries(ABILITIES.map(ab => [ab, String(s[ab])])) : {});
       setAbilityMethod(isStdArray ? 'standard' : 'manual');
       setLoading(false);
     };
@@ -281,18 +294,26 @@ export default function CharacterEdit() {
   );
   const featNames = useMemo(() => normalizeFeatNames(form.feats), [form.feats]);
 
+  // Caster classes with their OWN levels. For a multiclass character, limits used to come
+  // from the primary class at the total level (Fighter 5 / Wizard 3 → "not a spellcaster";
+  // Wizard 3 / Fighter 5 → 4th-level spells).
+  const formCasterClasses = useMemo(
+    () => getCharClasses(form).filter(c => SPELLCASTING_CLASSES.includes(c.class)),
+    [form.class, form.level, form.subclass, form.classes],
+  );
+  const casterKey = formCasterClasses.map(c => c.class).join('|');
   const [allSpells, setAllSpells] = useState([]);
   useEffect(() => {
-    const castingClass = form.class && SPELLCASTING_CLASSES.includes(form.class) ? form.class : null;
-    if (!castingClass && !featClasses.length) { setAllSpells([]); return; }
+    const castingClasses = casterKey ? casterKey.split('|') : [];
+    if (!castingClasses.length && !featClasses.length) { setAllSpells([]); return; }
     setSpellLoading(true);
     const byId = new Map();
-    for (const cls of [castingClass, ...featClasses].filter(Boolean)) {
+    for (const cls of [...castingClasses, ...featClasses].filter(Boolean)) {
       for (const sp of queryLocalSpells({ cls })) if (!byId.has(sp._id)) byId.set(sp._id, sp);
     }
     setAllSpells([...byId.values()]);
     setSpellLoading(false);
-  }, [form.class, featClasses]);
+  }, [casterKey, featClasses]);
 
   // Auto-calculate proficiency bonus from level
   const computedProfBonus = useMemo(() => profBonus(form.level || 1), [form.level]);
@@ -334,19 +355,43 @@ export default function CharacterEdit() {
   const maxFeats = asiCount + (isVariantHuman ? 1 : 0);
 
   // Spell limits
+  // The creator never saves `spellcastingAbility`, so fall back to the caster class's own
+  // ability — otherwise every new character's prepared-spell limit ignored its modifier.
+  const castingAbility = form.spellcastingAbility || CLASS_SPELL_ABILITY[formCasterClasses[0]?.class || form.class] || '';
   const spellcastingMod = useMemo(() => {
-    if (!form.spellcastingAbility || !scores[form.spellcastingAbility]) return 0;
-    return modVal(scores[form.spellcastingAbility]);
-  }, [form.spellcastingAbility, scores]);
+    if (!castingAbility || !scores[castingAbility]) return 0;
+    return modVal(scores[castingAbility]);
+  }, [castingAbility, scores]);
 
   const spellLimits = useMemo(() => {
-    return getSpellLimits(form.class, form.level || 1, spellcastingMod, form.ruleset || '2014', featNames);
-  }, [form.class, form.level, spellcastingMod, form.ruleset, featNames]);
+    const ruleset = form.ruleset || '2014';
+    if (formCasterClasses.length <= 1) {
+      const c = formCasterClasses[0];
+      return getSpellLimits(c ? c.class : form.class, c ? c.level : (form.level || 1), spellcastingMod, ruleset, featNames);
+    }
+    // Two or more caster classes: add up each class's allowance at its own level (using
+    // its own casting ability); Magic Initiate's bonus is counted once.
+    const parts = formCasterClasses.map((c, i) => getSpellLimits(
+      c.class, c.level, modVal(scores[CLASS_SPELL_ABILITY[c.class]] ?? 10), ruleset, i === 0 ? featNames : [],
+    )).filter(Boolean);
+    if (!parts.length) return null;
+    return {
+      ...parts[0],
+      cantrips: parts.reduce((n, l) => n + (l.cantrips || 0), 0),
+      maxSpells: parts.reduce((n, l) => n + (l.maxSpells || 0), 0),
+      prepareCount: parts.some(l => l.prepareCount) ? parts.reduce((n, l) => n + (l.prepareCount || l.maxSpells || 0), 0) : undefined,
+      maxLevel: Math.max(...parts.map(l => l.maxLevel || 0)),
+    };
+  }, [formCasterClasses, form.class, form.level, spellcastingMod, form.ruleset, featNames, scores]);
 
   // Class change handler — shows confirmation dialog
   const handleClassChange = async (newClass) => {
     const oldClass = form.class;
     if (newClass === oldClass) return;
+    if (isMulticlass(form) && getCharClasses(form).slice(1).some(c => c.class === newClass)) {
+      alert(`${newClass} is already one of this character's classes.`);
+      return;
+    }
 
     const oldSaves = SAVING_THROWS_BY_CLASS[oldClass] || [];
     const newSaves = SAVING_THROWS_BY_CLASS[newClass] || [];
@@ -405,18 +450,23 @@ export default function CharacterEdit() {
     const removeSet = new Set(spellsToRemove);
 
     setForm(prev => {
-      // Update hit dice: replace die type but keep level prefix
-      const hdMatch = (prev.hitDice || '').match(/^(\d+)/);
-      const hdLevel = hdMatch ? hdMatch[1] : prev.level;
-      return {
+      const base = {
         ...prev,
         class: newClass,
         subclass: '',
         savingThrowProficiencies: SAVING_THROWS_BY_CLASS[newClass] || [],
-        hitDice: `${hdLevel}${changes.newHD}`,
         spellcastingAbility: changes.newSpellAbility,
         preparedSpells: (prev.preparedSpells || []).filter(s => !removeSet.has(s)),
       };
+      if (isMulticlass(prev)) {
+        // Change the primary entry of the classes array; the sheet reads classes, not `class`.
+        const classes = getCharClasses(prev).map((c, i) => (i === 0 ? { ...c, class: newClass, subclass: '' } : { ...c }));
+        return { ...base, ...syncPrimaryFromClasses(classes), hitDice: formatHitDice({ classes }) };
+      }
+      // Update hit dice: replace die type but keep level prefix
+      const hdMatch = (prev.hitDice || '').match(/^(\d+)/);
+      const hdLevel = hdMatch ? hdMatch[1] : prev.level;
+      return { ...base, hitDice: `${hdLevel}${changes.newHD}` };
     });
     setClassChangeDialog(null);
   };
@@ -425,17 +475,31 @@ export default function CharacterEdit() {
   const save = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError('');
+    // Start from what's in localStorage NOW, not the snapshot taken when the editor opened —
+    // the sheet may have changed HP, ammo, spell slots or conditions in another tab since.
+    // (Fields this form edits, like equipment, still come from the form.)
+    let latest = char;
+    try { latest = JSON.parse(localStorage.getItem(`ond-char-${id}`) || 'null') || char; } catch { /* keep snapshot */ }
     const body = {
       ...form,
       proficiencyBonus: computedProfBonus,
-      currentHp: Math.min(char.currentHp ?? form.maxHp, form.maxHp),
+      currentHp: Math.max(0, Math.min((latest.currentHp ?? form.maxHp) + pendingHpGain, form.maxHp)),
     };
     // Always write the local copy first (local-first — matches the server's
     // {...existing, ...body} merge so fields the edit form doesn't manage survive).
-    const merged = { ...char, ...body, updatedAt: new Date().toISOString() };
+    const merged = { ...latest, ...body, updatedAt: new Date().toISOString() };
+    // A single class keeps class/level/subclass authoritative; drop a leftover one-element array.
+    if (!body.classes && Array.isArray(merged.classes) && merged.classes.length < 2) delete merged.classes;
     try {
       localStorage.setItem(`ond-char-${id}`, JSON.stringify(merged));
-    } catch { /* quota exceeded — ignore */ }
+    } catch (err) {
+      // Usually the ~5 MB storage quota (portraits are large). Nothing was saved locally —
+      // say so instead of flashing "Saved!" over an edit that will be gone on reload.
+      setSaving(false);
+      setSaveError(`Could not save to this browser's storage (${err?.name === 'QuotaExceededError' ? 'storage is full — try a smaller portrait or delete unused characters' : err?.message || 'unknown error'}).`);
+      return;
+    }
     try {
       // Local-only characters have no server file; localStorage is authoritative.
       if (!id?.startsWith('local-')) {
@@ -450,11 +514,13 @@ export default function CharacterEdit() {
         if (!res.ok) throw new Error('save failed');
       }
       setChar(merged);
+      setPendingHpGain(0);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
       // Server unreachable, but the local copy is saved — treat as a soft success.
       setChar(merged);
+      setPendingHpGain(0);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally { setSaving(false); }
@@ -506,6 +572,7 @@ export default function CharacterEdit() {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {saved && <span style={{ color: '#4ade80', fontSize: '13px' }}>Saved!</span>}
+          {saveError && <span style={{ color: '#f87171', fontSize: '13px', maxWidth: '360px' }}>{saveError}</span>}
           <button className="btn btn-primary" onClick={save} disabled={saving} style={{ padding: '8px 24px' }}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
@@ -541,14 +608,16 @@ export default function CharacterEdit() {
                       {(form.level || 1) < 20 && (
                         <button className="btn" style={{ padding: '6px 14px', fontSize: '12px', background: 'linear-gradient(135deg, #1a3a1a, #2a5a2a)', border: '1px solid #4ade80', color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}
                           onClick={() => {
-                            const conMod = modVal((form.abilityScores?.constitution ?? 10));
+                            const conMod = modVal((form.abilityScores?.constitution ?? 10) + (form.abilityBonuses?.constitution || 0));
+                            const featHp = featNames.reduce((n, f) => n + (FEAT_HP_PER_LEVEL[f] || 0), 0);
+
                             if (isMulticlass(form)) {
                               // Advance the primary class and re-sync summary fields
                               const classes = getCharClasses(form).map(c => ({ ...c }));
                               classes[0].level += 1;
                               const hd = CLASSES[classes[0].class]?.hitDice || HIT_DICE[classes[0].class] || 'd8';
                               const avg = Math.floor(parseInt(hd.replace('d', '')) / 2) + 1;
-                              const hpGain = avg + conMod;
+                              const hpGain = Math.max(1, avg + conMod) + featHp;
                               const patch = syncPrimaryFromClasses(classes);
                               set('classes', patch.classes);
                               set('level', patch.level);
@@ -556,7 +625,7 @@ export default function CharacterEdit() {
                               set('subclass', patch.subclass);
                               set('proficiencyBonus', patch.proficiencyBonus);
                               set('maxHp', (form.maxHp || 0) + hpGain);
-                              set('currentHp', (form.maxHp || 0) + hpGain);
+                              setPendingHpGain(g => g + hpGain);
                               set('hitDice', formatHitDice({ classes }));
                               alert(`${classes[0].class} leveled to ${classes[0].level} (total ${patch.level}). +${hpGain} HP.`);
                               return;
@@ -565,15 +634,15 @@ export default function CharacterEdit() {
                             const hd = HIT_DICE[form.class] || 'd8';
                             const dieMax = parseInt(hd.replace('d', ''));
                             const avg = Math.floor(dieMax / 2) + 1;
-                            const hpGain = avg + conMod;
+                            const hpGain = Math.max(1, avg + conMod) + featHp;
                             const newMaxHp = (form.maxHp || 0) + hpGain;
                             const newPB = newLevel <= 4 ? 2 : newLevel <= 8 ? 3 : newLevel <= 12 ? 4 : newLevel <= 16 ? 5 : 6;
                             set('level', newLevel);
                             set('maxHp', newMaxHp);
-                            set('currentHp', newMaxHp);
+                            setPendingHpGain(g => g + hpGain);
                             set('hitDice', `${newLevel}${hd}`);
                             set('proficiencyBonus', newPB);
-                            alert(`Leveled up to ${newLevel}!\n+${hpGain} HP (${hd} avg ${avg} + ${conMod} CON)\nNew Max HP: ${newMaxHp}`);
+                            alert(`Leveled up to ${newLevel}!\n+${hpGain} HP (${hd} avg ${avg} + ${conMod} CON${featHp ? ` + ${featHp} feats` : ''})\nNew Max HP: ${newMaxHp}`);
                           }}>
                           Lv Up
                         </button>
@@ -649,7 +718,12 @@ export default function CharacterEdit() {
                 <div style={st.grid2}>
                   <div>
                     <label style={st.label}>Subclass</label>
-                    <input style={st.input} value={form.subclass} onChange={e => set('subclass', e.target.value)} />
+                    <input style={st.input} value={form.subclass} onChange={e => {
+                      const v = e.target.value;
+                      setForm(prev => (isMulticlass(prev)
+                        ? { ...prev, subclass: v, classes: getCharClasses(prev).map((c, i) => (i === 0 ? { ...c, subclass: v } : c)) }
+                        : { ...prev, subclass: v }));
+                    }} />
                   </div>
                   <div>
                     <label style={st.label}>Background</label>
@@ -794,10 +868,9 @@ export default function CharacterEdit() {
                             const next = { ...prev };
                             Object.keys(next).forEach(k => { if (next[k] === val && k !== ab) next[k] = ''; });
                             next[ab] = val;
-                            // Update form scores
-                            const newScores = {};
-                            ABILITIES.forEach(a => { newScores[a] = Number(next[a]) || 10; });
-                            setForm(f => ({ ...f, abilityScores: newScores }));
+                            // Update only the assigned scores — unassigned ones keep their value.
+                            const assigned = Object.fromEntries(ABILITIES.filter(a => next[a]).map(a => [a, Number(next[a])]));
+                            setForm(f => ({ ...f, abilityScores: { ...f.abilityScores, ...assigned } }));
                             return next;
                           });
                         }}>
@@ -836,7 +909,8 @@ export default function CharacterEdit() {
                               if (v > 8) {
                                 const newScores = { ...pbScores, [ab]: v - 1 };
                                 setPbScores(newScores);
-                                setForm(f => ({ ...f, abilityScores: newScores }));
+                                // Only the clicked ability — the others may be outside 8–15 (a CON 17 stays 17).
+                                setForm(f => ({ ...f, abilityScores: { ...f.abilityScores, [ab]: v - 1 } }));
                               }
                             }} style={{ width: '28px', height: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)', fontSize: '16px' }}>−</button>
                             <span style={{ fontSize: '22px', fontWeight: 700, minWidth: '32px', textAlign: 'center', color: 'var(--gold)' }}>{v}</span>
@@ -845,7 +919,7 @@ export default function CharacterEdit() {
                               if (v < 15 && pbPointsLeft >= costIncrease) {
                                 const newScores = { ...pbScores, [ab]: v + 1 };
                                 setPbScores(newScores);
-                                setForm(f => ({ ...f, abilityScores: newScores }));
+                                setForm(f => ({ ...f, abilityScores: { ...f.abilityScores, [ab]: v + 1 } }));
                               }
                             }} style={{ width: '28px', height: '28px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--text)', fontSize: '16px' }}>+</button>
                           </div>
@@ -1068,7 +1142,9 @@ export default function CharacterEdit() {
               </div>
               <div style={{ marginTop: '14px' }}>
                 <label style={st.label}>Gold</label>
-                <NumInput style={{ ...st.input, width: '120px' }} min={0} value={form.gold} onChange={v => set('gold', v)} />
+                {/* The sheet shows `currency.gp` whenever it exists, so writing only `gold` did nothing. */}
+                <NumInput style={{ ...st.input, width: '120px' }} min={0} value={form.currency?.gp ?? form.gold}
+                  onChange={v => setForm(f => ({ ...f, gold: v, currency: { cp: 0, sp: 0, ep: 0, pp: 0, ...(f.currency || {}), gp: v } }))} />
               </div>
             </div>
           )}
@@ -1266,7 +1342,7 @@ export default function CharacterEdit() {
           {section === 5 && (() => {
             const currentSpells = form.preparedSpells || [];
             // A feat list alone makes a non-caster able to hold spells.
-            const isCaster = SPELLCASTING_CLASSES.includes(form.class) || featClasses.length > 0;
+            const isCaster = formCasterClasses.length > 0 || featClasses.length > 0;
 
             // Separate current spells into cantrips vs leveled based on allSpells data
             const spellsByName = {};
@@ -1877,6 +1953,7 @@ export default function CharacterEdit() {
           {/* Bottom save bar */}
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', padding: '16px 0' }}>
             {saved && <span style={{ color: '#4ade80', fontSize: '13px', alignSelf: 'center' }}>Changes saved!</span>}
+            {saveError && <span style={{ color: '#f87171', fontSize: '13px', alignSelf: 'center' }}>{saveError}</span>}
             <button className="btn btn-primary" onClick={save} disabled={saving} style={{ padding: '10px 32px', fontSize: '14px' }}>
               {saving ? 'Saving...' : 'Save Changes'}
             </button>
@@ -2030,16 +2107,14 @@ export default function CharacterEdit() {
         <ImageCropper
           src={cropSrc}
           onCancel={() => { URL.revokeObjectURL(cropSrc); setCropSrc(null); }}
-          onCrop={async (blob) => {
+          onCrop={(blob) => {
             URL.revokeObjectURL(cropSrc);
             setCropSrc(null);
-            const fd = new FormData();
-            fd.append('image', blob, 'avatar.png');
-            try {
-              const res = await fetch('/api/upload', { method: 'POST', body: fd });
-              const data = await res.json();
-              if (data.url) set('avatarUrl', data.url);
-            } catch {}
+            // Stored in the character like the creator does. An `/uploads/…` URL showed as a
+            // broken image under the launchers (Vite only proxies /api) and wasn't local-first.
+            const reader = new FileReader();
+            reader.onload = ev => set('avatarUrl', ev.target.result);
+            reader.readAsDataURL(blob);
           }}
         />
       )}

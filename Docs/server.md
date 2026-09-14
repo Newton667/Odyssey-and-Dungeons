@@ -16,18 +16,25 @@ Express entry point.
 
 **Routes mounted:**
 - `/api/characters` → routes/characters.js
-- `/api/campaigns` → routes/campaigns.js
-- `/api/spells` → routes/spells.js
-- `/api/equipment` → routes/equipment.js
-- `/api/homebrew` → routes/homebrew.js
+- `/api/campaigns` → routes/campaigns.js *(behind `requireDb`)*
+- `/api/spells` → routes/spells.js *(behind `requireDb`)*
+- `/api/equipment` → routes/equipment.js *(behind `requireDb`)*
+- `/api/homebrew` → routes/homebrew.js *(behind `requireDb`)*
+
+**Middleware / guards:**
+- **Same-site guard** (before body parsing): a state-changing `/api` request (anything but GET/HEAD/OPTIONS) with an `Origin` header is refused with 403 unless the Origin's host equals the request `Host` or is this machine's own address (localhost / an interface IP). Needed because `cors()` is open and the server listens on all interfaces; "this machine" is allowed because the Vite proxy shorthand uses `changeOrigin` (dev requests arrive with `Origin: …:5173`, `Host: localhost:3001`). Requests without `Origin` (curl, launchers) pass.
+- **`requireDb`**: answers 503 `{ error: 'Database not connected' }` immediately when mongoose isn't connected, instead of letting queries buffer for ~10 s.
+- **`process.on('unhandledRejection')`** logs instead of letting Node exit; `app.listen` prints a clear message and exits on `EADDRINUSE`.
+- The startup `git config --global --add safe.directory` only adds the path when it isn't already listed.
+- Mongo `/:id` routes return 404 for a malformed ObjectId (`router.param` + `mongoose.isValidObjectId`); search/filter text is regex-escaped (`escapeRegex`) and equality filters are coerced to strings.
 
 **Special Endpoints:**
 - `POST /api/upload` — Multipart image upload (multer, field name `image`, 5MB limit, jpg/jpeg/png/gif/webp only). Returns `{ url: '/uploads/...' }`. Used by `CharacterEdit.jsx` for character portraits.
 - `GET /api/health` — Returns `{ status: 'ok'|'no-db', db: 'connected'|'disconnected'|... }` for connection testing
-- `GET /api/check-update` — Runs `git fetch origin main`, compares local/remote HEAD
-- `POST /api/pull-update` — Runs `git reset --hard origin/main && git pull` + `npm install`
+- `GET /api/check-update` — Runs `git fetch origin main`; `updateAvailable` is true only when HEAD is **strictly behind** `origin/main` (ancestor and `rev-list --count HEAD..origin/main` > 0). Ahead/diverged → `updateAvailable: false` plus a `note`.
+- `POST /api/pull-update` — Fetches, returns 409 unless strictly behind (never discards local commits), then `git reset --hard origin/main` and runs `node scripts/ensure-deps.js` asynchronously (10-minute timeout). A failed install returns 500 `{ ok: false, error, output }`.
 - `POST /api/config/upload-data` — Bulk upload local JSON to MongoDB (body: `{ type: 'spells'|'equipment'|'both' }`); reads from `client/src/data/*.json` files
-- `POST /api/config/database` — Save MongoDB connection string to server/.env file
+- `POST /api/config/database` — Validates `mongoUri` (string, `mongodb://` or `mongodb+srv://`, no CR/LF), **tests it on a separate connection first**, and only then writes `server/.env` (function replacer — `$` in passwords is safe) and reconnects. A failing URI returns 400 and leaves `.env` and the live connection untouched.
 - `GET /api/config/database` — Read current MongoDB URI from .env (masked)
 
 **MongoDB Connection:**
@@ -269,6 +276,8 @@ Character CRUD with local JSON file backend.
 
 **Storage:** `server/data/characters/{id}.json` — one file per character.
 
+**Id safety:** `router.param('id')` rejects ids not matching `/^[A-Za-z0-9_-]+$/` (400), and `charFile(id)` resolves the path and refuses anything outside `data/characters/`. Express decodes `%2F` in params, so without this `..%2F..%2Fpackage` reached files outside the folder. POST and PUT set `_id` **after** spreading the body, so a body `_id` can't desync the stored id from the filename.
+
 ### routes/campaigns.js (~172 lines)
 Campaign CRUD with multiplayer features. Requires MongoDB.
 
@@ -326,7 +335,7 @@ Homebrew CRUD with share code system. Requires MongoDB.
 
 ## Seed Scripts
 
-All seed scripts connect to MongoDB and populate collections. Run with `node seed-{name}.js`.
+All seed scripts connect to MongoDB and populate collections. Run with `node seed-{name}.js`. **Deletes are scoped to the names each script inserts** (`deleteMany({ name: { $in: … } })`, plus the level filter for the spell seeds) — a category/level-only filter overlapped other scripts (magic ammunition, racial abilities, `seed-missing` spells).
 
 | Script | Collection | Contents |
 |--------|-----------|----------|

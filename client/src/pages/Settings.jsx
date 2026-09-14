@@ -282,6 +282,14 @@ export default function Settings() {
   const [showDbUri, setShowDbUri] = useState(false);
   const [uploading, setUploading] = useState(null); // null, 'equipment', 'spells', 'both'
   const [uploadResult, setUploadResult] = useState(null);
+  // Held in state (not read from localStorage during render) so the card re-renders on click.
+  const [dataSource, setDataSource] = useState(() => (localStorage.getItem('ond-data-source') === 'db' ? 'db' : 'local'));
+
+  function chooseDataSource(key) {
+    const next = key === 'db' ? 'db' : 'local';
+    setDataSource(next);
+    localStorage.setItem('ond-data-source', next);
+  }
 
   // Load current DB config from server
   useEffect(() => {
@@ -307,7 +315,6 @@ export default function Settings() {
   }
 
   async function saveServerSettings() {
-    localStorage.setItem('ond-db-uri', dbUri);
     if (dbUri.trim()) {
       // Send to server to update .env and reconnect
       setDbStatus('testing');
@@ -318,20 +325,26 @@ export default function Settings() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ mongoUri: dbUri.trim() }),
         });
-        const data = await res.json();
+        let data = null;
+        try { data = await res.json(); } catch { /* non-JSON body (e.g. proxy error page) */ }
         if (res.ok) {
+          // Only cache the URI once the server has accepted it — writing it before the
+          // request let a bad URI overwrite the last good one.
+          localStorage.setItem('ond-db-uri', dbUri);
           setDbStatus('success');
           setDbSaved(true);
           setTimeout(() => setDbSaved(false), 2000);
         } else {
           setDbStatus('error');
-          setDbError(data.error || 'Failed to update');
+          setDbError(data?.error || `Failed to update (server responded with ${res.status})`);
         }
       } catch (err) {
         setDbStatus('error');
         setDbError(err.message || 'Cannot reach server');
       }
     } else {
+      // Deliberately clearing the field and saving clears the cached URI; no request is made.
+      localStorage.setItem('ond-db-uri', dbUri);
       setDbSaved(true);
       setTimeout(() => setDbSaved(false), 2000);
     }
@@ -841,7 +854,7 @@ export default function Settings() {
           <h3 style={{ fontSize: '16px', marginBottom: '4px' }}>Shared Database</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '16px' }}>
             Everyone in your group connects to the <strong style={{ color: 'var(--text)' }}>same MongoDB database</strong>.
-            Each player runs the app locally but shares the same data — campaigns, characters, and rolls are all synced.
+            Each player runs the app locally but shares the same campaign data — campaigns, party HP and rolls are shared. Characters always stay on each player's own device.
           </p>
 
           <div style={{ marginBottom: '16px' }}>
@@ -1056,18 +1069,17 @@ export default function Settings() {
         <div className="card">
           <h3 style={{ fontSize: '16px', marginBottom: '4px' }}>Default Data Source</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-dim)', marginBottom: '16px' }}>
-            Choose whether the app uses local data (bundled with the app) or the database by default for equipment and spells.
-            Characters are always saved locally first — database sync is optional per character.
+            Choose whether the Spells and Equipment browsers use local data (bundled with the app) or the database.
+            This does not affect characters — they are always stored locally on this browser.
           </p>
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {[
               { key: 'local', label: 'Local (Recommended)', desc: 'Fast, always available, no internet needed', color: 'var(--gold)' },
               { key: 'db', label: 'Database', desc: 'Shared data, requires connection', color: '#4ade80' },
             ].map(opt => {
-              const current = localStorage.getItem('ond-data-source') !== 'db' ? 'local' : 'db';
-              const active = current === opt.key;
+              const active = dataSource === opt.key;
               return (
-                <div key={opt.key} onClick={() => localStorage.setItem('ond-data-source', opt.key === 'local' ? 'local' : 'db')}
+                <div key={opt.key} onClick={() => chooseDataSource(opt.key)}
                   className="cc-skill"
                   style={{ flex: 1, minWidth: '200px', padding: '14px', borderRadius: '8px', cursor: 'pointer', background: active ? 'var(--bg-dark)' : 'var(--surface)', border: `2px solid ${active ? opt.color : 'var(--border)'}` }}>
                   <div style={{ fontWeight: 700, fontSize: '14px', color: active ? opt.color : 'var(--text)', marginBottom: '4px' }}>{opt.label}</div>

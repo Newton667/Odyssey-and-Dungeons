@@ -166,6 +166,11 @@ Calculation and formatting helpers.
 - `cantripDamage(spell, charLevel)` — A cantrip's damage at a given **character** level (not slot level — neither edition upcasts a cantrip). Keys on `level === 0` plus an exclusion list, deliberately **not** on `scaling`. Returns `spell.damage` unchanged for non-cantrips, damageless cantrips, non-`NdM` strings, `source: 'race'` pseudo-spells, and anything in `CANTRIP_NO_SCALE`.
 - `CANTRIP_NO_SCALE` — `Set` of `Eldritch Blast` (gains *beams*, not dice: 1/2/3/4 separate attack rolls at 5/11/17), `Magic Stone` and `Shillelagh` (no level progression at all), and `Green-Flame Blade` (its stored `1d8` is already the 5th-level value, so scaling would run one die high). **Booming Blade is deliberately not in the set** — its `1d8` really does go 1d8/2d8/3d8/4d8. Racial pseudo-spells are excluded separately by `source === 'race'`, because the Dragonborn breath weapons use 1/6/11/16, a different tier set. Homebrew cantrips have no `source` and so scale by design.
 
+- `hitDiceAfterLongRest(total, remaining)` — Hit dice after a long rest: regain spent dice up to half the total, minimum 1 (PHB p.186). `remaining` undefined means none spent.
+- `unarmoredBaseAC(classNames, { dex, con, wis }, hasShield)` — Base AC with no armor: 10 + DEX, or the better of Barbarian 10 + DEX + CON (shield allowed) / Monk 10 + DEX + WIS (no shield). The caller adds the shield bonus. Used by the sheet's `calcAC`.
+- `martialArtsDie(monkLevel, ruleset='2014')` — by **Monk** class level: 2014 `'1d4'` / `'1d6'` at 5 / `'1d8'` at 11 / `'1d10'` at 17; 2024 one size larger (`'1d6'` → `'1d12'`).
+- `trimSpellPicks({ cantrips, spells, available, spellInfo })` — The creator's save filter: keeps only picks on the current class list, cantrips as cantrips and leveled spells within `spellInfo.maxLevel`, capped at the allowed counts (earliest first). `spellInfo` null → nothing.
+
 ### homebrew.js (~380 lines)
 The single door to the `ond-homebrew` localStorage key, plus the pure logic the Homebrewer page used to keep inside its component. **Which function you use depends on whether you are reading or writing, and this is a safety property, not a style choice** — see known-patterns-and-gotchas.md → "Homebrew: normalise on read".
 
@@ -197,7 +202,7 @@ The single door to the `ond-homebrew` localStorage key, plus the pure logic the 
 - `WEAPON_SUBS` / `ARMOR_SUBS` / `SCHOOLS` — shared by the Homebrewer's pickers and `validateHomebrew` so the two cannot drift apart.
 
 ### diceFormula.js
-- `parseDiceFormula(formula)` → `{ dice: [{die, sides}], staticBonus, hasDice, d1Count }`. The single dice-string parser, used by `DiceContext.rollDice3D` and by the sheet's advantage/disadvantage bonus (a regex there used to drop negative modifiers, since a negative renders as `1d20+-2`). Sums **all** modifiers including negatives; folds `d1` dice into `staticBonus` (`d1Count` lets a caller rebuild the d1-only result shape); with no dice groups it still sums bare integers, so `'1'` → 1 and `'—'` → 0. A non-string input passes straight through, so the array form of `rollDice3D` keeps working. **A countless die is one die** — the regex is `/(\d*)d(\d+)/g` with `count = m[1] || 1`, so `'d10'` (the shape of `CLASSES[cls].hitDice`) parses as a single d10 rather than a flat +10; reading it as a modifier is what made level-up HP always roll maximum. See known-patterns-and-gotchas.md → "`CLASSES[cls].hitDice` is a bare `'d10'`".
+- `parseDiceFormula(formula)` → `{ dice: [{die, sides}], staticBonus, hasDice, d1Count }`. Case-insensitive (`1D8` is a die). The single dice-string parser, used by `DiceContext.rollDice3D` and by the sheet's advantage/disadvantage bonus (a regex there used to drop negative modifiers, since a negative renders as `1d20+-2`). Sums **all** modifiers including negatives; folds `d1` dice into `staticBonus` (`d1Count` lets a caller rebuild the d1-only result shape); with no dice groups it still sums bare integers, so `'1'` → 1 and `'—'` → 0. A non-string input passes straight through, so the array form of `rollDice3D` keeps working. **A countless die is one die** — the regex is `/(\d*)d(\d+)/g` with `count = m[1] || 1`, so `'d10'` (the shape of `CLASSES[cls].hitDice`) parses as a single d10 rather than a flat +10; reading it as a modifier is what made level-up HP always roll maximum. See known-patterns-and-gotchas.md → "`CLASSES[cls].hitDice` is a bare `'d10'`".
 
 ### spellAccess.js
 - `allowedSpellClasses(char)` → lower-cased class names the character may draw spells from: every class from `getCharClasses(char)` (multiclass included) unioned with `char.featSpellLists` values (normalised via `[].concat`, so a legacy bare string works). Empty ⇒ the caller should not filter.
@@ -256,7 +261,7 @@ CLASSES['Fighter'] = {
 - `SAVING_THROWS_BY_CLASS` — Maps class name to saving throw proficiency array
 
 ### featureUses.js (~55 lines)
-`FEATURE_USES` — limited-use class features keyed by base name → `{ max(classLevel, char, className), recharge: 'short'|'long'|fn, unit? }`. `computeFeatureUses(name, classLevel, char, className)` returns `{max, recharge, unit}` or null (0 = unlimited, e.g. Rage 20). `baseFeatureName(name)` strips `(x/day)` etc. for a stable storage key. Remaining uses persist in `char.featureUses[baseName]`; long rest clears the whole object, short rest deletes short-recharge keys.
+`FEATURE_USES` — limited-use class features keyed by base name → `{ max(classLevel, char, className), recharge: 'short'|'long'|fn, unit? }`. Ability-based counts (Bardic Inspiration, Divine Sense, …) read the **effective** score (`abilityScores` + `abilityBonuses`). `computeFeatureUses(name, classLevel, char, className)` returns `{max, recharge, unit}` or null (0 = unlimited, e.g. Rage 20, Wild Shape at 2014 Druid 20; 2024 Wild Shape is 2/3 at 6/4 at 17 and never unlimited). `baseFeatureName(name)` strips `(x/day)` etc. for a stable storage key. Remaining uses persist in `char.featureUses[baseName]`; long rest clears the whole object, short rest deletes short-recharge keys.
 
 ### featureRolls.js (~35 lines)
 `featureRoll(name, { classLevel })` → `{ formula, type: 'healing'|'damage'|'utility', label, note? }` or null. Convenience dice for rollable class features so the Actions tab can show a roll button next to them: Second Wind (`1d10 + level` heal), Sneak Attack (`ceil(level/2)d6`), Divine Smite (`2d8`), Bardic Inspiration and Song of Rest (die scales with level). Keyed by `baseFeatureName`, so `(x/day)`-style qualifiers don't matter. `NATURAL_WEAPONS` (in `classData.js`) is the parallel racial-attack data (Aarakocra Talons, Lizardfolk Bite, Tabaxi/Tortle/Leonin Claws, Satyr Ram) rendered as rollable attacks near Unarmed Strike.
@@ -266,12 +271,13 @@ CLASSES['Fighter'] = {
 
 ### multiclass.js (~110 lines)
 Normalizes single- and multi-class characters and derives combined stats. Single-class saves have no `char.classes`; helpers synthesize one from `char.class/subclass/level`, so all callers treat characters uniformly and existing saves keep working.
-- `getCharClasses(char)` — Canonical `[{class, subclass, level}]` (per-class levels)
+- `getCharClasses(char)` — Canonical `[{class, subclass, level}]` (per-class levels). Only a `classes` array with **2+** entries is authoritative; for one class the top-level `class/level/subclass` win (a one-element array is a leftover — see gotchas).
 - `getTotalLevel(char)` / `isMulticlass(char)`
 - `formatClasses(char, {withSubclass})` — "Fighter 5 / Wizard 3"
 - `getHitDicePools(char)` / `formatHitDice(char)` — Per-class hit-dice pools (`[{die,count}]` / "5d10 + 5d6")
 - `getMulticlassExtraAttacks(char)` — Best single class (does not stack)
-- `getSpellcastingClasses(char)` — `[{class, ability, level}]` for per-class DCs
+- `getSpellcastingClasses(char)` — `[{class, ability, level}]` for per-class DCs; omits a class below `spellcastingStartLevel(class, ruleset)` (2014 Paladin/Ranger: 2)
+- `spellcastingStartLevel(className, ruleset)` — class level at which Spellcasting begins
 - `syncPrimaryFromClasses(classes)` — Patch to keep `class/subclass/level/proficiencyBonus` in sync with the `classes` array after a level-up
 
 **CLASS_LEVELS Object:**
@@ -293,7 +299,10 @@ Data for class progression choices.
 - `LAND_TERRAINS` — Circle of the Land terrain options with bonus spells
 - `FAVORED_ENEMIES` — Ranger favored enemy options
 - `FAVORED_TERRAINS` — Ranger favored terrain options
-- `getLevelChoices(cls, level, subclass)` — Returns available choices for a class at a given level
+- `getLevelChoices(cls, level, subclass, ruleset = '2014')` — Returns available choices for a class at a given level; every choice carries `level`, and the subclass choice follows `getSubclassLevel(cls, ruleset)`
+- `asiChoiceEffect(selection, featAbility?)` → `{ deltas: {ability: n}, saves: [ability] }` for an ASI-card pick ("+2 Strength", "+1 Dexterity / +1 Wisdom", or a half-feat via `FEAT_ABILITY_BONUSES`; Resilient adds its save)
+- `migrateSingleClassChoices(char, cls)` → `{ levelChoices, features }` re-keyed for the character's original class when a second class is added
+- `relocateOrphanedChoices(levelChoices, { cls, subclass, ruleset, namespaced })` → `{ changed, levelChoices }` — moves picks from old saves that sit on a level with no choice of that type to the nearest free card of that type (at or below, else above). Run once per class by the sheet on load
 
 Note: `FIGHTING_STYLES` and `FIGHTING_STYLE_CLASSES` are in `dndConstants.js`, not here.
 
@@ -319,7 +328,7 @@ Keyed by subclass name directly (not nested under class). Each level maps to a s
 Query functions for bundled JSON data.
 
 **Functions:**
-- `queryLocalEquipment({ category, subcategory, search, rarity })` — Filter equipment.json (sorted by category → subcategory → name)
+- `queryLocalEquipment({ category, subcategory, search, rarity })` — Filter equipment.json (sorted by category → subcategory → name). `search`/`subcategory`/`school` are matched as **literal**, case-insensitive substrings — never as a regex
 - `queryLocalSpells({ level, school, cls, search, source, sourceRace })` — Filter spells.json (`sourceRace` accepts a string or array; used for racial spell-like abilities)
 - `getLocalEquipmentByName(name)` — Exact-name lookup, returns the item or `null`
 - `getAllLocalSpells()` — Full spells.json array

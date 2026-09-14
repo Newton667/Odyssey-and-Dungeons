@@ -1,19 +1,19 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDice } from '../context/DiceContext';
 import { useCharacter } from '../hooks/useCharacterSync';
 import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
-import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
+import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FEAT_HP_PER_LEVEL, FEAT_ABILITY_BONUSES, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
 import { CLASS_LEVELS, CLASSES, NATURAL_WEAPONS, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
 import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses, syncPrimaryFromClasses } from '../utils/multiclass';
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
-import { getLevelChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
+import { getLevelChoices, asiChoiceEffect, migrateSingleClassChoices, relocateOrphanedChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
-import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageDice, weaponDamageFormula, weaponRangeText, cantripDamage } from '../utils/dndHelpers';
+import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageDice, weaponDamageFormula, weaponRangeText, cantripDamage, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, normalizeFeatNames } from '../utils/dndHelpers';
 import { parseDiceFormula } from '../utils/diceFormula';
 import { allowedSpellClasses, spellMatchesClasses } from '../utils/spellAccess';
 import { queryLocalEquipment, queryLocalSpells, getLocalEquipmentByName, getAllLocalSpells } from '../data/localDataService';
@@ -74,6 +74,248 @@ function saveColumnCount(charId, count) {
   localStorage.setItem(`ond-columns-${charId}`, String(count));
 }
 
+// ─── Sheet row/button components ──────────────────────
+// Module scope on purpose. These used to be defined inside CharacterSheet's render, so
+// every re-render made a new component type and React remounted them — an open upcast
+// <select> snapped shut and keyboard focus fell back to <body>. They read the sheet's
+// per-render values from SheetCtx instead of closing over them.
+const SheetCtx = createContext(null);
+
+function RollBtn({ label, formula, children, style: extraStyle, type = 'attack', onRoll, rerollLow = false }) {
+  const { rollResults, hasAttackDisadvantage, hasAttackAdvantage, doDisadvantage, doAdvantage, doRollWithResult, diceRolling, setRollMenu } = useContext(SheetCtx);
+  const result = rollResults[label];
+  const isAttack = type === 'attack' || formula.includes('d20');
+  const isDamage = type === 'damage' || !formula.includes('d20');
+  // Auto-apply condition effects to attack rolls
+  const conditionRoll = isAttack && hasAttackDisadvantage && !hasAttackAdvantage
+    ? () => doDisadvantage(label, formula)
+    : isAttack && hasAttackAdvantage && !hasAttackDisadvantage
+    ? () => doAdvantage(label, formula)
+    : () => doRollWithResult(label, formula, { rerollLow });
+
+  return (
+    <button
+      // One roll at a time — a click mid-flight would be swallowed by
+      // rollDice3D's guard and leave the previous number showing.
+      disabled={diceRolling}
+      onClick={(e) => { e.stopPropagation(); conditionRoll(); if (onRoll) onRoll(); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setRollMenu({ x: e.clientX, y: e.clientY, label, formula, type: isAttack ? 'attack' : 'damage' });
+      }}
+      title={`Roll ${formula} · Right-click for options`}
+      className="cc-skill"
+      style={{
+        background: result ? 'var(--accent)' : 'var(--surface)',
+        border: `1px solid ${result ? 'var(--gold)' : 'var(--border)'}`,
+        borderRadius: '6px',
+        opacity: diceRolling ? 0.5 : 1,
+        color: 'var(--gold)', cursor: diceRolling ? 'default' : 'pointer', fontSize: '12px', padding: '4px 12px',
+        fontFamily: 'Cinzel, serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
+        transition: 'all 0.15s', fontWeight: 600, minWidth: '48px', justifyContent: 'center',
+        ...extraStyle,
+      }}>
+      {children || formula}
+      {result && (
+        <>
+          <span style={{ fontSize: '14px', fontWeight: 800, color: result.tag === 'CRIT' ? '#ff4444' : 'var(--gold)', marginLeft: '4px' }}>{result.total}</span>
+          {result.tag && <span style={{ fontSize: '8px', opacity: 0.7, letterSpacing: '0.5px' }}>{result.tag}</span>}
+        </>
+      )}
+    </button>
+  );
+}
+
+function ProfDot({ filled, expert }) {
+  return (
+    <span style={{
+      width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
+      background: expert ? 'var(--gold)' : filled ? 'var(--green-light)' : 'transparent',
+      border: `2px solid ${expert ? 'var(--gold)' : filled ? 'var(--green-light)' : 'var(--border)'}`,
+    }} />
+  );
+}
+
+function SkillRow({ skill }) {
+  const { scores, char, skillProfBonus, rollResults, hasStealthDisadvantage, hasAbilityDisadvantage, doDisadvantage, doRollWithResult, setRollMenu } = useContext(SheetCtx);
+  const baseScore = scores[skill.ability] ?? 10;
+  const baseMod = modVal(baseScore);
+  const prof = char.skillProficiencies?.includes(skill.name);
+  const expert = char.skillExpertise?.includes(skill.name);
+  const bonus = baseMod + skillProfBonus(skill.name);
+  const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+  const formula = `1d20${bonus >= 0 ? '+' : ''}${bonus}`;
+  const result = rollResults[skill.name];
+  // Conditions and armor affect ability checks
+  const armorStealthDis = skill.name === 'Stealth' && hasStealthDisadvantage;
+  const condDis = hasAbilityDisadvantage || armorStealthDis;
+  const rollFn = condDis ? () => doDisadvantage(skill.name, formula) : () => doRollWithResult(skill.name, formula);
+  return (
+    <div
+      className="cc-skill"
+      onClick={rollFn}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setRollMenu({ x: e.clientX, y: e.clientY, label: skill.name, formula, type: 'attack' });
+      }}
+      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', fontSize: '13px', cursor: 'pointer', borderRadius: '4px' }}>
+      <ProfDot filled={prof} expert={expert} />
+      <span style={{ width: '30px', color: 'var(--text-dim)', fontSize: '12px' }}>{ABBR[skill.ability]}</span>
+      <span style={{ flex: 1 }}>{skill.name}{condDis && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>DIS</span>}</span>
+      <span style={{ fontWeight: 700, color: 'var(--gold)', minWidth: '28px', textAlign: 'right' }}>{bonusStr}</span>
+      {result && (
+        <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--gold)', minWidth: '36px', textAlign: 'center', background: 'var(--accent)', borderRadius: '4px', padding: '1px 6px', border: '1px solid var(--gold-dim)' }}>
+          {result.total}
+          {result.tag && <span style={{ fontSize: '7px', marginLeft: '2px', opacity: 0.7 }}>{result.tag}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function SaveRow({ ab }) {
+  const { scores, char, profBonus, rollResults, activeConditions, CONDITION_EFFECTS, doDisadvantage, doRollWithResult, logRoll, setRollMenu } = useContext(SheetCtx);
+  const baseScore = scores[ab] ?? 10;
+  const baseMod = modVal(baseScore);
+  const prof = char.savingThrowProficiencies?.includes(ab);
+  const bonus = baseMod + (prof ? profBonus : 0);
+  const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
+  const formula = `1d20${bonus >= 0 ? '+' : ''}${bonus}`;
+  const label = `${ab.charAt(0).toUpperCase() + ab.slice(1)} Save`;
+  const result = rollResults[label];
+  // Conditions: auto-fail STR/DEX saves, disadvantage on DEX saves
+  const autoFail = activeConditions.some(c => CONDITION_EFFECTS[c]?.autoFail?.includes(ab));
+  const dexDis = ab === 'dexterity' && activeConditions.some(c => CONDITION_EFFECTS[c]?.dexSaves === 'disadvantage');
+  const rollFn = autoFail ? null : dexDis ? () => doDisadvantage(label, formula) : () => doRollWithResult(label, formula);
+  return (
+    <div
+      className="cc-skill"
+      onClick={() => { if (autoFail) { logRoll(label, 'Auto-fail', 0, 'FAIL'); } else rollFn(); }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (!autoFail) setRollMenu({ x: e.clientX, y: e.clientY, label, formula, type: 'attack' });
+      }}
+      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', fontSize: '13px', cursor: 'pointer', borderRadius: '4px', opacity: autoFail ? 0.5 : 1 }}>
+      <ProfDot filled={prof} />
+      <span style={{ flex: 1, textTransform: 'capitalize' }}>{ab}{autoFail && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>AUTO-FAIL</span>}{dexDis && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>DIS</span>}</span>
+      <span style={{ fontWeight: 700, color: autoFail ? '#f87171' : 'var(--gold)' }}>{autoFail ? 'Fail' : bonusStr}</span>
+      {result && (
+        <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--gold)', background: 'var(--accent)', borderRadius: '4px', padding: '1px 6px', border: '1px solid var(--gold-dim)' }}>
+          {result.total}
+          {result.tag && <span style={{ fontSize: '7px', marginLeft: '2px', opacity: 0.7 }}>{result.tag}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function SpellCard({ spell, onClick }) {
+  const { char, upcastLevels, getUpcastDamage, spellSlotData, pactData, usedSlots, updateField, updateChar, setUpcast } = useContext(SheetCtx);
+  const isRacial = spell.source === 'race';
+  const canUpcast = spell.level > 0 && spell.damage && spell.scaling;
+  const castLevel = upcastLevels[spell.name] || spell.level;
+  const effectiveDamage = canUpcast ? getUpcastDamage(spell, castLevel) : cantripDamage(spell, char.level || 1);
+  const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
+  return (
+    <div onClick={() => onClick(spell)}
+      className="cc-skill"
+      style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
+        background: 'var(--input-bg)', border: `1px solid ${castLevel > spell.level ? '#2a6a2a' : 'var(--border)'}`,
+      }}>
+      {/* Unprepare button */}
+      {!isRacial && (
+        <button onClick={(e) => {
+          e.stopPropagation();
+          const current = char.preparedSpells || [];
+          updateField('preparedSpells', current.filter(n => n !== spell.name));
+        }}
+          title="Unprepare spell"
+          style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'var(--gold)', border: 'none', color: 'var(--bg-dark)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}>✓</button>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {spell.name}
+          {canUpcast && (
+            <select value={castLevel} onClick={e => e.stopPropagation()} onChange={e => { e.stopPropagation(); setUpcast(spell.name, parseInt(e.target.value)); }}
+              style={{ padding: '1px 4px', fontSize: '10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', color: castLevel > spell.level ? '#4ade80' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 600 }}>
+              {Array.from({ length: maxSlot - spell.level + 1 }, (_, i) => spell.level + i).map(lvl => (
+                <option key={lvl} value={lvl}>{lvl === spell.level ? `Lv${lvl}` : `Lv${lvl} ↑`}</option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <span>{spell.school}</span>
+          {spell.concentration && <span style={{ color: 'var(--gold)' }}>C</span>}
+          {spell.ritual && <span style={{ color: 'var(--gold)' }}>R</span>}
+          {isRacial && <span style={{ color: '#b07ee0' }}>Racial</span>}
+          {spell.damageType && <span>{spell.damageType}</span>}
+          {canUpcast && castLevel > spell.level && <span style={{ color: '#4ade80' }}>→ Lv{castLevel}</span>}
+        </div>
+      </div>
+      {(() => {
+        const rider = SPELL_WEAPON_RIDERS[spell.name];
+        if (rider) {
+          const isActive = (char.activeBuffs || []).includes(spell.name);
+          // Activation costs a slot; block it when none is available (deactivation is always allowed)
+          const stdAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
+          const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
+          const canActivate = stdAvail || pactAvail;
+          const disabled = !isActive && !canActivate;
+          return (
+            <button disabled={disabled} onClick={(e) => {
+              e.stopPropagation();
+              updateChar(prev => {
+                const cur = prev.activeBuffs || [];
+                if (cur.includes(spell.name)) return { ...prev, activeBuffs: cur.filter(n => n !== spell.name) };
+                // Activate = cast: spend a slot of the (upcast) level; refuse if none available
+                const us = prev.usedSpellSlots || {};
+                const stdTotal = spellSlotData ? (spellSlotData[castLevel - 1] || 0) : 0;
+                if (stdTotal > 0 && (us[String(castLevel)] || 0) < stdTotal)
+                  return { ...prev, usedSpellSlots: { ...us, [String(castLevel)]: (us[String(castLevel)] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
+                if (pactData && castLevel <= pactData.level && (us['pact'] || 0) < pactData.slots)
+                  return { ...prev, usedSpellSlots: { ...us, pact: (us['pact'] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
+                return prev; // no slot available — can't activate
+              });
+            }}
+              title={isActive ? 'Deactivate' : (canActivate ? `Activate (spends a slot) — adds ${rider.die} ${rider.type} to your weapon attacks` : 'No spell slot available to cast this')}
+              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: disabled ? 'not-allowed' : 'pointer', background: isActive ? 'rgba(176,126,224,0.25)' : 'var(--surface)', border: `1px solid ${isActive ? '#b07ee0' : 'var(--border)'}`, color: isActive ? '#d8b4f0' : 'var(--text-dim)', opacity: disabled ? 0.5 : 1 }}>
+              {isActive ? '◉ Active' : 'Activate'}
+            </button>
+          );
+        }
+        if (spell.level >= 1) {
+          const standardAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
+          const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
+          const canCast = standardAvail || pactAvail;
+          return (
+            <button onClick={(e) => {
+              e.stopPropagation();
+              if (standardAvail) updateField('usedSpellSlots', { ...usedSlots, [String(castLevel)]: (usedSlots[String(castLevel)] || 0) + 1 });
+              else if (pactAvail) updateField('usedSpellSlots', { ...usedSlots, pact: (usedSlots['pact'] || 0) + 1 });
+            }}
+              disabled={!canCast}
+              title={canCast ? `Cast — spends a level ${castLevel} slot` : 'No spell slot available at this level'}
+              style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: canCast ? 'pointer' : 'not-allowed', background: canCast ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${canCast ? 'var(--gold-dim)' : 'var(--border)'}`, color: canCast ? 'var(--gold)' : 'var(--text-dim)', opacity: canCast ? 1 : 0.5 }}>
+              Cast
+            </button>
+          );
+        }
+        return null;
+      })()}
+      {effectiveDamage && (
+        <RollBtn label={`${spell.name} Damage${castLevel > spell.level ? ` (Lv${castLevel})` : ''}`} formula={effectiveDamage} type="damage">
+          {effectiveDamage}
+        </RollBtn>
+      )}
+      <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{spell.castingTime}</span>
+    </div>
+  );
+}
+
 export default function CharacterSheet() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -116,6 +358,9 @@ export default function CharacterSheet() {
     const cached = equipCache.current[name];
     if (cached?.category === 'ammo') return true;                                   // homebrew ammo
     if ((cached?.subcategory || '').toLowerCase().includes('ammunition')) return true; // standard ammo
+    // Known item that isn't ammunition — "Hammer of Thunderbolts" and "Case, Crossbow Bolt"
+    // must not be spent as bolts. The name guess is only for items with no data.
+    if (cached) return false;
     const low = (name || '').toLowerCase();
     return low.includes('arrow') || low.includes('bolt') || low.includes('bullet') || low.includes('needle');
   };
@@ -170,6 +415,22 @@ export default function CharacterSheet() {
   const spellBrowserTimer = useRef(null);
   const toastTimer = useRef(null);
   const healTimer = useRef(null);
+  const longRestTimer = useRef(null);
+
+  // One-time repair for old saves: Progression picks used to be stored under the class's
+  // level at the time, not the card's level, so they sat on keys no card reads (and picking
+  // again re-applied the ASI). Move each one to the card it belongs to. No-op once repaired.
+  useEffect(() => {
+    if (!char?.levelChoices || !Object.keys(char.levelChoices).length) return;
+    const classes = getCharClasses(char);
+    let lc = char.levelChoices;
+    let changed = false;
+    for (const c of classes) {
+      const r = relocateOrphanedChoices(lc, { cls: c.class, subclass: c.subclass, ruleset: char.ruleset, namespaced: classes.length > 1 });
+      if (r.changed) { lc = r.levelChoices; changed = true; }
+    }
+    if (changed) updateChar(prev => ({ ...prev, levelChoices: lc }));
+  }, [char?.levelChoices, char?.classes, char?.class, char?.subclass, char?.level, char?.ruleset]);
 
   // Close roll context menu on click outside
   useEffect(() => {
@@ -286,6 +547,11 @@ export default function CharacterSheet() {
   const addEquipItem = (name) => {
     const updated = [...(char.equipment || []), name];
     updateField('equipment', updated);
+    // A stack that was used up left `ammo[name] = 0` behind; a fresh copy starts full.
+    if (!(char.equipment || []).includes(name) && char.ammo?.[name] === 0) {
+      const { [name]: _spent, ...rest } = char.ammo;
+      updateField('ammo', rest);
+    }
   };
 
   const removeEquipItem = (index) => {
@@ -359,13 +625,8 @@ export default function CharacterSheet() {
   // Short Rest: spend hit dice to heal
   const doShortRest = useCallback(() => {
     if (!char) return;
-    const remaining = char.hitDiceRemaining ?? char.level;
-    if (remaining <= 0 && char.currentHp >= char.maxHp) {
-      setHealToast({ amount: 0, newHp: char.currentHp, maxHp: char.maxHp, diceUsed: 0, diceMax: char.level, error: 'No hit dice and already full HP!' });
-      if (healTimer.current) clearTimeout(healTimer.current);
-      healTimer.current = setTimeout(() => setHealToast(null), 2500);
-      return;
-    }
+    // Always open the modal: even with no hit dice to spend at full HP, a short rest
+    // still restores pact slots and short-rest features ("Rest Without Healing").
     // Open short rest modal (default to the largest hit die in the pool)
     setShortRestModal({ rolls: [], totalHealed: 0, diceSpent: 0, selectedDie: getHitDicePools(char)[0]?.die || HIT_DICE[char.class] || 'd8' });
   }, [char]);
@@ -377,7 +638,8 @@ export default function CharacterSheet() {
     if (char.currentHp + shortRestModal.totalHealed >= char.maxHp) return;
 
     const hd = shortRestModal.selectedDie || getHitDicePools(char)[0]?.die || HIT_DICE[char.class] || 'd8';
-    const conMod = modVal(char.abilityScores?.constitution ?? 10);
+    // Effective CON (base + misc bonus) — the same modifier the button label shows.
+    const conMod = modVal((char.abilityScores?.constitution ?? 10) + (char.abilityBonuses?.constitution || 0));
     const formula = `1${hd}${conMod >= 0 ? '+' : ''}${conMod}`;
     const rolled = await rollDice3D(formula, 'Short Rest — Hit Die');
     if (!rolled) return; // dice already in the air
@@ -385,12 +647,14 @@ export default function CharacterSheet() {
     const healed = Math.max(1, total);
     logRoll('Short Rest Hit Die', formula, total, 'Short Rest');
 
-    setShortRestModal(prev => ({
+    // The modal may have been finished or cancelled while the die was rolling —
+    // `prev` is then null and spreading it would crash the whole sheet.
+    setShortRestModal(prev => prev ? {
       ...prev,
       rolls: [...prev.rolls, { formula, total: healed }],
       totalHealed: prev.totalHealed + healed,
       diceSpent: prev.diceSpent + 1,
-    }));
+    } : prev);
   }, [char, shortRestModal, rollDice3D, logRoll]);
 
   const shortRestFinish = useCallback(() => {
@@ -426,24 +690,28 @@ export default function CharacterSheet() {
     }
   }, [char, shortRestModal, updateChar]);
 
-  // Long Rest — full HP, all spell slots, regain ALL hit dice, reset death saves
+  // Long Rest — full HP, all spell slots, reset death saves, and regain spent hit dice
+  // up to half the character's total (minimum 1) — PHB p.186, same in 2024.
   const doLongRest = useCallback(() => {
     if (!char) return;
     const maxDice = char.level || 1;
+    const current = Math.min(maxDice, Math.max(0, char.hitDiceRemaining ?? maxDice));
+    const newRemaining = hitDiceAfterLongRest(maxDice, char.hitDiceRemaining);
     const hpRestored = Math.max(0, (char.maxHp || 0) - (char.currentHp || 0));
-    const diceRegained = Math.max(0, maxDice - (char.hitDiceRemaining ?? maxDice));
+    const diceRegained = newRemaining - current;
     // Clearing featureUses returns every limited-use feature to full; active buffs (concentration) end
-    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: maxDice, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {}, featureUses: {}, activeBuffs: [] }));
+    updateChar(prev => ({ ...prev, currentHp: prev.maxHp, hitDiceRemaining: newRemaining, deathSaveSuccesses: 0, deathSaveFailures: 0, usedSpellSlots: {}, featureUses: {}, activeBuffs: [] }));
     setLongRestToast({ hpRestored, maxHp: char.maxHp, diceRegained, maxDice });
-    if (healTimer.current) clearTimeout(healTimer.current);
-    healTimer.current = setTimeout(() => setLongRestToast(null), 4000);
+    if (longRestTimer.current) clearTimeout(longRestTimer.current);
+    longRestTimer.current = setTimeout(() => setLongRestToast(null), 4000);
   }, [char, updateChar]);
 
   // Level up — advance an existing class or add a new one (multiclass). Handles HP,
   // proficiency bonus, hit-dice pool, and reduced multiclass proficiencies for new classes.
   const applyLevelUp = useCallback(async ({ targetClass, isNew, subclass, useAvg }) => {
     if (!char || !targetClass) return;
-    const classes = getCharClasses(char).map(c => ({ ...c }));
+    const before = getCharClasses(char);
+    const classes = before.map(c => ({ ...c }));
     if (isNew) {
       classes.push({ class: targetClass, subclass: subclass || '', level: 1 });
     } else {
@@ -454,7 +722,8 @@ export default function CharacterSheet() {
     }
     const hd = CLASSES[targetClass]?.hitDice || HIT_DICE[targetClass] || 'd8';
     const dieMax = parseInt(hd.replace('d', '')) || 8;
-    const conMod = modVal(char.abilityScores?.constitution ?? 10);
+    // Effective CON (base + misc bonus) — what the modal's "+ CON" label shows.
+    const conMod = modVal((char.abilityScores?.constitution ?? 10) + (char.abilityBonuses?.constitution || 0));
     const avg = Math.floor(dieMax / 2) + 1;
     let hpGain;
     if (useAvg) {
@@ -465,16 +734,31 @@ export default function CharacterSheet() {
       // and the two must not drift apart.
       const formula = `1${hd}`;
       const rolled = await rollDice3D(formula, 'Level Up HP');
-      if (!rolled) return; // dice already in the air
+      if (!rolled) return; // dice already in the air (Cancel/Confirm are disabled while it rolls)
       hpGain = rolled.total + conMod;
       logRoll('Level Up HP', formula, rolled.total, 'Level Up');
     }
+    // Flat per-level HP feats (Tough: +2) — the creator applies these too.
+    const featHp = normalizeFeatNames(char.feats).reduce((s, f) => s + (FEAT_HP_PER_LEVEL[f] || 0), 0);
+    const gain = Math.max(1, hpGain) + featHp;
     const patch = syncPrimaryFromClasses(classes);
-    const newMaxHp = (char.maxHp || 0) + Math.max(1, hpGain);
+    // A single class keeps class/level/subclass as the source of truth; a one-element
+    // `classes` array would freeze them (see getCharClasses). Drop any leftover one.
+    if (patch.classes.length < 2) patch.classes = undefined;
+    const newMaxHp = (char.maxHp || 0) + gain;
+    const prevLevel = char.level || 1;
     patch.maxHp = newMaxHp;
-    patch.currentHp = newMaxHp;
-    patch.hitDiceRemaining = patch.level;             // regain all hit dice on level up
     patch.hitDice = formatHitDice({ classes });        // pooled string, e.g. "5d10 + 5d6"
+
+    let baseFeatures = char.features || [];
+    if (isNew && before.length === 1) {
+      // Going from one class to two: re-key the first class's Progression picks and
+      // fighting style so the multiclass sheet (which namespaces by class) still sees them.
+      const migrated = migrateSingleClassChoices(char, before[0].class);
+      patch.levelChoices = migrated.levelChoices;
+      baseFeatures = migrated.features;
+      patch.features = baseFeatures;
+    }
 
     if (isNew) {
       const mp = MULTICLASS_PROFICIENCIES[targetClass] || {};
@@ -485,13 +769,20 @@ export default function CharacterSheet() {
       if (mp.tools?.length) bits.push(`Tools: ${mp.tools.join(', ')}`);
       if (mp.skills) bits.push(`${mp.skills} skill${mp.skills > 1 ? 's' : ''} of your choice`);
       const note = `Multiclass Proficiencies (${targetClass}): ${bits.join(' · ') || 'None'}`;
-      const kept = (char.features || []).filter(f => {
+      const kept = baseFeatures.filter(f => {
         const s = typeof f === 'string' ? f : (f?.name || '');
         return !s.startsWith(`Multiclass Proficiencies (${targetClass})`);
       });
       patch.features = [...kept, note];
     }
-    updateChar(prev => ({ ...prev, ...patch }));
+    // Levelling doesn't heal: current HP rises by the HP gained, and the new level
+    // adds one hit die to the pool (spent dice come back on a long rest).
+    updateChar(prev => ({
+      ...prev,
+      ...patch,
+      currentHp: Math.min(newMaxHp, (prev.currentHp ?? prev.maxHp ?? 0) + gain),
+      hitDiceRemaining: Math.min(patch.level, Math.max(0, prev.hitDiceRemaining ?? prevLevel) + (patch.level - prevLevel)),
+    }));
     setLevelUpModal(null);
   }, [char, updateChar, rollDice3D, logRoll]);
 
@@ -552,12 +843,20 @@ export default function CharacterSheet() {
   }, [rollDice3D, logRoll]);
 
   // Widget move handlers — button-based for reliability
-  const allColumns = columnCount === 2 ? ['left', 'right'] : columnCount === 3 ? ['left', 'right', 'mid'] : ['left', 'right', 'mid', 'far'];
+  const columnsFor = (n) => (n === 2 ? ['left', 'right'] : n === 3 ? ['left', 'right', 'mid'] : ['left', 'right', 'mid', 'far']);
+  const allColumns = columnsFor(columnCount);
+  // A widget left in a column the current count doesn't render (e.g. "far" after
+  // switching 4 → 2) used to vanish with no controls to bring it back — Tabs included.
+  // Fold such widgets into the right column, after its own widgets.
+  const fitLayoutToColumns = (list, cols) => {
+    let nextOrder = Math.max(-1, ...list.filter(w => w.col === 'right').map(w => w.order)) + 1;
+    return list.map(w => (cols.includes(w.col) ? w : { ...w, col: 'right', order: nextOrder++ }));
+  };
 
   const moveWidget = (widgetId, direction) => {
     // direction: 'up', 'down', 'toLeft', 'toRight'
     setLayout(prev => {
-      const next = prev.map(w => ({ ...w }));
+      const next = fitLayoutToColumns(prev, allColumns).map(w => ({ ...w }));
       const widget = next.find(w => w.id === widgetId);
       if (!widget) return prev;
 
@@ -630,10 +929,18 @@ export default function CharacterSheet() {
     if (featSet.has('Alert') && char?.ruleset === '2024') totals.initiative = totals.initiative - 5 + profBonus;
     return totals;
   }, [featSet, char?.ruleset, profBonus]);
-  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Perception') ? profBonus : 0) + featEffects.passivePerception;
-  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + (char?.skillProficiencies?.includes('Investigation') ? profBonus : 0) + featEffects.passiveInvestigation;
-  const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + (char?.skillProficiencies?.includes('Insight') ? profBonus : 0);
-  const initiative = modVal(scores.dexterity ?? 10) + featEffects.initiative + (char?.initiativeBonus || 0);
+  // Jack of All Trades (Bard): half proficiency, rounded down, on ability checks that
+  // don't already add proficiency — skills, passives and initiative (a DEX check).
+  const bardLevel = getCharClasses(char).find(c => c.class === 'Bard')?.level || 0;
+  const jackLevel = Number(Object.entries(getClassLevels('Bard', char?.ruleset)).find(([, fs]) => fs.includes('Jack of All Trades'))?.[0] || 2);
+  const jackBonus = bardLevel >= jackLevel ? Math.floor(profBonus / 2) : 0;
+  // Proficiency part of a skill check: expertise doubles, proficiency adds, else Jack of All Trades.
+  const skillProfBonus = (skill) => (char?.skillExpertise?.includes(skill) ? profBonus * 2
+    : char?.skillProficiencies?.includes(skill) ? profBonus : jackBonus);
+  const passivePerception = 10 + modVal(scores.wisdom ?? 10) + skillProfBonus('Perception') + featEffects.passivePerception;
+  const passiveInvestigation = 10 + modVal(scores.intelligence ?? 10) + skillProfBonus('Investigation') + featEffects.passiveInvestigation;
+  const passiveInsight = 10 + modVal(scores.wisdom ?? 10) + skillProfBonus('Insight');
+  const initiative = modVal(scores.dexterity ?? 10) + jackBonus + featEffects.initiative + (char?.initiativeBonus || 0);
   const dexMod = modVal(scores.dexterity ?? 10);
 
   // Auto-calculate AC from equipped armor
@@ -646,16 +953,20 @@ export default function CharacterSheet() {
     let baseAC = 10 + dexMod; // unarmored default
     let shieldBonus = 0;
     let hasArmor = false;
+    let hasShield = false;
 
     for (const name of equipped) {
       const item = cache[name];
       if (!item || item.category !== 'armor') continue;
-      const ac = parseInt(item.ac);
+      // Built-in magic armor bakes its +N into `ac` ("+1 Chain Mail" is 17); the
+      // Homebrewer stores the base AC and the +N separately in `bonus`.
+      const ac = parseInt(item.ac) + (item.homebrew ? (Number(item.bonus) || 0) : 0);
       if (isNaN(ac)) continue;
       const sub = (item.subcategory || '').toLowerCase();
 
       if (sub.includes('shield')) {
         shieldBonus = Math.max(shieldBonus, ac || 2);
+        hasShield = true;
       } else if (sub.includes('heavy')) {
         baseAC = ac;
         hasArmor = true;
@@ -671,10 +982,16 @@ export default function CharacterSheet() {
         if (ac > baseAC) { baseAC = ac + dexMod; hasArmor = true; }
       }
     }
+    // Unarmored Defense (Barbarian CON / Monk WIS) — only with no armor on.
+    if (!hasArmor) {
+      baseAC = unarmoredBaseAC(getCharClasses(char).map(c => c.class), {
+        dex: dexMod, con: modVal(scores.constitution ?? 10), wis: modVal(scores.wisdom ?? 10),
+      }, hasShield);
+    }
     // Defense fighting style: +1 AC while wearing armor
     if (hasArmor && fightingStyles.has('Defense')) baseAC += 1;
     return baseAC + shieldBonus + (char.acBonus || 0);
-  }, [char?.equippedItems, char?.acBonus, char?.acOverride, dexMod, equipDataLoaded, featSet, fightingStyles]);
+  }, [char?.equippedItems, char?.acBonus, char?.acOverride, char?.class, char?.classes, dexMod, scores.constitution, scores.wisdom, equipDataLoaded, featSet, fightingStyles]);
 
   // Check if equipped armor gives stealth disadvantage
   const hasStealthDisadvantage = useMemo(() => {
@@ -687,10 +1004,12 @@ export default function CharacterSheet() {
 
   // Update char.armorClass when calculated AC changes
   useEffect(() => {
-    if (char && calcAC !== char.armorClass) {
+    // Wait for the equipment data: before it loads every armor looks unarmored, and
+    // writing that interim AC bumped updatedAt (reordering the list) on every open.
+    if (char && (equipDataLoaded || !char.equippedItems?.length) && calcAC !== char.armorClass) {
       updateField('armorClass', calcAC);
     }
-  }, [calcAC, char?.armorClass]);
+  }, [calcAC, char?.armorClass, equipDataLoaded]);
 
   if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;
   if (!char) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Character not found.</div>;
@@ -698,6 +1017,12 @@ export default function CharacterSheet() {
   // Class breakdown (single- or multi-class, normalized)
   const charClasses = getCharClasses(char);
   const charIsMulticlass = isMulticlass(char);
+  // Ability for spell attacks/DCs outside the Spells tab. The creator never saves
+  // `spellcastingAbility`, so reading it alone fell back to INT for every Cleric,
+  // Druid, Bard, Sorcerer, Warlock, Paladin and Ranger.
+  const primaryCastAbility = getSpellcastingClasses(char)[0]?.ability || char.spellcastingAbility || 'intelligence';
+  // Weapon Mastery comes from any martial class, not just the primary one.
+  const hasWeaponMasteryClass = char.ruleset === '2024' && charClasses.some(c => WEAPON_MASTERY_CLASSES[c.class]);
 
   // Spell slots — standard slots (array) and Warlock Pact Magic (separate) can coexist
   const mcSlots = getMulticlassSpellSlots(charClasses, char.ruleset);
@@ -821,7 +1146,7 @@ export default function CharacterSheet() {
 
   // Get sorted widgets for each column (hide xp-bar if not using XP leveling)
   const isXpMode = char?.levelingMethod === 'xp';
-  const visibleLayout = layout.filter(w => w.id !== 'xp-bar' || isXpMode);
+  const visibleLayout = fitLayoutToColumns(layout, allColumns).filter(w => w.id !== 'xp-bar' || isXpMode);
   const leftWidgets = visibleLayout.filter(w => w.col === 'left').sort((a, b) => a.order - b.order);
   const rightWidgets = visibleLayout.filter(w => w.col === 'right').sort((a, b) => a.order - b.order);
   const midWidgets = visibleLayout.filter(w => w.col === 'mid').sort((a, b) => a.order - b.order);
@@ -857,236 +1182,6 @@ export default function CharacterSheet() {
     }),
     panelOverlay: { position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: 'rgba(0,0,0,0.2)', zIndex: 1000, transition: 'opacity 0.3s ease' },
     panel: { position: 'fixed', top: 0, right: 0, bottom: 0, width: '420px', maxWidth: '90vw', background: 'var(--bg-dark)', borderLeft: '2px solid var(--gold-dim)', zIndex: 1001, overflowY: 'auto', padding: '24px', boxShadow: '-4px 0 30px rgba(0,0,0,0.6)', transition: 'transform 0.3s ease' },
-  };
-
-  // ─── Reusable components ──────────────────────────────
-  const RollBtn = ({ label, formula, children, style: extraStyle, type = 'attack', onRoll, rerollLow = false }) => {
-    const result = rollResults[label];
-    const isAttack = type === 'attack' || formula.includes('d20');
-    const isDamage = type === 'damage' || !formula.includes('d20');
-    // Auto-apply condition effects to attack rolls
-    const conditionRoll = isAttack && hasAttackDisadvantage && !hasAttackAdvantage
-      ? () => doDisadvantage(label, formula)
-      : isAttack && hasAttackAdvantage && !hasAttackDisadvantage
-      ? () => doAdvantage(label, formula)
-      : () => doRollWithResult(label, formula, { rerollLow });
-
-    return (
-      <button
-        // One roll at a time — a click mid-flight would be swallowed by
-        // rollDice3D's guard and leave the previous number showing.
-        disabled={diceRolling}
-        onClick={(e) => { e.stopPropagation(); conditionRoll(); if (onRoll) onRoll(); }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setRollMenu({ x: e.clientX, y: e.clientY, label, formula, type: isAttack ? 'attack' : 'damage' });
-        }}
-        title={`Roll ${formula} · Right-click for options`}
-        className="cc-skill"
-        style={{
-          background: result ? 'var(--accent)' : 'var(--surface)',
-          border: `1px solid ${result ? 'var(--gold)' : 'var(--border)'}`,
-          borderRadius: '6px',
-          opacity: diceRolling ? 0.5 : 1,
-          color: 'var(--gold)', cursor: diceRolling ? 'default' : 'pointer', fontSize: '12px', padding: '4px 12px',
-          fontFamily: 'Cinzel, serif', display: 'inline-flex', alignItems: 'center', gap: '6px',
-          transition: 'all 0.15s', fontWeight: 600, minWidth: '48px', justifyContent: 'center',
-          ...extraStyle,
-        }}>
-        {children || formula}
-        {result && (
-          <>
-            <span style={{ fontSize: '14px', fontWeight: 800, color: result.tag === 'CRIT' ? '#ff4444' : 'var(--gold)', marginLeft: '4px' }}>{result.total}</span>
-            {result.tag && <span style={{ fontSize: '8px', opacity: 0.7, letterSpacing: '0.5px' }}>{result.tag}</span>}
-          </>
-        )}
-      </button>
-    );
-  };
-
-  const ProfDot = ({ filled, expert }) => (
-    <span style={{
-      width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-      background: expert ? 'var(--gold)' : filled ? 'var(--green-light)' : 'transparent',
-      border: `2px solid ${expert ? 'var(--gold)' : filled ? 'var(--green-light)' : 'var(--border)'}`,
-    }} />
-  );
-
-  const SkillRow = ({ skill }) => {
-    const baseScore = scores[skill.ability] ?? 10;
-    const baseMod = modVal(baseScore);
-    const prof = char.skillProficiencies?.includes(skill.name);
-    const expert = char.skillExpertise?.includes(skill.name);
-    const bonus = baseMod + (expert ? profBonus * 2 : prof ? profBonus : 0);
-    const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
-    const formula = `1d20${bonus >= 0 ? '+' : ''}${bonus}`;
-    const result = rollResults[skill.name];
-    // Conditions and armor affect ability checks
-    const armorStealthDis = skill.name === 'Stealth' && hasStealthDisadvantage;
-    const condDis = hasAbilityDisadvantage || armorStealthDis;
-    const rollFn = condDis ? () => doDisadvantage(skill.name, formula) : () => doRollWithResult(skill.name, formula);
-    return (
-      <div
-        className="cc-skill"
-        onClick={rollFn}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setRollMenu({ x: e.clientX, y: e.clientY, label: skill.name, formula, type: 'attack' });
-        }}
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', fontSize: '13px', cursor: 'pointer', borderRadius: '4px' }}>
-        <ProfDot filled={prof} expert={expert} />
-        <span style={{ width: '30px', color: 'var(--text-dim)', fontSize: '12px' }}>{ABBR[skill.ability]}</span>
-        <span style={{ flex: 1 }}>{skill.name}{condDis && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>DIS</span>}</span>
-        <span style={{ fontWeight: 700, color: 'var(--gold)', minWidth: '28px', textAlign: 'right' }}>{bonusStr}</span>
-        {result && (
-          <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--gold)', minWidth: '36px', textAlign: 'center', background: 'var(--accent)', borderRadius: '4px', padding: '1px 6px', border: '1px solid var(--gold-dim)' }}>
-            {result.total}
-            {result.tag && <span style={{ fontSize: '7px', marginLeft: '2px', opacity: 0.7 }}>{result.tag}</span>}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const SaveRow = ({ ab }) => {
-    const baseScore = scores[ab] ?? 10;
-    const baseMod = modVal(baseScore);
-    const prof = char.savingThrowProficiencies?.includes(ab);
-    const bonus = baseMod + (prof ? profBonus : 0);
-    const bonusStr = bonus >= 0 ? `+${bonus}` : `${bonus}`;
-    const formula = `1d20${bonus >= 0 ? '+' : ''}${bonus}`;
-    const label = `${ab.charAt(0).toUpperCase() + ab.slice(1)} Save`;
-    const result = rollResults[label];
-    // Conditions: auto-fail STR/DEX saves, disadvantage on DEX saves
-    const autoFail = activeConditions.some(c => CONDITION_EFFECTS[c]?.autoFail?.includes(ab));
-    const dexDis = ab === 'dexterity' && activeConditions.some(c => CONDITION_EFFECTS[c]?.dexSaves === 'disadvantage');
-    const rollFn = autoFail ? null : dexDis ? () => doDisadvantage(label, formula) : () => doRollWithResult(label, formula);
-    return (
-      <div
-        className="cc-skill"
-        onClick={() => { if (autoFail) { logRoll(label, 'Auto-fail', 0, 'FAIL'); } else rollFn(); }}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          if (!autoFail) setRollMenu({ x: e.clientX, y: e.clientY, label, formula, type: 'attack' });
-        }}
-        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', fontSize: '13px', cursor: 'pointer', borderRadius: '4px', opacity: autoFail ? 0.5 : 1 }}>
-        <ProfDot filled={prof} />
-        <span style={{ flex: 1, textTransform: 'capitalize' }}>{ab}{autoFail && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>AUTO-FAIL</span>}{dexDis && <span style={{ fontSize: '9px', color: '#f87171', marginLeft: '4px' }}>DIS</span>}</span>
-        <span style={{ fontWeight: 700, color: autoFail ? '#f87171' : 'var(--gold)' }}>{autoFail ? 'Fail' : bonusStr}</span>
-        {result && (
-          <span style={{ fontWeight: 800, fontSize: '14px', color: 'var(--gold)', background: 'var(--accent)', borderRadius: '4px', padding: '1px 6px', border: '1px solid var(--gold-dim)' }}>
-            {result.total}
-            {result.tag && <span style={{ fontSize: '7px', marginLeft: '2px', opacity: 0.7 }}>{result.tag}</span>}
-          </span>
-        )}
-      </div>
-    );
-  };
-
-  const SpellCard = ({ spell, onClick }) => {
-    const isRacial = spell.source === 'race';
-    const canUpcast = spell.level > 0 && spell.damage && spell.scaling;
-    const castLevel = upcastLevels[spell.name] || spell.level;
-    const effectiveDamage = canUpcast ? getUpcastDamage(spell, castLevel) : cantripDamage(spell, char.level || 1);
-    const maxSlot = Math.max(spellSlotData ? spellSlotData.reduce((max, total, i) => total > 0 ? i + 1 : max, 0) : 0, pactData ? pactData.level : 0) || 9;
-    return (
-      <div onClick={() => onClick(spell)}
-        className="cc-skill"
-        style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
-          background: 'var(--input-bg)', border: `1px solid ${castLevel > spell.level ? '#2a6a2a' : 'var(--border)'}`,
-        }}>
-        {/* Unprepare button */}
-        {!isRacial && (
-          <button onClick={(e) => {
-            e.stopPropagation();
-            const current = char.preparedSpells || [];
-            updateField('preparedSpells', current.filter(n => n !== spell.name));
-          }}
-            title="Unprepare spell"
-            style={{ width: '18px', height: '18px', borderRadius: '4px', background: 'var(--gold)', border: 'none', color: 'var(--bg-dark)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0 }}>✓</button>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {spell.name}
-            {canUpcast && (
-              <select value={castLevel} onClick={e => e.stopPropagation()} onChange={e => { e.stopPropagation(); setUpcast(spell.name, parseInt(e.target.value)); }}
-                style={{ padding: '1px 4px', fontSize: '10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', color: castLevel > spell.level ? '#4ade80' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 600 }}>
-                {Array.from({ length: maxSlot - spell.level + 1 }, (_, i) => spell.level + i).map(lvl => (
-                  <option key={lvl} value={lvl}>{lvl === spell.level ? `Lv${lvl}` : `Lv${lvl} ↑`}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <span>{spell.school}</span>
-            {spell.concentration && <span style={{ color: 'var(--gold)' }}>C</span>}
-            {spell.ritual && <span style={{ color: 'var(--gold)' }}>R</span>}
-            {isRacial && <span style={{ color: '#b07ee0' }}>Racial</span>}
-            {spell.damageType && <span>{spell.damageType}</span>}
-            {canUpcast && castLevel > spell.level && <span style={{ color: '#4ade80' }}>→ Lv{castLevel}</span>}
-          </div>
-        </div>
-        {(() => {
-          const rider = SPELL_WEAPON_RIDERS[spell.name];
-          if (rider) {
-            const isActive = (char.activeBuffs || []).includes(spell.name);
-            // Activation costs a slot; block it when none is available (deactivation is always allowed)
-            const stdAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
-            const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
-            const canActivate = stdAvail || pactAvail;
-            const disabled = !isActive && !canActivate;
-            return (
-              <button disabled={disabled} onClick={(e) => {
-                e.stopPropagation();
-                updateChar(prev => {
-                  const cur = prev.activeBuffs || [];
-                  if (cur.includes(spell.name)) return { ...prev, activeBuffs: cur.filter(n => n !== spell.name) };
-                  // Activate = cast: spend a slot of the (upcast) level; refuse if none available
-                  const us = prev.usedSpellSlots || {};
-                  const stdTotal = spellSlotData ? (spellSlotData[castLevel - 1] || 0) : 0;
-                  if (stdTotal > 0 && (us[String(castLevel)] || 0) < stdTotal)
-                    return { ...prev, usedSpellSlots: { ...us, [String(castLevel)]: (us[String(castLevel)] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
-                  if (pactData && castLevel <= pactData.level && (us['pact'] || 0) < pactData.slots)
-                    return { ...prev, usedSpellSlots: { ...us, pact: (us['pact'] || 0) + 1 }, activeBuffs: [...cur, spell.name] };
-                  return prev; // no slot available — can't activate
-                });
-              }}
-                title={isActive ? 'Deactivate' : (canActivate ? `Activate (spends a slot) — adds ${rider.die} ${rider.type} to your weapon attacks` : 'No spell slot available to cast this')}
-                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: disabled ? 'not-allowed' : 'pointer', background: isActive ? 'rgba(176,126,224,0.25)' : 'var(--surface)', border: `1px solid ${isActive ? '#b07ee0' : 'var(--border)'}`, color: isActive ? '#d8b4f0' : 'var(--text-dim)', opacity: disabled ? 0.5 : 1 }}>
-                {isActive ? '◉ Active' : 'Activate'}
-              </button>
-            );
-          }
-          if (spell.level >= 1) {
-            const standardAvail = spellSlotData && spellSlotData[castLevel - 1] > 0 && (usedSlots[String(castLevel)] || 0) < spellSlotData[castLevel - 1];
-            const pactAvail = pactData && castLevel <= pactData.level && (usedSlots['pact'] || 0) < pactData.slots;
-            const canCast = standardAvail || pactAvail;
-            return (
-              <button onClick={(e) => {
-                e.stopPropagation();
-                if (standardAvail) updateField('usedSpellSlots', { ...usedSlots, [String(castLevel)]: (usedSlots[String(castLevel)] || 0) + 1 });
-                else if (pactAvail) updateField('usedSpellSlots', { ...usedSlots, pact: (usedSlots['pact'] || 0) + 1 });
-              }}
-                disabled={!canCast}
-                title={canCast ? `Cast — spends a level ${castLevel} slot` : 'No spell slot available at this level'}
-                style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontFamily: 'Cinzel, serif', flexShrink: 0, cursor: canCast ? 'pointer' : 'not-allowed', background: canCast ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${canCast ? 'var(--gold-dim)' : 'var(--border)'}`, color: canCast ? 'var(--gold)' : 'var(--text-dim)', opacity: canCast ? 1 : 0.5 }}>
-                Cast
-              </button>
-            );
-          }
-          return null;
-        })()}
-        {effectiveDamage && (
-          <RollBtn label={`${spell.name} Damage${castLevel > spell.level ? ` (Lv${castLevel})` : ''}`} formula={effectiveDamage} type="damage">
-            {effectiveDamage}
-          </RollBtn>
-        )}
-        <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>{spell.castingTime}</span>
-      </div>
-    );
   };
 
   const openSpellPanel = (spell) => setSidePanel({ type: 'spell', data: spell });
@@ -1791,14 +1886,24 @@ export default function CharacterSheet() {
 
   // ─── Tab renderers ──────────────────────────────────
   const renderActionsTab = () => {
-    const spellMod = modVal(scores[char.spellcastingAbility] ?? scores.intelligence ?? 10);
+    const spellMod = modVal(scores[primaryCastAbility] ?? 10);
     const attackSpells = spellData.filter(sp => sp.damage || sp.attackType || sp.savingThrow);
     const strMod = modVal(scores.strength ?? 10);
 
-    // Unarmed strike die: Monk Martial Arts scaling → else Tavern Brawler (1d4) → else 1
-    const monkUnarmedDie = char.level >= 17 ? '1d10' : char.level >= 11 ? '1d8' : char.level >= 5 ? '1d6' : '1d4';
-    const unarmedDie = char?.class === 'Monk' ? monkUnarmedDie : (featSet.has('Tavern Brawler') ? '1d4' : '1');
-    const unarmedRollFormula = `${unarmedDie === '1' ? '1d1' : unarmedDie}+${strMod}`;
+    // Martial Arts (Monk): the die scales with MONK level (not total level), and unarmed
+    // strikes and monk weapons may use DEX instead of STR.
+    const monkLevel = charClasses.find(c => c.class === 'Monk')?.level || 0;
+    const unarmedDie = monkLevel ? martialArtsDie(monkLevel, char.ruleset) : (featSet.has('Tavern Brawler') ? '1d4' : '1');
+    const unarmedMod = monkLevel ? Math.max(strMod, dexMod) : strMod;
+    const unarmedStat = monkLevel && dexMod > strMod ? 'DEX' : 'STR';
+    const unarmedRollFormula = `${unarmedDie === '1' ? '1d1' : unarmedDie}+${unarmedMod}`;
+    // Monk weapons (PHB p.78): shortswords and simple melee weapons without Two-Handed or Heavy.
+    const isMonkWeapon = (wpn) => {
+      const props = (wpn.properties || []).map(p => p.toLowerCase());
+      const sub = (wpn.subcategory || '').toLowerCase();
+      if (/shortsword/i.test(wpn.name || '')) return true;
+      return sub.includes('simple') && sub.includes('melee') && !props.some(p => p.includes('two-handed') || p.includes('heavy'));
+    };
 
     // Class & subclass features surfaced here as usable actions/abilities (shared list)
     const classActions = classFeatureList;
@@ -1840,7 +1945,10 @@ export default function CharacterSheet() {
             // Find EQUIPPED ammo items compatible with this weapon (handles homebrew ammoType)
             const equippedAmmo = needsAmmo ? (char.equippedItems || []).filter(name => ammoMatchesWeapon(name, wpn)) : [];
             // Selected ammo for this weapon (or first equipped)
-            const selectedAmmo = (char.ammo?.selected?.[wpn.name]) || equippedAmmo[0] || null;
+            // The remembered pick only counts while it is still equipped — otherwise an
+            // unequipped or used-up stack kept its bonus and blocked every shot.
+            const rememberedAmmo = char.ammo?.selected?.[wpn.name];
+            const selectedAmmo = (rememberedAmmo && equippedAmmo.includes(rememberedAmmo)) ? rememberedAmmo : (equippedAmmo[0] || null);
             const ammoCount = selectedAmmo ? (char.ammo?.[selectedAmmo] ?? defaultAmmoCount(selectedAmmo, equipCache.current[selectedAmmo])) : 0;
             // Ammo bonus (from +1/+2/+3 magical ammo)
             const ammoCached = selectedAmmo ? equipCache.current[selectedAmmo] : null;
@@ -1852,7 +1960,7 @@ export default function CharacterSheet() {
             const ammoSuffix = ammoDice ? `+${ammoDice}` : '';
 
             // Calculate hit/damage with weapon + ammo + fighting-style bonuses
-            const abilityMod = isRanged ? dexMod : (isFinesse ? Math.max(strMod, dexMod) : strMod);
+            const abilityMod = isRanged ? dexMod : ((isFinesse || (monkLevel && isMonkWeapon(wpn))) ? Math.max(strMod, dexMod) : strMod);
             const isTwoHanded = wpn.properties?.some(p => p.toLowerCase().includes('two-handed'));
             const isVersatile = wpn.properties?.some(p => p.toLowerCase().includes('versatile'));
             const isLight = wpn.properties?.some(p => p.toLowerCase().includes('light'));
@@ -1888,7 +1996,9 @@ export default function CharacterSheet() {
               const newCount = current - 1;
               const newAmmo = { ...(char.ammo || {}), [selectedAmmo]: newCount };
               if (newCount <= 0) {
-                // Remove empty ammo from equipment and equipped
+                // Remove empty ammo from equipment and equipped. Drop its count too, so
+                // picking the same stack up again starts full instead of at 0.
+                delete newAmmo[selectedAmmo];
                 const newEquip = (char.equipment || []).filter(n => n !== selectedAmmo);
                 const newEquipped = (char.equippedItems || []).filter(n => n !== selectedAmmo);
                 updateChar(prev => ({ ...prev, ammo: newAmmo, equipment: newEquip, equippedItems: newEquipped }));
@@ -1912,13 +2022,13 @@ export default function CharacterSheet() {
                 }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 500, color: wpn.rarity && wpn.rarity !== 'common' ? rarityColor(wpn.rarity) : undefined, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {wpn.name}{wpn.bonus ? ` +${wpn.bonus}` : ''}
+                    {wpn.name}{wpn.bonus && !wpn.name.includes(`+${wpn.bonus}`) ? ` +${wpn.bonus}` : ''}
                     {(() => {
                       const baseName = wpn.name.replace(/^\+\d\s+/, '');
                       const mastery = wpn.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[wpn.name];
                       // Weapon Mastery is a 2024-only feature; without this rider a 2014
                       // Fighter also sees the badge.
-                      const hasMastery = mastery && WEAPON_MASTERY_CLASSES[char.class] && char.ruleset === '2024';
+                      const hasMastery = mastery && hasWeaponMasteryClass;
                       if (!hasMastery) return null;
                       const masteryData = WEAPON_MASTERIES[mastery];
                       return (
@@ -2003,10 +2113,10 @@ export default function CharacterSheet() {
               name: 'Unarmed Strike',
               actionType: '1 Action',
               attackType: 'Melee Attack',
-              toHit: strMod + profBonus,
-              damage: `${unarmedDie}+${strMod}`,
+              toHit: unarmedMod + profBonus,
+              damage: `${unarmedDie}+${unarmedMod}`,
               damageType: 'Bludgeoning',
-              stat: 'STR',
+              stat: unarmedStat,
               range: '5ft. Reach',
               proficient: true,
               description: `Instead of using a weapon to make a melee attack, you can use a punch, kick, head-butt, or similar forceful blow. In game terms, this is an Unarmed Strike—a melee attack that involves you using your body to damage, grapple, or shove a target within 5 feet of you.\n\nWhenever you use your Unarmed Strike, choose one of the following options for its effect.\n\nDamage. You make an attack roll against the target. Your bonus to the roll equals your Strength modifier plus your Proficiency Bonus. On a hit, the target takes Bludgeoning damage equal to 1 plus your Strength modifier.\n\nGrapple. The target must succeed on a Strength or Dexterity saving throw (it chooses which), or it has the Grappled condition. The DC for the saving throw and any escape attempts equals 8 plus your Strength modifier and Proficiency Bonus. This grapple is possible only if the target is no more than one size larger than you and if you have a hand free to grab it.\n\nShove. The target must succeed on a Strength or Dexterity saving throw (it chooses which), or you either push it 5 feet away or cause it to have the Prone condition. The DC for the saving throw equals 8 plus your Strength modifier and Proficiency Bonus. This shove is possible only if the target is no more than one size larger than you.`,
@@ -2018,13 +2128,13 @@ export default function CharacterSheet() {
             </div>
             <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>5 ft.</span>
             <span style={{ fontSize: '12px' }}>
-              <RollBtn label="Unarmed Strike Attack" formula={`1d20+${strMod + profBonus}`}>
-                +{strMod + profBonus}
+              <RollBtn label="Unarmed Strike Attack" formula={`1d20+${unarmedMod + profBonus}`}>
+                +{unarmedMod + profBonus}
               </RollBtn>
             </span>
             <span style={{ fontSize: '12px' }}>
               <RollBtn label="Unarmed Strike Damage" formula={unarmedRollFormula}>
-                {unarmedDie} + {strMod}
+                {unarmedDie} + {unarmedMod}
               </RollBtn>
               {' '}<span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>bludg.</span>
             </span>
@@ -2206,7 +2316,10 @@ export default function CharacterSheet() {
       const mod = modVal(scores[c.ability] ?? 10);
       return { label: c.class, ability: c.ability, dc: 8 + profBonus + mod, atk: profBonus + mod };
     });
-    if (dcEntries.length === 0 && char.spellcastingAbility) {
+    // Fallback for feat casters (Magic Initiate on a Fighter). Not for a class whose own
+    // Spellcasting hasn't started yet — a 2014 level-1 Paladin has no spell save DC.
+    const pendingCasterClass = charClasses.some(c => CLASSES[c.class]?.spellcasting) && !Object.keys(char.featSpellLists || {}).length;
+    if (dcEntries.length === 0 && char.spellcastingAbility && !pendingCasterClass) {
       const mod = modVal(scores[char.spellcastingAbility] ?? 10);
       dcEntries = [{ label: '', ability: char.spellcastingAbility, dc: 8 + profBonus + mod, atk: profBonus + mod }];
     }
@@ -2229,8 +2342,11 @@ export default function CharacterSheet() {
     // Count non-racial prepared spells by tier
     const cantripCount = spellData.filter(s => s.level === 0 && s.source !== 'race').length;
     const leveledCount = spellData.filter(s => (s.level || 0) >= 1 && s.source !== 'race').length;
-    const atCantripCap = cantripLimit > 0 && cantripCount >= cantripLimit;
-    const atLeveledCap = leveledLimit > 0 && leveledCount >= leveledLimit;
+    // A limit of 0 normally means "no cap" (a Fighter's feat-free browser). But a caster
+    // class whose Spellcasting hasn't started (2014 level-1 Paladin/Ranger) really has 0.
+    const casterNotStarted = casterClasses.length === 0 && charClasses.some(c => CLASSES[c.class]?.spellcasting);
+    const atCantripCap = (cantripLimit > 0 || casterNotStarted) && cantripCount >= cantripLimit;
+    const atLeveledCap = (leveledLimit > 0 || casterNotStarted) && leveledCount >= leveledLimit;
 
     return (
     <div>
@@ -2390,7 +2506,7 @@ export default function CharacterSheet() {
                 const isPrepared = (char.preparedSpells || []).includes(sp.name);
                 const capped = !isPrepared && ((sp.level === 0 && atCantripCap) || ((sp.level || 0) >= 1 && atLeveledCap));
                 return (
-                  <div key={sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}`, opacity: capped ? 0.45 : 1 }}>
+                  <div key={sp._id || sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}`, opacity: capped ? 0.45 : 1 }}>
                     <button
                       disabled={capped}
                       title={capped ? `At your ${sp.level === 0 ? 'cantrip' : 'spell'} limit — remove one first` : undefined}
@@ -2818,6 +2934,9 @@ export default function CharacterSheet() {
 
   const renderProgressionTab = () => {
     const sections = charClasses;
+    // Choices made once per class — the only ones a card may read from another level's entry.
+    const SINGLE_PICK_CHOICES = new Set(['subclass', 'pact-boon', 'land-terrain']);
+    const featureText = (f) => (typeof f === 'string' ? f : (f?.name || ''));
     // Fighting style is stored per-class in features for multiclass ("Fighting Style (Cls): X")
     const fightingStyleOf = (clsName) => {
       const pref = charIsMulticlass ? `Fighting Style (${clsName}):` : 'Fighting Style:';
@@ -2835,7 +2954,7 @@ export default function CharacterSheet() {
       const classInfo = CLASSES[cls] || {};
       const nextLvl = lvl < 20 ? lvl + 1 : null;
       const nextFeatures = nextLvl ? (levels[nextLvl] || []) : [];
-      const nextChoices = nextLvl ? getLevelChoices(cls, nextLvl, subclass) : [];
+      const nextChoices = nextLvl ? getLevelChoices(cls, nextLvl, subclass, char.ruleset) : [];
       // Choice storage + expand-state keys are namespaced by class when multiclass
       const skey = (level) => charIsMulticlass ? `${cls}:${level}` : String(level);
       const kp = charIsMulticlass ? `${cls}-` : '';
@@ -2873,7 +2992,8 @@ export default function CharacterSheet() {
         case 'land-terrain': return { options: Object.entries(LAND_TERRAINS).map(([k, v]) => ({ name: k, desc: v })) };
         case 'favored-enemy': return { options: FAVORED_ENEMIES.map(e => ({ name: e })) };
         case 'favored-terrain': return { options: FAVORED_TERRAINS.map(t => ({ name: t })) };
-        case 'expertise': return { desc: 'Double your proficiency bonus for chosen skills.' };
+        // Expertise needs a skill you're already proficient in; ones you already have expertise in are fine to re-pick.
+        case 'expertise': return { desc: 'Double your proficiency bonus for chosen skills.', options: (char.skillProficiencies || []).map(sk => ({ name: sk })) };
         default: return {};
       }
     };
@@ -2889,9 +3009,14 @@ export default function CharacterSheet() {
       const getSelected = () => {
         const directKey = skey(choice.level || lvl);
         if (savedChoices[directKey]?.[choiceKey] != null) return savedChoices[directKey][choiceKey];
-        for (const [k, val] of Object.entries(savedChoices)) {
-          if (charIsMulticlass && !k.startsWith(`${cls}:`)) continue;   // scope to this class
-          if (val?.[choiceKey] != null) return val[choiceKey];
+        // Borrowing another level's pick is only safe for choices made once per class.
+        // For repeatable ones (ASI, invocations, maneuvers, …) it showed the level-4 ASI on
+        // the level-6 card too — and picking there "undid" the level-4 bonus.
+        if (SINGLE_PICK_CHOICES.has(choiceKey)) {
+          for (const [k, val] of Object.entries(savedChoices)) {
+            if (charIsMulticlass && !k.startsWith(`${cls}:`)) continue;   // scope to this class
+            if (val?.[choiceKey] != null) return val[choiceKey];
+          }
         }
         // Check direct character fields
         if (choiceKey === 'subclass') return subclass || null;
@@ -2905,10 +3030,13 @@ export default function CharacterSheet() {
       const isMulti = choice.count && choice.count > 1;
       const selectedArr = Array.isArray(selected) ? selected : (selected ? [selected] : []);
 
-      const selectOption = (name) => {
+      const selectOption = (name, featAbility) => {
         const lc = { ...(char.levelChoices || {}) };
         const lvlKey = skey(choice.level || lvl);
-        if (!lc[lvlKey]) lc[lvlKey] = {};
+        // Clicking the pick that's already chosen changes nothing (it used to re-apply an ASI).
+        if (choiceKey === 'asi' && selected === name && featAbility === undefined) return;
+        lc[lvlKey] = { ...(lc[lvlKey] || {}) };
+        const prevLevelPick = lc[lvlKey][choiceKey];
 
         if (isMulti) {
           const current = Array.isArray(lc[lvlKey][choiceKey]) ? [...lc[lvlKey][choiceKey]] : [];
@@ -2943,66 +3071,37 @@ export default function CharacterSheet() {
           }
         }
         if (choiceKey === 'asi') {
-          const FEAT_ASI = {
-            'Athlete': { choose: ['strength', 'dexterity'], amount: 1 },
-            'Actor': { fixed: { charisma: 1 } },
-            'Durable': { fixed: { constitution: 1 } },
-            'Heavily Armored': { fixed: { strength: 1 } },
-            'Heavy Armor Master': { fixed: { strength: 1 } },
-            'Keen Mind': { fixed: { intelligence: 1 } },
-            'Lightly Armored': { choose: ['strength', 'dexterity'], amount: 1 },
-            'Linguist': { fixed: { intelligence: 1 } },
-            'Moderately Armored': { choose: ['strength', 'dexterity'], amount: 1 },
-            'Observant': { choose: ['intelligence', 'wisdom'], amount: 1 },
-            'Resilient': { chooseAny: 1 },
-            'Tavern Brawler': { choose: ['strength', 'constitution'], amount: 1 },
-            'Weapon Master': { choose: ['strength', 'dexterity'], amount: 1 },
-          };
-
-          // Helper: get the ASI deltas for a given selection name
-          const getAsiDeltas = (selName) => {
-            const deltas = {};
-            if (!selName) return deltas;
-            if (FEATS[selName]) {
-              const d = FEAT_ASI[selName];
-              if (d?.fixed) Object.entries(d.fixed).forEach(([ab, amt]) => { deltas[ab] = (deltas[ab] || 0) + amt; });
-              if (d?.choose) deltas[d.choose[0]] = (deltas[d.choose[0]] || 0) + (d.amount || 1);
-              if (d?.chooseAny) deltas.constitution = (deltas.constitution || 0) + 1;
-            } else if (selName.startsWith('+2 ') || selName.startsWith('+1 ')) {
-              selName.split(' / ').forEach(part => {
-                const m = part.match(/\+(\d)\s+(\w+)/i);
-                if (m && ABILITIES.includes(m[2].toLowerCase())) deltas[m[2].toLowerCase()] = (deltas[m[2].toLowerCase()] || 0) + parseInt(m[1]);
-              });
-            }
-            return deltas;
-          };
-
-          // Find previous selection and undo it
-          const prevSelection = selected || (Array.isArray(selectedArr) && selectedArr[0]) || null;
-          const prevDeltas = prevSelection && prevSelection !== name ? getAsiDeltas(prevSelection) : {};
-          const newDeltas = getAsiDeltas(name);
-
-          const scores = { ...(char.abilityScores || {}) };
-          // Undo previous
-          for (const [ab, amt] of Object.entries(prevDeltas)) {
-            scores[ab] = (scores[ab] || 10) - amt;
+          // Undo the previous pick at THIS level, then apply the new one. Both go through
+          // asiChoiceEffect (the creator's FEAT_ABILITY_BONUSES table), so a choice feat uses
+          // the ability the player picked and Resilient grants its saving throw.
+          const prevSelection = selected || null;
+          const prevAbility = lc[lvlKey].asiAbility;
+          const nextAbility = featAbility ?? (name === prevSelection ? prevAbility : undefined);
+          // Picks saved before asiAbility existed: the old picker always put Resilient's +1 on
+          // CON with no save (every other feat's old default matches the table's first option).
+          const prevEffect = prevSelection === 'Resilient' && !prevAbility
+            ? { deltas: { constitution: 1 }, saves: [] }
+            : asiChoiceEffect(prevSelection, prevAbility);
+          const nextEffect = asiChoiceEffect(name, nextAbility);
+          const nextScores = { ...(char.abilityScores || {}) };
+          for (const [ab, amt] of Object.entries(prevEffect.deltas)) nextScores[ab] = (nextScores[ab] ?? 10) - amt;
+          for (const [ab, amt] of Object.entries(nextEffect.deltas)) nextScores[ab] = Math.min(20, (nextScores[ab] ?? 10) + amt);
+          updates.abilityScores = nextScores;
+          if (FEAT_ABILITY_BONUSES[name]?.choice) {
+            lc[lvlKey].asiAbility = Object.keys(nextEffect.deltas)[0];
+          } else {
+            delete lc[lvlKey].asiAbility;
           }
-          // Apply new
-          for (const [ab, amt] of Object.entries(newDeltas)) {
-            scores[ab] = Math.min(20, (scores[ab] || 10) + amt);
+          if (prevEffect.saves.length || nextEffect.saves.length) {
+            // Keep a save any of the character's classes grants on its own.
+            const classSaves = charClasses.flatMap(c => CLASSES[c.class]?.savingThrows || []);
+            const kept = (char.savingThrowProficiencies || []).filter(ab => !prevEffect.saves.includes(ab) || classSaves.includes(ab));
+            updates.savingThrowProficiencies = [...new Set([...kept, ...nextEffect.saves])];
           }
-          updates.abilityScores = scores;
 
           // Update feats list — normalize any objects to strings
-          const prevName = typeof prevSelection === 'object' && prevSelection !== null ? prevSelection.name : prevSelection;
-          const currentFeats = (char.feats || []).map(f => typeof f === 'object' && f !== null ? (f.name || String(f)) : f).filter(f => f !== prevName);
-          if (FEATS[name]) {
-            if (!currentFeats.includes(name)) updates.feats = [...currentFeats, name];
-            else updates.feats = currentFeats;
-          } else {
-            // Remove old feat if switching from feat to ASI
-            updates.feats = currentFeats;
-          }
+          const currentFeats = normalizeFeatNames(char.feats).filter(f => f !== prevSelection);
+          updates.feats = FEATS[name] && !currentFeats.includes(name) ? [...currentFeats, name] : currentFeats;
         }
         if (choiceKey === 'metamagic') {
           // Collect all metamagic from all levels
@@ -3011,7 +3110,7 @@ export default function CharacterSheet() {
             if (Array.isArray(val?.metamagic)) allMeta.push(...val.metamagic);
           }
           // Add as features
-          const nonMeta = (char.features || []).filter(f => !f.startsWith('Metamagic:'));
+          const nonMeta = (char.features || []).filter(f => !featureText(f).startsWith('Metamagic:'));
           updates.features = [...nonMeta, ...allMeta.map(m => `Metamagic: ${m}`)];
         }
         if (choiceKey === 'invocations') {
@@ -3019,11 +3118,11 @@ export default function CharacterSheet() {
           for (const [, val] of Object.entries(lc)) {
             if (Array.isArray(val?.invocations)) allInv.push(...val.invocations);
           }
-          const nonInv = (char.features || []).filter(f => !f.startsWith('Invocation:'));
+          const nonInv = (char.features || []).filter(f => !featureText(f).startsWith('Invocation:'));
           updates.features = [...nonInv, ...allInv.map(m => `Invocation: ${m}`)];
         }
         if (choiceKey === 'pact-boon') {
-          const nonPact = (char.features || []).filter(f => !f.startsWith('Pact Boon:'));
+          const nonPact = (char.features || []).filter(f => !featureText(f).startsWith('Pact Boon:'));
           updates.features = [...nonPact, `Pact Boon: ${name}`];
         }
         if (choiceKey === 'maneuvers') {
@@ -3031,32 +3130,37 @@ export default function CharacterSheet() {
           for (const [, val] of Object.entries(lc)) {
             if (Array.isArray(val?.maneuvers)) allMan.push(...val.maneuvers);
           }
-          const nonMan = (char.features || []).filter(f => !f.startsWith('Maneuver:'));
+          const nonMan = (char.features || []).filter(f => !featureText(f).startsWith('Maneuver:'));
           updates.features = [...nonMan, ...allMan.map(m => `Maneuver: ${m}`)];
         }
         if (choiceKey === 'totem') {
-          const nonTotem = (char.features || []).filter(f => !f.startsWith('Totem Spirit'));
-          updates.features = [...nonTotem, `Totem Spirit (Lv${choice.level || lvl}): ${name}`];
+          // Only replace the totem chosen at THIS level — 3, 6 and 14 are separate picks.
+          const totemPrefix = `Totem Spirit (Lv${choice.level || lvl}):`;
+          const nonTotem = (char.features || []).filter(f => !featureText(f).startsWith(totemPrefix));
+          updates.features = [...nonTotem, `${totemPrefix} ${name}`];
         }
         if (choiceKey === 'hunter-option') {
           const label = HUNTER_OPTIONS[choice.level]?.label || 'Hunter Feature';
-          const nonHunter = (char.features || []).filter(f => !f.startsWith(`${label}:`));
+          const nonHunter = (char.features || []).filter(f => !featureText(f).startsWith(`${label}:`));
           updates.features = [...nonHunter, `${label}: ${name}`];
         }
         if (choiceKey === 'land-terrain') {
-          const nonLand = (char.features || []).filter(f => !f.startsWith('Circle Land:'));
+          const nonLand = (char.features || []).filter(f => !featureText(f).startsWith('Circle Land:'));
           updates.features = [...nonLand, `Circle Land: ${name}`];
         }
         if (choiceKey === 'expertise') {
-          const currentExp = [...(char.skillExpertise || [])];
-          if (!currentExp.includes(name)) {
-            updates.skillExpertise = [...currentExp, name];
-          } else {
-            updates.skillExpertise = currentExp.filter(s => s !== name);
-          }
+          // Sync skillExpertise with this card's pick list — including a skill pushed out
+          // when a third pick replaces the oldest of two.
+          const before = Array.isArray(prevLevelPick) ? prevLevelPick : [];
+          const after = Array.isArray(lc[lvlKey][choiceKey]) ? lc[lvlKey][choiceKey] : [];
+          // …but keep a skill another level's expertise card still lists.
+          const elsewhere = new Set(Object.entries(lc).filter(([k]) => k !== lvlKey).flatMap(([, v]) => (Array.isArray(v?.expertise) ? v.expertise : [])));
+          const removed = before.filter(sk => !after.includes(sk) && !elsewhere.has(sk));
+          const added = after.filter(sk => !before.includes(sk));
+          updates.skillExpertise = [...new Set([...(char.skillExpertise || []).filter(sk => !removed.includes(sk)), ...added])];
         }
         if (choiceKey === 'favored-enemy') {
-          const nonFE = (char.features || []).filter(f => !f.startsWith('Favored Enemy:'));
+          const nonFE = (char.features || []).filter(f => !featureText(f).startsWith('Favored Enemy:'));
           const allFE = [];
           for (const [, val] of Object.entries(lc)) {
             if (val?.['favored-enemy']) allFE.push(val['favored-enemy']);
@@ -3064,7 +3168,7 @@ export default function CharacterSheet() {
           updates.features = [...(updates.features || nonFE), ...allFE.map(e => `Favored Enemy: ${e}`)];
         }
         if (choiceKey === 'favored-terrain') {
-          const nonFT = (char.features || []).filter(f => !f.startsWith('Natural Explorer:'));
+          const nonFT = (char.features || []).filter(f => !featureText(f).startsWith('Natural Explorer:'));
           const allFT = [];
           for (const [, val] of Object.entries(lc)) {
             if (val?.['favored-terrain']) allFT.push(val['favored-terrain']);
@@ -3093,6 +3197,25 @@ export default function CharacterSheet() {
             </div>
             <span style={{ color: 'var(--gold)', fontSize: '14px' }}>{expanded ? '▾' : '▸'}</span>
           </div>
+          {choiceKey === 'asi' && typeof selected === 'string' && FEAT_ABILITY_BONUSES[selected]?.choice && (
+            <div onClick={e => e.stopPropagation()} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', fontSize: '11px' }}>
+              <span style={{ color: 'var(--text-dim)' }}>{selected} +1 to:</span>
+              {FEAT_ABILITY_BONUSES[selected].choice.map(ab => {
+                // Picks saved before asiAbility existed: the old picker gave Resilient's +1 to CON.
+                const current = savedChoices[skey(choice.level || lvl)]?.asiAbility
+                  || (selected === 'Resilient' ? 'constitution' : FEAT_ABILITY_BONUSES[selected].choice[0]);
+                const on = current === ab;
+                return (
+                  <button key={ab} onClick={() => { if (!on) selectOption(selected, ab); }}
+                    style={{ padding: '2px 8px', borderRadius: '4px', cursor: on ? 'default' : 'pointer', fontSize: '11px', fontWeight: 600,
+                      background: on ? 'rgba(74, 222, 128, 0.15)' : 'var(--surface)', border: `1px solid ${on ? '#4ade80' : 'var(--border)'}`,
+                      color: on ? '#4ade80' : 'var(--text-dim)' }}>
+                    {ABBR[ab]}{FEAT_ABILITY_BONUSES[selected].save && on ? ' + save' : ''}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {expanded && data.options && (
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '400px', overflowY: 'auto' }}>
               {data.options.map((opt, oi) => {
@@ -3154,7 +3277,7 @@ export default function CharacterSheet() {
 
         {/* Current level choices (if any still need to be made) */}
         {(() => {
-          const currentChoices = getLevelChoices(cls, lvl, subclass);
+          const currentChoices = getLevelChoices(cls, lvl, subclass, char.ruleset);
           if (currentChoices.length === 0) return null;
           return (
             <div style={{ ...st.sideCard, border: '1px solid #4ade80', background: 'rgba(74, 222, 128, 0.05)' }}>
@@ -3183,7 +3306,7 @@ export default function CharacterSheet() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {Array.from({ length: 20 }, (_, i) => i + 1).map(l => {
               const features = levels[l] || [];
-              const choices = getLevelChoices(cls, l, subclass);
+              const choices = getLevelChoices(cls, l, subclass, char.ruleset);
               const isCurrent = l === lvl;
               const isPast = l < lvl;
               const isFuture = l > lvl;
@@ -3285,7 +3408,15 @@ export default function CharacterSheet() {
     </div>
   );
 
+  const sheetCtx = {
+    char, scores, profBonus, skillProfBonus, rollResults, diceRolling, setRollMenu, logRoll,
+    doRollWithResult, doAdvantage, doDisadvantage, hasAttackDisadvantage, hasAttackAdvantage,
+    hasAbilityDisadvantage, hasStealthDisadvantage, activeConditions, CONDITION_EFFECTS,
+    upcastLevels, getUpcastDamage, setUpcast, spellSlotData, pactData, usedSlots, updateField, updateChar,
+  };
+
   return (
+    <SheetCtx.Provider value={sheetCtx}>
     <div style={st.sheet}>
       {/* ═══ HEADER ═══ */}
       <div style={st.header}>
@@ -3335,6 +3466,21 @@ export default function CharacterSheet() {
               {char.inspiration ? '★' : '☆'} Heroic Inspiration
             </button>
           </Tip>
+          {/* Milestone characters have no XP widget, which used to be the only way into Level Up. */}
+          {!isXpMode && (char.level || 1) < 20 && (
+            <Tip text="Level Up: advance one of your classes or add a new one (multiclass). Choose average or rolled HP.">
+              <button
+                onClick={() => setLevelUpModal({ targetClass: charClasses[0]?.class || char.class, isNew: false, subclass: '', useAvg: true })}
+                style={{
+                  padding: '8px 14px', fontSize: '12px', fontWeight: 600, whiteSpace: 'nowrap',
+                  fontFamily: 'Cinzel, serif', borderRadius: '8px', cursor: 'pointer',
+                  border: '2px solid var(--gold-dim)', background: 'var(--surface)',
+                  color: 'var(--gold)', transition: 'all 0.2s ease',
+                }}>
+                Level Up
+              </button>
+            </Tip>
+          )}
           <Tip text={`Short Rest: Spend 1 hit die (${formatHitDice(char) || char.hitDice || HIT_DICE[char.class] || 'd8'} + CON mod) to heal.\n${char.hitDiceRemaining ?? char.level} of ${char.level} hit dice remaining.`}>
             <button onClick={doShortRest}
               style={{
@@ -3432,7 +3578,15 @@ export default function CharacterSheet() {
             <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Columns:</span>
             {[2, 3, 4].map(n => (
               <button key={n} className="cc-skill"
-                onClick={() => { setColumnCount(n); if (char?._id) saveColumnCount(char._id, n); }}
+                onClick={() => {
+                  setColumnCount(n);
+                  setLayout(prev => {
+                    const next = fitLayoutToColumns(prev, columnsFor(n));
+                    if (char?._id) saveLayout(char._id, next);
+                    return next;
+                  });
+                  if (char?._id) saveColumnCount(char._id, n);
+                }}
                 style={{
                   width: '28px', height: '28px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 700,
                   background: columnCount === n ? 'var(--gold)' : 'var(--surface)',
@@ -3648,7 +3802,7 @@ export default function CharacterSheet() {
                 {(sidePanel.data.attackType || sidePanel.data.savingThrow || sidePanel.data.damage) && (
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
                     {sidePanel.data.attackType && (() => {
-                      const spMod = modVal(scores[char.spellcastingAbility] ?? scores.intelligence ?? 10);
+                      const spMod = modVal(scores[primaryCastAbility] ?? 10);
                       return (
                         <RollBtn label={`${sidePanel.data.name} Attack`} formula={`1d20+${spMod + profBonus}`}
                           style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', background: 'var(--accent)', border: '1px solid var(--gold-dim)' }}>
@@ -3657,7 +3811,7 @@ export default function CharacterSheet() {
                       );
                     })()}
                     {sidePanel.data.savingThrow && (() => {
-                      const spMod = modVal(scores[char.spellcastingAbility] ?? scores.intelligence ?? 10);
+                      const spMod = modVal(scores[primaryCastAbility] ?? 10);
                       const dc = 8 + spMod + profBonus;
                       return (
                         <div style={{ background: 'var(--accent)', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', border: '1px solid var(--gold-dim)' }}>
@@ -3775,7 +3929,7 @@ export default function CharacterSheet() {
                 {sidePanel.data.category === 'weapon' && (() => {
                   const baseName = sidePanel.data.name.replace(/^\+\d\s+/, '');
                   const mastery = sidePanel.data.mastery || WEAPON_MASTERY_MAP[baseName] || WEAPON_MASTERY_MAP[sidePanel.data.name];
-                  const hasMasteryClass = WEAPON_MASTERY_CLASSES[char.class];
+                  const hasMasteryClass = charClasses.some(c => WEAPON_MASTERY_CLASSES[c.class]);
                   // Weapon Mastery is a 2024-only mechanic — same gate as the Actions-tab badge
                   // (see the `hasMastery` check above). Without this the panel would advertise a
                   // rule that does not exist for a 2014 character while the badge stayed hidden.
@@ -4084,11 +4238,13 @@ export default function CharacterSheet() {
               {/* Buttons */}
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 <button className="btn" style={{ flex: 1, padding: '8px 16px', fontSize: '14px', background: remaining > 0 && !atMax ? 'linear-gradient(135deg, #1a3a1a, #2a5a2a)' : 'var(--surface)', border: `1px solid ${remaining > 0 && !atMax ? '#4ade80' : 'var(--border)'}`, color: remaining > 0 && !atMax ? '#4ade80' : 'var(--text-dim)', fontWeight: 700 }}
-                  disabled={remaining <= 0 || atMax}
+                  disabled={remaining <= 0 || atMax || diceRolling}
                   onClick={shortRestRollDie}>
                   Roll {hd} + {conMod}
                 </button>
-                <button className="btn" style={{ flex: 1, padding: '8px 16px', fontSize: '14px', background: 'var(--accent)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', fontWeight: 700 }}
+                {/* Disabled mid-roll: finishing then would drop the die that's still in the air. */}
+                <button className="btn" style={{ flex: 1, padding: '8px 16px', fontSize: '14px', background: 'var(--accent)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', fontWeight: 700, opacity: diceRolling ? 0.5 : 1 }}
+                  disabled={diceRolling}
                   onClick={shortRestFinish}>
                   {shortRestModal.rolls.length > 0 ? 'Finish Rest' : 'Rest Without Healing'}
                 </button>
@@ -4097,7 +4253,7 @@ export default function CharacterSheet() {
               {atMax && <div style={{ textAlign: 'center', fontSize: '12px', color: '#4ade80', marginTop: '8px' }}>Already at full HP!</div>}
               {remaining <= 0 && !atMax && <div style={{ textAlign: 'center', fontSize: '12px', color: '#f87171', marginTop: '8px' }}>No hit dice remaining!</div>}
 
-              <button onClick={() => setShortRestModal(null)} style={{ display: 'block', margin: '12px auto 0', padding: '4px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '12px' }}>
+              <button disabled={diceRolling} onClick={() => setShortRestModal(null)} style={{ display: 'block', margin: '12px auto 0', padding: '4px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '12px' }}>
                 Cancel
               </button>
             </div>
@@ -4107,15 +4263,18 @@ export default function CharacterSheet() {
 
       {/* ═══ LEVEL UP MODAL (single- & multi-class) ═══ */}
       {levelUpModal && (() => {
-        const abScores = char.abilityScores || {};
-        const meetsReq = (cls) => {
+        // Multiclassing needs the prerequisites of every class you already have AND the
+        // new one (PHB p.163), checked against the scores the sheet shows (base + bonuses).
+        const meetsOne = (cls) => {
           const req = MULTICLASS_REQS[cls];
           if (!req) return true;
           const main = Object.entries(req).filter(([k]) => k !== '_or');
-          if (main.every(([ab, min]) => (abScores[ab] ?? 10) >= min)) return true;
-          if (req._or) return Object.entries(req._or).every(([ab, min]) => (abScores[ab] ?? 10) >= min);
+          if (main.every(([ab, min]) => (scores[ab] ?? 10) >= min)) return true;
+          if (req._or) return Object.entries(req._or).every(([ab, min]) => (scores[ab] ?? 10) >= min);
           return false;
         };
+        const unmetCurrent = getCharClasses(char).map(c => c.class).filter(c => !meetsOne(c));
+        const meetsReq = (cls) => meetsOne(cls) && unmetCurrent.length === 0;
         const reqText = (cls) => {
           const req = MULTICLASS_REQS[cls];
           if (!req) return '';
@@ -4135,9 +4294,9 @@ export default function CharacterSheet() {
         const needsSubclass = (targetInfo.subclasses || []).length > 0 && !existingSubclass
           && resultingLevel >= getSubclassLevel(lu.targetClass, char.ruleset);
         const eligible = !lu.isNew || meetsReq(lu.targetClass);
-        const canConfirm = eligible && (!needsSubclass || lu.subclass);
         const hd = targetInfo.hitDice || HIT_DICE[lu.targetClass] || 'd8';
         const totalLvl = getTotalLevel(char);
+        const canConfirm = eligible && (!needsSubclass || lu.subclass) && totalLvl < 20 && !diceRolling;
         const chip = (active) => ({ padding: '5px 12px', fontSize: '13px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, background: active ? 'var(--accent)' : 'var(--surface)', border: `1px solid ${active ? 'var(--gold)' : 'var(--border)'}`, color: active ? 'var(--gold)' : 'var(--text-dim)' });
         return (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -4171,6 +4330,11 @@ export default function CharacterSheet() {
                       <div style={{ color: eligible ? '#4ade80' : '#f87171', fontWeight: 600, marginBottom: '4px' }}>
                         {eligible ? '✓ Meets requirements' : '✕ Requirements not met'}{reqText(lu.targetClass) ? ` — ${reqText(lu.targetClass)}` : ''}
                       </div>
+                      {unmetCurrent.length > 0 && (
+                        <div style={{ color: '#f87171', marginBottom: '4px' }}>
+                          Your current class{unmetCurrent.length > 1 ? 'es' : ''} must also qualify: {unmetCurrent.map(c => `${c} (${reqText(c)})`).join(', ')}
+                        </div>
+                      )}
                       {(() => {
                         const mp = MULTICLASS_PROFICIENCIES[lu.targetClass] || {};
                         const bits = [];
@@ -4214,7 +4378,7 @@ export default function CharacterSheet() {
                   onClick={() => canConfirm && applyLevelUp({ targetClass: lu.targetClass, isNew: lu.isNew, subclass: lu.subclass, useAvg: lu.useAvg !== false })}>
                   Confirm Level Up
                 </button>
-                <button onClick={() => setLevelUpModal(null)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px' }}>
+                <button disabled={diceRolling} onClick={() => setLevelUpModal(null)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '13px' }}>
                   Cancel
                 </button>
               </div>
@@ -4223,5 +4387,6 @@ export default function CharacterSheet() {
         );
       })()}
     </div>
+    </SheetCtx.Provider>
   );
 }

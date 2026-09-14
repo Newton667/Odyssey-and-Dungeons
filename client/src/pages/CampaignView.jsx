@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
+// A campaign document — not an error body such as { error: 'Database not connected' }.
+const isCampaign = (d) => !!d && typeof d === 'object' && !Array.isArray(d)
+  && typeof d._id === 'string' && (d.players === undefined || Array.isArray(d.players));
+
 export default function CampaignView() {
   const { id } = useParams();
   const [campaign, setCampaign] = useState(null);
@@ -9,21 +13,46 @@ export default function CampaignView() {
   const [characters, setCharacters] = useState({});
   const [tab, setTab] = useState('players');
   const [playerName] = useState(() => localStorage.getItem('ond-player-name') || 'Unknown');
+  const [loadError, setLoadError] = useState('');
+  const [loadStatus, setLoadStatus] = useState(0);
+  const [actionError, setActionError] = useState('');
   const lastRollTime = useRef(null);
   const pollRef = useRef(null);
 
-  // Load campaign
+  // Load campaign. Every response is checked: an error body ({ error }) stored as the
+  // campaign rendered a blank page, and the poll then crashed the whole app.
   useEffect(() => {
-    fetch(`/api/campaigns/${id}`)
-      .then(r => r.json())
-      .then(data => { setCampaign(data); setRolls(data.rollLog || []); setLoading(false); })
-      .catch(() => setLoading(false));
+    let cancelled = false;
+    setLoading(true);
+    setLoadError('');
+    setLoadStatus(0);
+    (async () => {
+      try {
+        const r = await fetch(`/api/campaigns/${id}`);
+        let data = null;
+        try { data = await r.json(); } catch { /* non-JSON body */ }
+        if (cancelled) return;
+        if (!r.ok || !isCampaign(data)) {
+          setCampaign(null);
+          setLoadStatus(r.status);
+          setLoadError(r.status === 404 ? 'Campaign not found.' : (data?.error || `Could not load the campaign (server responded with ${r.status}).`));
+          return;
+        }
+        setCampaign(data);
+        setRolls(Array.isArray(data.rollLog) ? data.rollLog : []);
+      } catch {
+        if (!cancelled) { setCampaign(null); setLoadError('Could not reach the server.'); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [id]);
 
   // Load character data for all players
   useEffect(() => {
-    if (!campaign?.players) return;
-    const charIds = campaign.players.filter(p => p.characterId).map(p => p.characterId);
+    if (!Array.isArray(campaign?.players)) return;
+    const charIds = campaign.players.filter(p => p?.characterId).map(p => p.characterId);
     if (charIds.length === 0) return;
     Promise.all(charIds.map(cid =>
       fetch(`/api/characters/${cid}`).then(r => r.ok ? r.json() : null).catch(() => null)
@@ -34,50 +63,94 @@ export default function CampaignView() {
     });
   }, [campaign?.players]);
 
-  // Poll for new rolls and player updates every 5 seconds
-  const poll = useCallback(() => {
+  // Poll for new rolls and player updates every 5 seconds.
+  // A failed request (404/500/503, or the server being down) yields null and is ignored;
+  // only well-formed arrays are applied, so an error body can never replace `players`.
+  const poll = useCallback(async () => {
     const since = lastRollTime.current || (rolls.length > 0 ? rolls[rolls.length - 1].timestamp : null);
     const params = since ? `?since=${encodeURIComponent(since)}` : '';
+    const getJson = (url) => fetch(url).then(r => (r.ok ? r.json() : null)).catch(() => null);
 
-    Promise.all([
-      fetch(`/api/campaigns/${id}/rolls${params}`).then(r => r.json()).catch(() => []),
-      fetch(`/api/campaigns/${id}/players`).then(r => r.json()).catch(() => null),
-    ]).then(([newRolls, players]) => {
-      if (newRolls.length > 0) {
+    try {
+      const [newRolls, players] = await Promise.all([
+        getJson(`/api/campaigns/${id}/rolls${params}`),
+        getJson(`/api/campaigns/${id}/players`),
+      ]);
+      if (Array.isArray(newRolls) && newRolls.length > 0) {
         setRolls(prev => {
           const existingIds = new Set(prev.map(r => r._id));
-          const unique = newRolls.filter(r => !existingIds.has(r._id));
+          const unique = newRolls.filter(r => r && !existingIds.has(r._id));
           const updated = [...prev, ...unique].slice(-200);
           if (updated.length > 0) lastRollTime.current = updated[updated.length - 1].timestamp;
           return updated;
         });
       }
-      if (players) {
+      if (Array.isArray(players)) {
         setCampaign(prev => prev ? { ...prev, players } : prev);
       }
-    });
+    } catch { /* transient failure — the next tick retries */ }
   }, [id, rolls]);
 
+  // Only poll a campaign that actually loaded — a 404 page has nothing to refresh.
+  const hasCampaign = !!campaign;
   useEffect(() => {
+    if (!hasCampaign) return;
     pollRef.current = setInterval(poll, 5000);
     return () => clearInterval(pollRef.current);
-  }, [poll]);
+  }, [poll, hasCampaign]);
 
   // Link character to campaign
   const linkCharacter = async (characterId, characterName) => {
-    await fetch(`/api/campaigns/${id}/player`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerName, characterId, characterName }),
-    });
-    // Reload
-    const res = await fetch(`/api/campaigns/${id}`);
-    const data = await res.json();
-    setCampaign(data);
+    setActionError('');
+    try {
+      const patch = await fetch(`/api/campaigns/${id}/player`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName, characterId, characterName }),
+      });
+      let data = null;
+      try { data = await patch.json(); } catch { /* non-JSON body */ }
+      if (!patch.ok || !isCampaign(data)) {
+        setActionError(data?.error || `Could not link the character (server responded with ${patch.status}).`);
+        return;
+      }
+      // The PATCH answers with the updated campaign, so no second request is needed.
+      setCampaign(data);
+    } catch {
+      setActionError('Could not reach the server to link the character.');
+    }
+  };
+
+  const saveNotes = async () => {
+    setActionError('');
+    try {
+      const res = await fetch(`/api/campaigns/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: campaign.notes }),
+      });
+      if (!res.ok) {
+        let data = null;
+        try { data = await res.json(); } catch { /* non-JSON body */ }
+        setActionError(data?.error || `Notes were not saved (server responded with ${res.status}).`);
+      }
+    } catch {
+      setActionError('Notes were not saved — could not reach the server.');
+    }
   };
 
   if (loading) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Loading...</div>;
-  if (!campaign) return <div className="page" style={{ textAlign: 'center', padding: '60px' }}>Campaign not found.</div>;
+  if (!campaign) return (
+    <div className="page" style={{ textAlign: 'center', padding: '60px' }}>
+      <div>{loadError || 'Campaign not found.'}</div>
+      {loadStatus === 503 && (
+        <div style={{ fontSize: '13px', color: 'var(--text-dim)', marginTop: '8px' }}>
+          Campaigns need a shared MongoDB database — add a connection string in Settings.
+        </div>
+      )}
+      <Link to="/campaigns" style={{ display: 'inline-block', marginTop: '16px', fontSize: '13px', color: 'var(--text-dim)' }}>&larr; Back to Campaigns</Link>
+    </div>
+  );
 
   const isPlayer = campaign.players?.some(p => p.playerName === playerName);
   const currentPlayer = campaign.players?.find(p => p.playerName === playerName);
@@ -116,6 +189,10 @@ export default function CampaignView() {
           }}>{t}</button>
         ))}
       </div>
+
+      {actionError && (
+        <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '12px' }}>{actionError}</div>
+      )}
 
       {/* Players Tab */}
       {tab === 'players' && (
@@ -257,13 +334,7 @@ export default function CampaignView() {
           <textarea
             value={campaign.notes || ''}
             onChange={e => setCampaign(prev => ({ ...prev, notes: e.target.value }))}
-            onBlur={() => {
-              fetch(`/api/campaigns/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: campaign.notes }),
-              });
-            }}
+            onBlur={saveNotes}
             rows={14}
             placeholder="Campaign notes, quest log, NPC info..."
             style={{ width: '100%', resize: 'vertical', fontSize: '13px', padding: '12px', background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}
@@ -272,6 +343,12 @@ export default function CampaignView() {
       )}
     </div>
   );
+}
+
+// A character record we can offer in the picker: a plain object with an id and a name.
+function isLinkableChar(c) {
+  return !!c && typeof c === 'object' && !Array.isArray(c)
+    && typeof c.name === 'string' && c.name.trim() !== '' && !!c._id;
 }
 
 // Sub-component: Link character picker
@@ -283,11 +360,17 @@ function LinkCharacterBtn({ onLink }) {
   useEffect(() => {
     if (!open) return;
     // Load from server
-    fetch('/api/characters').then(r => r.json()).then(data => setChars(Array.isArray(data) ? data : [])).catch(() => {});
-    // Load from localStorage
+    fetch('/api/characters')
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => setChars(Array.isArray(data) ? data.filter(isLinkableChar) : []))
+      .catch(() => {});
+    // Load from localStorage. The `ond-char-` prefix also matches `ond-char-index` (an array
+    // of ids), which rendered as a "— undefined undefined Lvundefined" row with no key.
     try {
-      const keys = Object.keys(localStorage).filter(k => k.startsWith('ond-char-'));
-      const local = keys.map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }).filter(Boolean);
+      const keys = Object.keys(localStorage).filter(k => k.startsWith('ond-char-') && k !== 'ond-char-index');
+      const local = keys
+        .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } })
+        .filter(isLinkableChar);
       setLocalChars(local);
     } catch { /* noop */ }
   }, [open]);
@@ -304,13 +387,17 @@ function LinkCharacterBtn({ onLink }) {
       </button>
       {open && allChars.length > 0 && (
         <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {allChars.map(c => (
-            <button key={c._id} onClick={() => { onLink(c._id, c.name); setOpen(false); }}
-              className="cc-skill"
-              style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text)', fontSize: '12px' }}>
-              <strong style={{ color: 'var(--gold)' }}>{c.name}</strong> — {c.race} {c.class} Lv{c.level}
-            </button>
-          ))}
+          {allChars.map(c => {
+            const meta = [c.race, c.class, c.level ? `Lv${c.level}` : '']
+              .filter(v => typeof v === 'string' && v).join(' ');
+            return (
+              <button key={c._id} onClick={() => { onLink(c._id, c.name); setOpen(false); }}
+                className="cc-skill"
+                style={{ textAlign: 'left', padding: '6px 10px', borderRadius: '4px', background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--text)', fontSize: '12px' }}>
+                <strong style={{ color: 'var(--gold)' }}>{c.name}</strong>{meta && ` — ${meta}`}
+              </button>
+            );
+          })}
         </div>
       )}
       {open && allChars.length === 0 && (

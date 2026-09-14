@@ -537,8 +537,9 @@ async function seed() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB');
 
-  // Remove existing cantrips to avoid duplicates
-  const deleted = await Spell.deleteMany({ level: 0 });
+  // Remove only the cantrips this script inserts, to avoid duplicates. A bare `{ level: 0 }` delete
+  // also wiped racial abilities (seed-racial-abilities.js) and seed-missing.js spells (gotcha #6).
+  const deleted = await Spell.deleteMany({ level: 0, name: { $in: CANTRIPS.map(s => s.name) } });
   console.log(`Removed ${deleted.deletedCount} existing cantrips`);
 
   const inserted = await Spell.insertMany(CANTRIPS);

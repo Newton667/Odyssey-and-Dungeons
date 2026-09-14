@@ -768,7 +768,9 @@ async function seed() {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB');
 
-  const deleted = await Spell.deleteMany({ level: 1 });
+  // Remove only the spells this script inserts. A bare `{ level: 1 }` delete also wiped racial
+  // abilities (seed-racial-abilities.js) and seed-missing.js spells at this level (gotcha #6).
+  const deleted = await Spell.deleteMany({ level: 1, name: { $in: SPELLS.map(s => s.name) } });
   console.log(`Removed ${deleted.deletedCount} existing level 1 spells`);
 
   const inserted = await Spell.insertMany(SPELLS);

@@ -16,49 +16,86 @@ export default function Campaigns() {
   const [joinCode, setJoinCode] = useState('');
   const [joinName, setJoinName] = useState(() => localStorage.getItem('ond-player-name') || '');
   const [joinError, setJoinError] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [listError, setListError] = useState('');
 
   useEffect(() => {
-    fetch('/api/campaigns').then(r => r.json()).then(data => { setCampaigns(Array.isArray(data) ? data : []); setLoading(false); }).catch(() => setLoading(false));
+    fetch('/api/campaigns')
+      .then(async r => {
+        let data = null;
+        try { data = await r.json(); } catch { /* non-JSON body */ }
+        if (!r.ok) {
+          setListError(data?.error || `Could not load campaigns (server responded with ${r.status}).`);
+          return;
+        }
+        setCampaigns(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setListError('Could not reach the server to load campaigns.'))
+      .finally(() => setLoading(false));
   }, []);
+
+  // The server stores the name it is sent; the browser must remember the SAME string, or
+  // CampaignView never matches this player (and the Link Character button never shows).
+  const dmNameFallback = joinName.trim();
 
   const create = async (e) => {
     e.preventDefault();
-    const dmName = form.dmName || joinName;
-    const res = await fetch('/api/campaigns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, dmName, players: [{ playerName: dmName, role: 'dm' }] }),
-    });
-    const data = await res.json();
-    if (res.ok) {
+    setCreateError('');
+    const name = form.name.trim();
+    // The campaign model requires players[].playerName — an empty DM name is a 400.
+    const dmName = form.dmName.trim() || dmNameFallback;
+    if (!name) { setCreateError('Enter a campaign name.'); return; }
+    if (!dmName) { setCreateError('Enter a DM name — it is also your player name in this campaign.'); return; }
+    try {
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, name, dmName, players: [{ playerName: dmName, role: 'dm' }] }),
+      });
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON body */ }
+      if (!res.ok || !data) {
+        setCreateError(data?.error || `Could not create the campaign (server responded with ${res.status}).`);
+        return;
+      }
       setCampaigns(prev => [...prev, data]);
       setCreating(false);
       setForm({ name: '', setting: '', dmName: '', description: '' });
       localStorage.setItem('ond-player-name', dmName);
+      setJoinName(dmName);
+    } catch {
+      setCreateError('Could not reach the server to create the campaign.');
     }
   };
 
   const joinCampaign = async (e) => {
     e.preventDefault();
     setJoinError('');
-    if (!joinCode.trim() || !joinName.trim()) return;
-    localStorage.setItem('ond-player-name', joinName);
-    const res = await fetch('/api/campaigns/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ joinCode: joinCode.trim(), playerName: joinName.trim() }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      // Add to list if not already there
-      setCampaigns(prev => {
-        if (prev.find(c => c._id === data._id)) return prev.map(c => c._id === data._id ? data : c);
-        return [...prev, data];
+    const playerName = joinName.trim();
+    const code = joinCode.trim();
+    if (!code || !playerName) { setJoinError('Enter your name and the join code.'); return; }
+    localStorage.setItem('ond-player-name', playerName);
+    try {
+      const res = await fetch('/api/campaigns/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ joinCode: code, playerName }),
       });
-      setJoining(false);
-      setJoinCode('');
-    } else {
-      setJoinError(data.error || 'Failed to join');
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON body */ }
+      if (res.ok && data) {
+        // Add to list if not already there
+        setCampaigns(prev => {
+          if (prev.find(c => c._id === data._id)) return prev.map(c => c._id === data._id ? data : c);
+          return [...prev, data];
+        });
+        setJoining(false);
+        setJoinCode('');
+      } else {
+        setJoinError(data?.error || `Failed to join (server responded with ${res.status}).`);
+      }
+    } catch {
+      setJoinError('Could not reach the server to join the campaign.');
     }
   };
 
@@ -103,10 +140,12 @@ export default function Campaigns() {
         <form onSubmit={create} className="card" style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '16px', marginBottom: '14px' }}>New Campaign</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-            {[['name', 'Campaign Name *', true], ['setting', 'Setting'], ['dmName', 'DM Name']].map(([key, label, req]) => (
+            {[['name', 'Campaign Name *', true], ['setting', 'Setting'], ['dmName', dmNameFallback ? 'DM Name' : 'DM Name *']].map(([key, label, req]) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</label>
-                <input required={!!req} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+                <input required={!!req} value={form[key]}
+                  placeholder={key === 'dmName' ? (dmNameFallback || 'Your name') : undefined}
+                  onChange={e => { setCreateError(''); setForm(f => ({ ...f, [key]: e.target.value })); }} />
               </div>
             ))}
           </div>
@@ -114,8 +153,13 @@ export default function Campaigns() {
             <label style={{ fontSize: '12px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Description</label>
             <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ width: '100%', resize: 'vertical' }} />
           </div>
+          {createError && <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '10px' }}>{createError}</div>}
           <button type="submit" className="btn btn-primary">Create Campaign</button>
         </form>
+      )}
+
+      {listError && (
+        <div style={{ color: '#f87171', fontSize: '13px', marginBottom: '16px' }}>{listError}</div>
       )}
 
       {campaigns.length === 0 ? (

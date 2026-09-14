@@ -219,6 +219,10 @@ export function useCharacterList() {
   // Delete character from both local and server
   const deleteCharacter = useCallback(async (id) => {
     localStorage.removeItem(`${STORAGE_PREFIX}${id}`);
+    // The sheet's per-character layout keys, and the navbar's "My Sheet" pointer — left
+    // behind, the link opened "Character not found".
+    for (const k of ['ond-layout-', 'ond-columns-', 'ond-sidebar-', 'ond-tab-']) localStorage.removeItem(`${k}${id}`);
+    if (localStorage.getItem('ond-last-character') === id) localStorage.removeItem('ond-last-character');
     setCharacters(prev => prev.filter(c => c._id !== id));
     try { await fetch(`/api/characters/${id}`, { method: 'DELETE' }); } catch {}
   }, []);

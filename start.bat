@@ -91,30 +91,46 @@ if %ERRORLEVEL% neq 0 (
 )
 
 :: ─── Check for updates ──────────────────────────────
+:: Only offer an update when HEAD is strictly BEHIND origin/main. When HEAD is ahead or has
+:: diverged, `git reset --hard origin/main` would silently drop local commits that are not on
+:: GitHub. Each check sits on its own line with goto labels, so ERRORLEVEL is read at run time.
 echo  [1/4] Checking for updates...
 git fetch origin main >nul 2>nul
-for /f %%i in ('git rev-parse HEAD 2^>nul') do set LOCAL=%%i
-for /f %%i in ('git rev-parse origin/main 2^>nul') do set REMOTE=%%i
-if "!LOCAL!"=="!REMOTE!" (
-    echo  Already up to date.
-) else if "!REMOTE!"=="" (
-    echo  Already up to date.
-) else (
-    echo  [UPDATE] New version available!
+set "LOCAL="
+set "REMOTE="
+set "BEHIND=0"
+for /f %%i in ('git rev-parse --verify --quiet HEAD 2^>nul') do set LOCAL=%%i
+for /f %%i in ('git rev-parse --verify --quiet origin/main 2^>nul') do set REMOTE=%%i
+if "!LOCAL!"=="" goto UPDATE_NONE
+if "!REMOTE!"=="" goto UPDATE_NONE
+if "!LOCAL!"=="!REMOTE!" goto UPDATE_NONE
+git merge-base --is-ancestor HEAD origin/main >nul 2>nul
+if !ERRORLEVEL! neq 0 goto UPDATE_LOCAL_COMMITS
+for /f %%i in ('git rev-list --count HEAD..origin/main 2^>nul') do set BEHIND=%%i
+if !BEHIND! gtr 0 goto UPDATE_OFFER
+:UPDATE_LOCAL_COMMITS
+echo  [UPDATE] Skipped: this folder has local commits that are not on GitHub.
+goto UPDATE_DONE
+:UPDATE_NONE
+echo  Already up to date.
+goto UPDATE_DONE
+:UPDATE_OFFER
+echo  [UPDATE] New version available!
+echo.
+set "DOUPDATE="
+set /p DOUPDATE="  Do you want to update? (y/n): "
+if /i "!DOUPDATE!"=="y" (
+    git reset --hard origin/main >nul 2>nul
+    git pull origin main
+    :: The update just rewrote THIS file. cmd.exe resumes a running .bat by byte offset, so
+    :: continuing here would execute whatever now sits at the old offset. Relaunch the fresh
+    :: file from the top and let this window close instead.
     echo.
-    set /p DOUPDATE="  Do you want to update? (y/n): "
-    if /i "!DOUPDATE!"=="y" (
-        git reset --hard origin/main >nul 2>nul
-        git pull origin main
-        :: The update just rewrote THIS file. cmd.exe resumes a running .bat by byte offset, so
-        :: continuing here would execute whatever now sits at the old offset. Relaunch the fresh
-        :: file from the top and let this window close instead.
-        echo.
-        echo  Updated. Restarting the launcher...
-        start "OND Launcher" /D "%~dp0" "%~f0"
-        exit
-    )
+    echo  Updated. Restarting the launcher...
+    start "OND Launcher" /D "%~dp0" "%~f0"
+    exit
 )
+:UPDATE_DONE
 
 :: ─── Install dependencies ───────────────────────────
 echo.

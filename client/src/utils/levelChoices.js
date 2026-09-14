@@ -1,6 +1,9 @@
 // ─── Level-Up Choice Definitions ─────────────────────────────────────
 // Defines what interactive choices players make at each level per class.
 
+import { getSubclassLevel } from './classData';
+import { FEAT_ABILITY_BONUSES } from './dndConstants';
+
 export const METAMAGIC_OPTIONS = {
   'Careful Spell': 'Spend 1 sorcery point: chosen creatures auto-succeed on your spell\'s saving throw.',
   'Distant Spell': 'Spend 1 sorcery point: double the range of a spell (touch becomes 30 ft).',
@@ -131,8 +134,10 @@ export const FAVORED_TERRAINS = [
   'Mountain', 'Swamp', 'Underdark',
 ];
 
-// Maps class + level to the type of choice available
-export function getLevelChoices(cls, level, subclass) {
+// Maps class + level to the type of choice available. Every returned choice
+// carries its own `level` — the Progression tab stores a pick under that level,
+// so a card must never fall back to the character's current level.
+export function getLevelChoices(cls, level, subclass, ruleset = '2014') {
   const choices = [];
 
   // ASI / Feat at standard levels
@@ -153,9 +158,8 @@ export function getLevelChoices(cls, level, subclass) {
     choices.push({ type: 'fighting-style', label: 'Additional Fighting Style' });
   }
 
-  // Subclass
-  const subclassLevels = { Barbarian: 3, Bard: 3, Cleric: 1, Druid: 2, Fighter: 3, Monk: 3, Paladin: 3, Ranger: 3, Rogue: 3, Sorcerer: 1, Warlock: 1, Wizard: 2, Artificer: 3 };
-  if (level === subclassLevels[cls]) {
+  // Subclass — ruleset-aware (2024: every class at level 3)
+  if (level === getSubclassLevel(cls, ruleset)) {
     choices.push({ type: 'subclass', label: 'Choose a Subclass' });
   }
 
@@ -215,5 +219,97 @@ export function getLevelChoices(cls, level, subclass) {
   // Spells (for known casters when spells known increases)
   // This is handled separately in the UI
 
-  return choices;
+  return choices.map(c => ({ ...c, level }));
+}
+
+const ABILITY_NAMES = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
+
+// What an ASI-card selection does: ability deltas plus any saving-throw
+// proficiencies it grants. `selection` is "+2 Strength", "+1 Dexterity / +1 Wisdom"
+// or a feat name; `featAbility` is the player's pick for a choice half-feat
+// (Resilient, Observant, Athlete, …). Reads the shared FEAT_ABILITY_BONUSES table
+// the creator uses, so the two can never disagree.
+export function asiChoiceEffect(selection, featAbility) {
+  const deltas = {};
+  const saves = [];
+  if (!selection || typeof selection !== 'string') return { deltas, saves };
+  if (selection.startsWith('+2 ') || selection.startsWith('+1 ')) {
+    for (const part of selection.split(' / ')) {
+      const m = part.match(/\+(\d)\s+(\w+)/);
+      const ab = m?.[2]?.toLowerCase();
+      if (ab && ABILITY_NAMES.includes(ab)) deltas[ab] = (deltas[ab] || 0) + parseInt(m[1], 10);
+    }
+    return { deltas, saves };
+  }
+  const cfg = FEAT_ABILITY_BONUSES[selection];
+  if (!cfg) return { deltas, saves };
+  const ab = cfg.fixed || (cfg.choice?.includes(featAbility) ? featAbility : cfg.choice?.[0]);
+  if (ab) {
+    deltas[ab] = 1;
+    if (cfg.save) saves.push(ab);
+  }
+  return { deltas, saves };
+}
+
+// Old saves stored every Progression pick under the class's level AT THE TIME of picking,
+// not the card's level. Such a pick sits on a key whose level has no choice of that type, so
+// no card shows it — and picking again re-applied an ASI. Move each orphan to the nearest card
+// of that type at or below its key (else the nearest above) that has no pick yet; leave it
+// where it is when there's no such card. Returns { changed, levelChoices } (a new object).
+export function relocateOrphanedChoices(levelChoices, { cls, subclass = '', ruleset = '2014', namespaced = false }) {
+  const prefix = namespaced ? `${cls}:` : '';
+  const out = Object.fromEntries(Object.entries(levelChoices || {}).map(([k, v]) => [k, v && typeof v === 'object' ? { ...v } : v]));
+  const typesAt = (lvl) => new Set(getLevelChoices(cls, lvl, subclass, ruleset).map(c => c.type));
+  const keyLevel = (k) => {
+    if (!k.startsWith(prefix)) return null;
+    const rest = k.slice(prefix.length);
+    return /^\d+$/.test(rest) ? Number(rest) : null;
+  };
+  let changed = false;
+  const keys = Object.keys(out).filter(k => keyLevel(k) != null).sort((a, b) => keyLevel(a) - keyLevel(b));
+  for (const key of keys) {
+    const level = keyLevel(key);
+    const entry = out[key];
+    if (!entry || typeof entry !== 'object') continue;
+    const here = typesAt(level);
+    for (const type of Object.keys(entry)) {
+      if (type === 'asiAbility' || here.has(type) || entry[type] == null) continue;
+      const below = [];
+      const above = [];
+      for (let l = 1; l <= 20; l++) {
+        if (!typesAt(l).has(type) || out[`${prefix}${l}`]?.[type] != null) continue;
+        (l <= level ? below : above).push(l);
+      }
+      const target = below.length ? below[below.length - 1] : above[0];
+      if (target == null) continue;
+      const tKey = `${prefix}${target}`;
+      out[tKey] = { ...(out[tKey] || {}), [type]: entry[type] };
+      if (type === 'asi' && entry.asiAbility) { out[tKey].asiAbility = entry.asiAbility; delete entry.asiAbility; }
+      delete entry[type];
+      changed = true;
+    }
+    if (Object.keys(entry).length === 0) delete out[key];
+  }
+  return { changed, levelChoices: changed ? out : (levelChoices || {}) };
+}
+
+// A single-class character stores Progression picks under bare level keys ("4")
+// and its style as "Fighting Style: X". Once a second class is added the sheet
+// reads "<Class>:4" and "Fighting Style (<Class>): X". Returns the migrated
+// { levelChoices, features } for the character's ORIGINAL class.
+export function migrateSingleClassChoices(char, cls) {
+  const levelChoices = {};
+  for (const [k, v] of Object.entries(char?.levelChoices || {})) {
+    levelChoices[/^\d+$/.test(k) ? `${cls}:${k}` : k] = v;
+  }
+  let hasStyle = false;
+  const features = (char?.features || []).map(f => {
+    if (typeof f !== 'string') return f;
+    const m = f.match(/^Fighting Style:\s*(.+)$/);
+    if (!m) return f;
+    hasStyle = true;
+    return `Fighting Style (${cls}): ${m[1].trim()}`;
+  });
+  if (!hasStyle && char?.fightingStyle) features.push(`Fighting Style (${cls}): ${char.fightingStyle}`);
+  return { levelChoices, features };
 }

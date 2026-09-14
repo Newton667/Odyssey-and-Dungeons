@@ -43,8 +43,10 @@ export default function App() {
 
   return (
     <ThemeProvider>
+      {/* The boundary wraps DiceProvider too: the 3D dice render inside it, and an error
+          there used to have no boundary above it and blank the whole app. */}
+      <ErrorBoundary>
       <DiceProvider>
-        <ErrorBoundary>
           <div style={{ minHeight: '100vh' }}>
             <Navbar />
             <Routes>
@@ -84,8 +86,8 @@ export default function App() {
 
             {diceOpen && <DiceRoller onClose={() => setDiceOpen(false)} />}
           </div>
-        </ErrorBoundary>
       </DiceProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }
