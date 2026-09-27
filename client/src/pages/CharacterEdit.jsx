@@ -11,7 +11,7 @@ import {
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, normalizeFeatNames } from '../utils/dndHelpers';
 import { CLASSES, RACES, SAVING_THROWS_BY_CLASS, getSubclassLevel, spellcastingAbilityFor, spellListClassFor } from '../utils/classData';
 import { subclassSelectOptions, subclassEdition, subclassHpDelta, thirdCasterSpellInfo, thirdCasterSchoolStatus } from '../utils/subclassData';
-import { extraSpellNames, getAlwaysPreparedSpells } from '../utils/spellAccess';
+import { extraSpellNames, getAlwaysPreparedSpells, allowedSpellClasses } from '../utils/spellAccess';
 import { getCharClasses, isMulticlass, syncPrimaryFromClasses, formatHitDice, formatClasses } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 import { readHomebrew } from '../utils/homebrew';
@@ -1418,12 +1418,15 @@ export default function CharacterEdit() {
             const currentLeveled = currentSpells.filter(name => spellsByName[name] && spellsByName[name].level > 0 && !granted.has(name));
             // 2014 EK/AT school budget (off-school Wizard picks limited to the any-school allowance).
             // Override lifts it like every other limit; skipped when the character also has Wizard levels.
+            // Every class list counts (not just Magic Initiate's), as on the sheet: a Wizard spell a
+            // multiclass Cleric could also learn isn't an off-school pick.
+            const allowedLists = allowedSpellClasses(form);
             const schoolRules = spellOverride || getCharClasses(form).some(c => c.class === 'Wizard') ? [] : getCharClasses(form)
               .map(c => ({ subclass: c.subclass, info: thirdCasterSpellInfo(c.class, c.subclass, c.level, form.ruleset || '2014') }))
               .filter(x => x.info?.schools)
-              .map(x => ({ ...x, status: thirdCasterSchoolStatus({ info: x.info, pickedSpells: currentLeveled.map(n => spellsByName[n]), otherListClasses: featClasses }) }));
+              .map(x => ({ ...x, status: thirdCasterSchoolStatus({ info: x.info, pickedSpells: currentLeveled.map(n => spellsByName[n]), otherListClasses: allowedLists }) }));
             const schoolBlock = (spell) => schoolRules.find(r => r.status.atLimit
-              && thirdCasterSchoolStatus({ info: r.info, pickedSpells: [spell], otherListClasses: featClasses }).offSchool === 1);
+              && thirdCasterSchoolStatus({ info: r.info, pickedSpells: [spell], otherListClasses: allowedLists }).offSchool === 1);
             const currentOther = currentSpells.filter(name => !spellsByName[name]); // racial/multiclass spells not in this class list
 
             const filteredSpells = spellSearch

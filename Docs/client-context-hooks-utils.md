@@ -319,6 +319,7 @@ Data for class progression choices.
 - `asiChoiceEffect(selection, featAbility?)` → `{ deltas: {ability: n}, saves: [ability] }` for an ASI-card pick ("+2 Strength", "+1 Dexterity / +1 Wisdom", or a half-feat via `FEAT_ABILITY_BONUSES`; Resilient adds its save)
 - `migrateSingleClassChoices(char, cls)` → `{ levelChoices, features }` re-keyed for the character's original class when a second class is added
 - `relocateOrphanedChoices(levelChoices, { cls, subclass, ruleset, namespaced })` → `{ changed, levelChoices }` — moves picks from old saves that sit on a level with no choice of that type to the nearest free card of that type (at or below, else above). Run once per class by the sheet on load (and on a ruleset change). Never moves `LEVEL_SPECIFIC_CHOICES` (`totem`, `hunter-option`); a Champion additional-style pick only moves to an `additional` card (the stored entry and `typesAt` share one `type + ':additional'` key)
+- `dropChampionStyle({ features, levelChoices }, classes)` → `{ changed, features, levelChoices }` — when no entry of `classes` (from `getCharClasses`) is a Fighter (Champion), removes the `Fighting Style (Champion): X` feature (`CHAMPION_STYLE_PREFIX`) and a matching `fighting-style` pick at 7/10 (bare or `Fighter:` key). The sheet calls it on a subclass pick and before relocation on load
 
 Note: `FIGHTING_STYLES` and `FIGHTING_STYLE_CLASSES` are in `dndConstants.js`, not here.
 

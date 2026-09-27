@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { allowedSpellClasses, spellMatchesClasses, extraSpellNames, getAlwaysPreparedSpells, resolveSheetSpells, spellLimitCounts } from './spellAccess';
 import { MAGIC_INITIATE_CLASSES } from './dndConstants';
+import { thirdCasterSpellInfo, thirdCasterSchoolStatus } from './subclassData';
 
 // Which spell lists a character may actually draw from: every class they have
 // (multiclass included) plus any feat-granted list. The sheet's browser used to
@@ -188,5 +189,25 @@ describe('spellLimitCounts', () => {
       { level: 0 }, { level: 0, source: 'race' }, { level: 1 }, { level: 2 },
       { level: 1, _alwaysPrepared: 'Life Domain' }, { level: 0, _alwaysPrepared: 'Arcane Trickster' },
     ])).toEqual({ cantrips: 1, leveled: 2 });
+  });
+});
+
+describe('2014 EK/AT school budget reads every class list', () => {
+  // Regression (v1.9.0 review M2): the editor passed only Magic Initiate lists, so a Wizard
+  // spell the character's Cleric levels also offer counted as off-school there but not on the sheet.
+  const DETECT = { name: 'Detect Magic', level: 1, school: 'Divination', classes: ['Bard', 'Cleric', 'Druid', 'Paladin', 'Ranger', 'Sorcerer', 'Wizard'] };
+  const SLEEP = { name: 'Sleep', level: 1, school: 'Enchantment', classes: ['Bard', 'Sorcerer', 'Wizard'] };
+  const char = {
+    class: 'Fighter', subclass: 'Eldritch Knight', level: 4, ruleset: '2014',
+    classes: [{ class: 'Fighter', subclass: 'Eldritch Knight', level: 3 }, { class: 'Cleric', subclass: 'Life Domain', level: 1 }],
+  };
+  const info = thirdCasterSpellInfo('Fighter', 'Eldritch Knight', 3, '2014');
+
+  it('a spell on another class list is not an off-school pick', () => {
+    const lists = allowedSpellClasses(char);
+    expect(lists).toContain('cleric');
+    expect(thirdCasterSchoolStatus({ info, pickedSpells: [DETECT, SLEEP], otherListClasses: lists })).toEqual({ offSchool: 1, allowed: 1, atLimit: true });
+    // The old editor input (feat lists only) over-counted.
+    expect(thirdCasterSchoolStatus({ info, pickedSpells: [DETECT, SLEEP], otherListClasses: [] }).offSchool).toBe(2);
   });
 });

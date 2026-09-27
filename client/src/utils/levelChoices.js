@@ -373,6 +373,33 @@ export function relocateOrphanedChoices(levelChoices, { cls, subclass = '', rule
   return { changed, levelChoices: changed ? out : (levelChoices || {}) };
 }
 
+// A Champion's Additional Fighting Style belongs to the subclass. Once no class entry is a
+// Fighter (Champion) any more — a subclass switch on the sheet or in the editor, or a class
+// change — drop the "Fighting Style (Champion): X" feature and that style's pick on the
+// Champion card (Fighter 7 or 10, bare or "Fighter:" key). Left in place, the style kept
+// counting (e.g. Defense's +1 AC) and relocation moved the pick onto the level-1 style card.
+// Only a pick equal to the Champion style is removed, so an old-save orphan of the level-1
+// style is left for relocation. `classes` is getCharClasses(char). Returns { changed, features, levelChoices }.
+export const CHAMPION_STYLE_PREFIX = 'Fighting Style (Champion):';
+export function dropChampionStyle({ features, levelChoices }, classes) {
+  const text = f => (typeof f === 'string' ? f : (f?.name || ''));
+  const feats = features || [];
+  const champFeat = feats.find(f => text(f).startsWith(CHAMPION_STYLE_PREFIX));
+  if (!champFeat || (classes || []).some(c => c.class === 'Fighter' && c.subclass === 'Champion')) {
+    return { changed: false, features: feats, levelChoices: levelChoices || {} };
+  }
+  const style = text(champFeat).slice(CHAMPION_STYLE_PREFIX.length).trim();
+  const lc = { ...(levelChoices || {}) };
+  for (const lvl of CHAMPION_ADDITIONAL_LEVELS) {
+    for (const key of [`${lvl}`, `Fighter:${lvl}`]) {
+      if (lc[key]?.['fighting-style'] !== style) continue;
+      const { 'fighting-style': _dropped, ...rest } = lc[key];
+      if (Object.keys(rest).length) lc[key] = rest; else delete lc[key];
+    }
+  }
+  return { changed: true, features: feats.filter(f => !text(f).startsWith(CHAMPION_STYLE_PREFIX)), levelChoices: lc };
+}
+
 // A single-class character stores Progression picks under bare level keys ("4")
 // and its style as "Fighting Style: X". Once a second class is added the sheet
 // reads "<Class>:4" and "Fighting Style (<Class>): X". Returns the migrated

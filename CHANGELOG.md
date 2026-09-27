@@ -28,6 +28,12 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.9.1 — 2026-09-27
+
+### Fixed
+- **Switching a Champion to another subclass removes the Champion's extra fighting style.** It used to stay active (a Battle Master kept Defense's +1 AC) and showed up on the level-1 fighting style card. This works whether you switch on the Progression tab or in the editor (the sheet tidies up the next time you open it), and an already-affected character loses the leftover style's bonus when you open the sheet.
+- **The editor's spell-school limit for 2014 Eldritch Knights and Arcane Tricksters matches the sheet for multiclass characters.** A Wizard spell your other class can also learn (for example Detect Magic with Cleric levels) no longer counts as an off-school pick in the editor.
+
 ## v1.9.0 — 2026-09-27
 
 ### Added

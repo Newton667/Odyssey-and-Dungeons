@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  getLevelChoices, migrateSingleClassChoices, asiChoiceEffect, relocateOrphanedChoices,
+  getLevelChoices, migrateSingleClassChoices, asiChoiceEffect, relocateOrphanedChoices, dropChampionStyle,
   getHunterOptions, getLandOptions, HUNTER_OPTIONS, LAND_TERRAINS, LAND_TERRAINS_2024,
 } from './levelChoices';
 
@@ -268,5 +268,52 @@ describe('land option helpers and text', () => {
     expect(LAND_TERRAINS.Swamp).toContain("Melf's Acid Arrow");
     expect(LAND_TERRAINS.Swamp).toContain('Scrying');
     expect(LAND_TERRAINS_2024.Polar).toContain('Ray of Frost');
+  });
+});
+
+describe('dropChampionStyle — leaving Champion drops its Additional Fighting Style', () => {
+  // Regression (v1.9.0 review M1): a Fighter 10 with Archery + Champion Defense switched to
+  // Battle Master kept Defense (+1 AC), and relocation moved the L10 pick onto the L1 card.
+  const char = {
+    features: ['Fighting Style: Archery', 'Fighting Style (Champion): Defense', 'Second Wind'],
+    levelChoices: { 4: { asi: '+2 Dexterity' }, 10: { 'fighting-style': 'Defense' } },
+  };
+
+  it('removes the feature and the L10 pick once no class is a Champion', () => {
+    const r = dropChampionStyle(char, [{ class: 'Fighter', subclass: 'Battle Master', level: 10 }]);
+    expect(r.changed).toBe(true);
+    expect(r.features).toEqual(['Fighting Style: Archery', 'Second Wind']);
+    expect(r.levelChoices).toEqual({ 4: { asi: '+2 Dexterity' } });
+    // …so relocation has nothing left to move onto the level-1 style card.
+    expect(relocateOrphanedChoices(r.levelChoices, { cls: 'Fighter', subclass: 'Battle Master', ruleset: '2014' }).changed).toBe(false);
+  });
+
+  it('leaves a Champion untouched', () => {
+    const r = dropChampionStyle(char, [{ class: 'Fighter', subclass: 'Champion', level: 10 }]);
+    expect(r.changed).toBe(false);
+    expect(r.features).toBe(char.features);
+    expect(r.levelChoices).toBe(char.levelChoices);
+  });
+
+  it('multiclass keys, 2024 level 7, and other picks at the same level survive', () => {
+    const mc = {
+      features: [{ name: 'Fighting Style (Champion): Dueling' }, 'Fighting Style (Fighter): Defense'],
+      levelChoices: { 'Fighter:7': { 'fighting-style': 'Dueling', other: 'x' }, 'Wizard:4': { asi: 'Alert' } },
+    };
+    const r = dropChampionStyle(mc, [{ class: 'Fighter', subclass: 'Psi Warrior', level: 7 }, { class: 'Wizard', subclass: '', level: 4 }]);
+    expect(r.features).toEqual(['Fighting Style (Fighter): Defense']);
+    expect(r.levelChoices).toEqual({ 'Fighter:7': { other: 'x' }, 'Wizard:4': { asi: 'Alert' } });
+  });
+
+  it('keeps a pick at 7/10 that is not the Champion style (an old-save level-1 orphan)', () => {
+    const old = { features: ['Fighting Style (Champion): Defense'], levelChoices: { 7: { 'fighting-style': 'Archery' } } };
+    const r = dropChampionStyle(old, [{ class: 'Fighter', subclass: 'Battle Master', level: 10 }]);
+    expect(r.features).toEqual([]);
+    expect(r.levelChoices).toEqual({ 7: { 'fighting-style': 'Archery' } });
+  });
+
+  it('no Champion feature → no change', () => {
+    const r = dropChampionStyle({ features: ['Fighting Style: Archery'], levelChoices: {} }, [{ class: 'Fighter', subclass: 'Battle Master', level: 10 }]);
+    expect(r.changed).toBe(false);
   });
 });

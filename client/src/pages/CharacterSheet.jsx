@@ -11,7 +11,7 @@ import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDiceP
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
-import { getLevelChoices, asiChoiceEffect, migrateSingleClassChoices, relocateOrphanedChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, getHunterOptions, getLandOptions, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
+import { getLevelChoices, asiChoiceEffect, migrateSingleClassChoices, relocateOrphanedChoices, dropChampionStyle, CHAMPION_STYLE_PREFIX, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, getHunterOptions, getLandOptions, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
 import { getSubclasses, getSubclassDesc, subclassEdition, getSubclassFeatures, listSubclassFeatures, isSubclassPlaceholder, subclassHpDelta, subclassRepickHp, thirdCasterSpellInfo, thirdCasterSchoolStatus } from '../utils/subclassData';
 import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageDice, weaponDamageFormula, weaponRangeText, cantripDamage, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, normalizeFeatNames } from '../utils/dndHelpers';
 import { parseDiceFormula } from '../utils/diceFormula';
@@ -428,16 +428,20 @@ export default function CharacterSheet() {
   // level at the time, not the card's level, so they sat on keys no card reads (and picking
   // again re-applied the ASI). Move each one to the card it belongs to. No-op once repaired.
   useEffect(() => {
-    if (!char?.levelChoices || !Object.keys(char.levelChoices).length) return;
+    if (!char) return;
     const classes = getCharClasses(char);
-    let lc = char.levelChoices;
-    let changed = false;
+    // A Champion style left behind by a subclass change (sheet or editor) goes first, so
+    // relocation can't move its pick onto the level-1 style card.
+    const champ = dropChampionStyle(char, classes);
+    let lc = champ.levelChoices;
+    let changed = champ.changed;
+    if (!changed && !Object.keys(lc).length) return;
     for (const c of classes) {
       const r = relocateOrphanedChoices(lc, { cls: c.class, subclass: c.subclass, ruleset: char.ruleset, namespaced: classes.length > 1 });
       if (r.changed) { lc = r.levelChoices; changed = true; }
     }
-    if (changed) updateChar(prev => ({ ...prev, levelChoices: lc }));
-  }, [char?.levelChoices, char?.classes, char?.class, char?.subclass, char?.level, char?.ruleset]);
+    if (changed) updateChar(prev => ({ ...prev, levelChoices: lc, ...(champ.changed && { features: champ.features }) }));
+  }, [char?.levelChoices, char?.features, char?.classes, char?.class, char?.subclass, char?.level, char?.ruleset]);
 
   // Close roll context menu on click outside
   useEffect(() => {
@@ -936,13 +940,16 @@ export default function CharacterSheet() {
   const fightingStyles = useMemo(() => {
     const s = new Set();
     if (char?.fightingStyle) s.add(char.fightingStyle);
+    // The Champion's additional style only counts while a class entry is still a Champion.
+    const champion = getCharClasses(char || {}).some(c => c.class === 'Fighter' && c.subclass === 'Champion');
     for (const f of (char?.features || [])) {
       const str = typeof f === 'string' ? f : (f?.name || '');
+      if (!champion && str.startsWith(CHAMPION_STYLE_PREFIX)) continue;
       const m = str.match(/^Fighting Style(?:\s*\([^)]*\))?:\s*(.+)$/);
       if (m) s.add(m[1].trim());
     }
     return s;
-  }, [char?.fightingStyle, char?.features]);
+  }, [char?.fightingStyle, char?.features, char?.classes, char?.class, char?.subclass]);
   // Sum unconditional feat bonuses that feed into derived stats (e.g. Alert → initiative)
   const featEffects = useMemo(() => {
     const totals = { initiative: 0, passivePerception: 0, passiveInvestigation: 0 };
@@ -3002,8 +3009,7 @@ export default function CharacterSheet() {
       return (typeof f === 'string' ? f : (f.name || '')).slice(pref.length).trim();
     };
     const fightingStyleOf = (clsName) => styleFromFeature(charIsMulticlass ? `Fighting Style (${clsName}):` : 'Fighting Style:');
-    // The Champion's Additional Fighting Style lives beside the class style.
-    const CHAMPION_STYLE_PREFIX = 'Fighting Style (Champion):';
+    // The Champion's Additional Fighting Style lives beside the class style (CHAMPION_STYLE_PREFIX).
     const championStyle = () => styleFromFeature(CHAMPION_STYLE_PREFIX);
 
     // Renders the full progression UI for ONE class (single-class characters have one section)
@@ -3130,6 +3136,9 @@ export default function CharacterSheet() {
           } else {
             updates.subclass = name;
           }
+          // Leaving Champion takes its Additional Fighting Style with it.
+          const champ = dropChampionStyle({ features: char.features, levelChoices: lc }, getCharClasses({ ...char, ...updates }));
+          if (champ.changed) { updates.features = champ.features; updates.levelChoices = champ.levelChoices; }
           // Subclass HP (Draconic resilience) on the pick event. A gain is applied; a loss is
           // never subtracted (older Draconic characters never received it) — remind instead.
           const cur = getCharClasses(char).find(c => c.class === cls);
