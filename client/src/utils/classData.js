@@ -293,15 +293,15 @@ export const CLASS_LEVELS = {
 export const CLASSES = {
   Barbarian: { desc: 'A fierce warrior who channels primal rage to deal devastating damage and shrug off blows. Best in melee combat with heavy weapons.', hitDice: 'd12', hpBase: 12, primaryAbility: 'strength', armorProf: 'Light armor, medium armor, shields', weaponProf: 'Simple weapons, martial weapons', savingThrows: ['strength', 'constitution'], skillChoices: ['Animal Handling', 'Athletics', 'Intimidation', 'Nature', 'Perception', 'Survival'], numSkills: 2, subclasses: ['Path of the Berserker', 'Path of the Totem Warrior'], subclassLevel: 3, subclassDescs: { 'Path of the Berserker': 'Go into a frenzy for extra attacks, but risk exhaustion. Pure offensive rage.', 'Path of the Totem Warrior': 'Channel animal spirits for defensive and utility powers. Bear totem gives resistance to all damage while raging.' }, spellcasting: false, features: ['Rage — Enter a fury (bonus action, 2 uses/long rest). Advantage on STR checks/saves, +2 melee damage, resistance to bludgeoning/piercing/slashing', 'Unarmored Defense — While not wearing armor, AC = 10 + DEX mod + CON mod'], equipment: ['(a) a greataxe or (b) any martial melee weapon', '(a) two handaxes or (b) any simple weapon', "An explorer's pack and four javelins"] },
   Bard: { desc: 'A charismatic performer who weaves magic through music and words. Inspires allies, casts versatile spells, and excels at social encounters.', hitDice: 'd8', hpBase: 8, primaryAbility: 'charisma', armorProf: 'Light armor', weaponProf: 'Simple weapons, hand crossbows, longswords, rapiers, shortswords', savingThrows: ['dexterity', 'charisma'], skillChoices: ['Acrobatics','Animal Handling','Arcana','Athletics','Deception','History','Insight','Intimidation','Investigation','Medicine','Nature','Perception','Performance','Persuasion','Religion','Sleight of Hand','Stealth','Survival'], numSkills: 3, subclasses: ['College of Lore', 'College of Valor', 'College of Eloquence'], subclassLevel: 3, subclassDescs: { 'College of Lore': 'More skills, extra magical secrets, and Cutting Words to debuff enemies.', 'College of Valor': 'Medium armor, shields, martial weapons, and Combat Inspiration for allies.', 'College of Eloquence': 'The master persuader (Theros). Reliable social checks, debuffing saves, and Bardic Inspiration that never goes to waste and spreads to others.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Spellcasting (CHA) — 2 cantrips known, 2 first-level spell slots, 4 spells known', 'Bardic Inspiration (d6) — Bonus action: give an ally a d6 to add to one ability check, attack, or save within 10 min. CHA mod uses per long rest'], equipment: ['(a) a rapier, (b) a longsword, or (c) any simple weapon', "(a) a diplomat's pack or (b) an entertainer's pack", '(a) a lute or (b) any other musical instrument', 'Leather armor and a dagger'] },
-  Cleric: { desc: 'A holy warrior empowered by a divine domain. Heals allies, wears armor, and channels the power of their deity through prayers and spells.', hitDice: 'd8', hpBase: 8, primaryAbility: 'wisdom', armorProf: 'Light armor, medium armor, shields', weaponProf: 'Simple weapons', savingThrows: ['wisdom', 'charisma'], skillChoices: ['History', 'Insight', 'Medicine', 'Persuasion', 'Religion'], numSkills: 2, subclasses: ['Knowledge Domain', 'Life Domain', 'Light Domain', 'Nature Domain', 'Tempest Domain', 'Trickery Domain', 'War Domain'], subclassLevel: 1, subclassDescs: { 'Knowledge Domain': 'Expertise in knowledge skills, read thoughts, and learn any spell briefly.', 'Life Domain': 'The best healer in the game. Heavy armor and boosted healing spells.', 'Light Domain': 'Blasts of radiant fire, Warding Flare to protect yourself, area damage spells.', 'Nature Domain': 'Heavy armor druid-cleric hybrid. Command plants, animals, and elements.', 'Tempest Domain': 'Heavy armor, martial weapons, thunder/lightning spells, maximize lightning damage.', 'Trickery Domain': 'Stealth, illusions, disguise, and creating duplicates. The sneaky cleric.', 'War Domain': 'Heavy armor, martial weapons, bonus attacks, and guided strikes.' }, spellcasting: true, spellcastingAbility: 'wisdom', features: ['Spellcasting (WIS) — 3 cantrips known, 2 first-level spell slots. Prepare WIS mod + 1 spells each day', 'Divine Domain — Choose a domain at level 1, granting bonus spells and domain features'], equipment: ['(a) a mace or (b) a warhammer', '(a) scale mail, (b) leather, or (c) chain mail', "(a) a light crossbow and 20 bolts or (b) any simple weapon", "(a) a priest's pack or (b) an explorer's pack", 'A shield and a holy symbol'] },
+  Cleric: { desc: 'A holy warrior empowered by a divine domain. Heals allies, wears armor, and channels the power of their deity through prayers and spells.', hitDice: 'd8', hpBase: 8, primaryAbility: 'wisdom', armorProf: 'Light armor, medium armor, shields', weaponProf: 'Simple weapons', savingThrows: ['wisdom', 'charisma'], skillChoices: ['History', 'Insight', 'Medicine', 'Persuasion', 'Religion'], numSkills: 2, subclasses: ['Knowledge Domain', 'Life Domain', 'Light Domain', 'Nature Domain', 'Tempest Domain', 'Trickery Domain', 'War Domain'], subclassLevel: 1, subclassDescs: { 'Knowledge Domain': 'Expertise in knowledge skills, read thoughts, and learn any spell briefly.', 'Life Domain': 'The best healer in the game. Heavy armor and boosted healing spells.', 'Light Domain': 'Blasts of radiant fire, Warding Flare to protect yourself, area damage spells.', 'Nature Domain': 'Heavy armor druid-cleric hybrid. Command plants, animals, and elements.', 'Tempest Domain': 'Heavy armor, martial weapons, thunder/lightning spells, maximize lightning damage.', 'Trickery Domain': 'Stealth, illusions, disguise, and creating duplicates. The sneaky cleric.', 'War Domain': 'Heavy armor, martial weapons, bonus attacks, and guided strikes.' }, spellcasting: true, spellcastingAbility: 'wisdom', features: ['Spellcasting (WIS) — 3 cantrips known, 2 first-level spell slots. Prepare WIS mod + 1 spells each day', 'Divine Domain — Choose your Cleric subclass (Divine Domain), gaining domain spells and features'], equipment: ['(a) a mace or (b) a warhammer', '(a) scale mail, (b) leather, or (c) chain mail', "(a) a light crossbow and 20 bolts or (b) any simple weapon", "(a) a priest's pack or (b) an explorer's pack", 'A shield and a holy symbol'] },
   Druid: { desc: 'A guardian of nature who draws power from the natural world. Can shapeshift into animals, cast nature spells, and control the elements.', hitDice: 'd8', hpBase: 8, primaryAbility: 'wisdom', armorProf: 'Light armor (non-metal), medium armor (non-metal), shields (non-metal)', weaponProf: 'Clubs, daggers, darts, javelins, maces, quarterstaffs, scimitars, sickles, slings, spears', savingThrows: ['intelligence', 'wisdom'], skillChoices: ['Arcana', 'Animal Handling', 'Insight', 'Medicine', 'Nature', 'Perception', 'Religion', 'Survival'], numSkills: 2, subclasses: ['Circle of the Land', 'Circle of the Moon'], subclassLevel: 2, subclassDescs: { 'Circle of the Land': 'Extra spells based on your chosen terrain. Better spell recovery and more casting focused.', 'Circle of the Moon': 'Transform into powerful beasts in combat. The best shapeshifter — tank with Wild Shape.' }, spellcasting: true, spellcastingAbility: 'wisdom', features: ['Druidic — You know Druidic, a secret language only druids can speak and leave hidden messages in', 'Spellcasting (WIS) — 2 cantrips known, 2 first-level spell slots. Prepare WIS mod + 1 spells each day'], equipment: ['(a) a wooden shield or (b) any simple weapon', '(a) a scimitar or (b) any simple melee weapon', "Leather armor, explorer's pack, and a druidic focus"] },
   Fighter: { desc: 'A master of martial combat trained in a variety of weapons and armor. Tough, versatile, and deadly — the backbone of any adventuring party.', hitDice: 'd10', hpBase: 10, primaryAbility: 'strength', armorProf: 'All armor, shields', weaponProf: 'Simple weapons, martial weapons', savingThrows: ['strength', 'constitution'], skillChoices: ['Acrobatics', 'Animal Handling', 'Athletics', 'History', 'Insight', 'Intimidation', 'Perception', 'Survival'], numSkills: 2, subclasses: ['Champion', 'Battle Master', 'Eldritch Knight'], subclassLevel: 3, subclassDescs: { 'Champion': 'Simple but effective. Improved critical hits, extra fighting style, and remarkable athleticism.', 'Battle Master': 'Tactical combat maneuvers like Trip, Riposte, and Disarm. The most versatile fighter.', 'Eldritch Knight': 'Combines fighting with wizard spells. Abjuration and evocation magic plus weapon bond.' }, spellcasting: false, features: ['Fighting Style — Choose one: Archery (+2 ranged attacks), Defense (+1 AC in armor), Dueling (+2 damage one-handed), Great Weapon Fighting (reroll 1s/2s on two-handed damage), Protection (impose disadvantage with shield), Two-Weapon Fighting (add modifier to offhand damage)', 'Second Wind — Bonus action: regain 1d10 + fighter level HP. Once per short rest'], equipment: ['(a) chain mail or (b) leather armor, longbow, and 20 arrows', '(a) a martial weapon and shield or (b) two martial weapons', "(a) a light crossbow and 20 bolts or (b) two handaxes", "(a) a dungeoneer's pack or (b) an explorer's pack"] },
   Monk: { desc: 'A disciplined martial artist who harnesses ki energy. Strikes fast, dodges attacks, and needs no armor or weapons to be deadly.', hitDice: 'd8', hpBase: 8, primaryAbility: 'dexterity', armorProf: 'None', weaponProf: 'Simple weapons, shortswords', savingThrows: ['strength', 'dexterity'], skillChoices: ['Acrobatics', 'Athletics', 'History', 'Insight', 'Religion', 'Stealth'], numSkills: 2, subclasses: ['Way of the Open Hand', 'Way of Shadow', 'Way of the Four Elements'], subclassLevel: 3, subclassDescs: { 'Way of the Open Hand': 'The classic martial artist. Knock enemies prone, push them, or prevent reactions with Flurry of Blows.', 'Way of Shadow': 'Ninja-like abilities: darkness, silence, pass without trace, and shadow teleportation.', 'Way of the Four Elements': 'Channel ki into elemental spells like fireball and water whip. Spellcasting monk.' }, spellcasting: false, features: ['Unarmored Defense — While not wearing armor, AC = 10 + DEX mod + WIS mod', 'Martial Arts — Unarmed strikes use d4 damage and can use DEX. Bonus action unarmed strike after attacking with a monk weapon'], equipment: ['(a) a shortsword or (b) any simple weapon', "(a) a dungeoneer's pack or (b) an explorer's pack", '10 darts'] },
   Paladin: { desc: 'A holy knight sworn to an oath. Combines heavy armor and martial prowess with divine magic to smite evil and protect allies.', hitDice: 'd10', hpBase: 10, primaryAbility: 'strength', armorProf: 'All armor, shields', weaponProf: 'Simple weapons, martial weapons', savingThrows: ['wisdom', 'charisma'], skillChoices: ['Athletics', 'Insight', 'Intimidation', 'Medicine', 'Persuasion', 'Religion'], numSkills: 2, subclasses: ['Oath of Devotion', 'Oath of the Ancients', 'Oath of Vengeance', 'Oath of Glory'], subclassLevel: 3, subclassDescs: { 'Oath of Devotion': 'The classic holy knight. Sacred Weapon, Turn the Unholy, and protective auras.', 'Oath of the Ancients': 'Fey-themed paladin. Resistance to spell damage for nearby allies, nature-based powers.', 'Oath of Vengeance': 'Relentless hunter of evil. Vow of Enmity for advantage, and spells to chase down foes.', 'Oath of Glory': 'The heroic athlete (Theros). Grants temp HP on smites, speed-boosting auras, and reactive defense of allies.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Divine Sense — Action: detect celestials, fiends, or undead within 60 ft. 1 + CHA mod uses per long rest', 'Lay on Hands — Touch a creature to restore HP from a pool of 5 x paladin level. Can also spend 5 points to cure a disease or poison'], equipment: ['(a) a martial weapon and shield or (b) two martial weapons', "(a) five javelins or (b) any simple melee weapon", "(a) a priest's pack or (b) an explorer's pack", 'Chain mail and a holy symbol'] },
   Ranger: { desc: 'A skilled hunter and tracker at home in the wilderness. Combines martial ability with nature magic, specializing against chosen foes and terrain.', hitDice: 'd10', hpBase: 10, primaryAbility: 'dexterity', armorProf: 'Light armor, medium armor, shields', weaponProf: 'Simple weapons, martial weapons', savingThrows: ['strength', 'dexterity'], skillChoices: ['Animal Handling', 'Athletics', 'Insight', 'Investigation', 'Nature', 'Perception', 'Stealth', 'Survival'], numSkills: 3, subclasses: ['Hunter', 'Beast Master'], subclassLevel: 3, subclassDescs: { 'Hunter': 'Specialized at slaying specific prey. Choose abilities for fighting hordes, giants, or evasion.', 'Beast Master': 'Bond with an animal companion that fights alongside you in combat.' }, spellcasting: true, spellcastingAbility: 'wisdom', features: ['Favored Enemy — Choose a creature type (beasts, fey, humanoids, undead, etc.). Advantage on Survival checks to track and INT checks to recall info about them. Learn one of their languages', 'Natural Explorer — Choose a terrain (forest, mountain, swamp, etc.). Double proficiency on INT/WIS checks in that terrain, difficult terrain doesn\'t slow your group, always alert to danger'], equipment: ['(a) scale mail or (b) leather armor', '(a) two shortswords or (b) two simple melee weapons', "(a) a dungeoneer's pack or (b) an explorer's pack", 'A longbow and a quiver of 20 arrows'] },
   Rogue: { desc: 'A cunning scoundrel who relies on stealth, trickery, and precision strikes. Excels at skills, scouting, and dealing massive single-hit damage.', hitDice: 'd8', hpBase: 8, primaryAbility: 'dexterity', armorProf: 'Light armor', weaponProf: "Simple weapons, hand crossbows, longswords, rapiers, shortswords, thieves' tools", savingThrows: ['dexterity', 'intelligence'], skillChoices: ['Acrobatics', 'Athletics', 'Deception', 'Insight', 'Intimidation', 'Investigation', 'Perception', 'Performance', 'Persuasion', 'Sleight of Hand', 'Stealth'], numSkills: 4, subclasses: ['Thief', 'Assassin', 'Arcane Trickster'], subclassLevel: 3, subclassDescs: { 'Thief': 'Fast hands, second-story work, and supreme stealth. Use items as a bonus action.', 'Assassin': 'Disguise expert and ambush specialist. Auto-crits on surprised enemies.', 'Arcane Trickster': 'Combines rogue skills with wizard illusion and enchantment magic. Invisible Mage Hand.' }, spellcasting: false, features: ['Expertise — Choose 2 skill proficiencies: your proficiency bonus is doubled for those skills', 'Sneak Attack (1d6) — Once per turn, deal extra 1d6 damage when you have advantage or an ally is within 5 ft of the target. Must use a finesse or ranged weapon', "Thieves' Cant — A secret mix of dialect, jargon, and code that lets you hide messages in normal conversation. Only other rogues understand it"], equipment: ['(a) a rapier or (b) a shortsword', '(a) a shortbow and 20 arrows or (b) a shortsword', "(a) a burglar's pack, (b) dungeoneer's pack, or (c) explorer's pack", "Leather armor, two daggers, and thieves' tools"] },
-  Sorcerer: { desc: 'A spellcaster born with innate magical power. Fewer spells known than a wizard, but can twist and enhance them with metamagic.', hitDice: 'd6', hpBase: 6, primaryAbility: 'charisma', armorProf: 'None', weaponProf: 'Daggers, darts, slings, quarterstaffs, light crossbows', savingThrows: ['constitution', 'charisma'], skillChoices: ['Arcana', 'Deception', 'Insight', 'Intimidation', 'Persuasion', 'Religion'], numSkills: 2, subclasses: ['Draconic Bloodline', 'Wild Magic'], subclassLevel: 1, subclassDescs: { 'Draconic Bloodline': 'Dragon ancestry grants extra HP, natural armor (AC 13+DEX), and elemental affinity at higher levels.', 'Wild Magic': 'Unpredictable surges of random magic. Chaotic but potentially very powerful effects on every spell.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Spellcasting (CHA) — 4 cantrips known, 2 first-level spell slots, 2 spells known', 'Sorcerous Origin — Choose your innate magic source at level 1. Draconic Bloodline: +1 HP/level, AC 13 + DEX unarmored. Wild Magic: spells can trigger random magical surges'], equipment: ['(a) a light crossbow and 20 bolts or (b) any simple weapon', '(a) a component pouch or (b) an arcane focus', "(a) a dungeoneer's pack or (b) an explorer's pack", 'Two daggers'] },
-  Warlock: { desc: 'A spellcaster who made a pact with a powerful being for magical power. Few spell slots but they recover on short rests, plus unique invocations.', hitDice: 'd8', hpBase: 8, primaryAbility: 'charisma', armorProf: 'Light armor', weaponProf: 'Simple weapons', savingThrows: ['wisdom', 'charisma'], skillChoices: ['Arcana', 'Deception', 'History', 'Intimidation', 'Investigation', 'Nature', 'Religion'], numSkills: 2, subclasses: ['The Archfey', 'The Fiend', 'The Great Old One'], subclassLevel: 1, subclassDescs: { 'The Archfey': 'Pact with a fey lord. Charm and frighten enemies, misty escape, and beguiling defenses.', 'The Fiend': 'Pact with a demon or devil. Gain temp HP on kills, luck manipulation, and fire resistance.', 'The Great Old One': 'Pact with an eldritch being. Telepathy, thought shield, and mind-bending abilities.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Otherworldly Patron — Choose your patron at level 1. The Archfey: Fey Presence (charm/frighten nearby). The Fiend: Dark One\'s Blessing (temp HP on kills). The Great Old One: Awakened Mind (telepathy 30 ft)', 'Pact Magic (CHA) — 2 cantrips known, 1 first-level spell slot (recovers on short rest), 2 spells known'], equipment: ['(a) a light crossbow and 20 bolts or (b) any simple weapon', '(a) a component pouch or (b) an arcane focus', "(a) a scholar's pack or (b) a dungeoneer's pack", 'Leather armor, any simple weapon, and two daggers'] },
+  Sorcerer: { desc: 'A spellcaster born with innate magical power. Fewer spells known than a wizard, but can twist and enhance them with metamagic.', hitDice: 'd6', hpBase: 6, primaryAbility: 'charisma', armorProf: 'None', weaponProf: 'Daggers, darts, slings, quarterstaffs, light crossbows', savingThrows: ['constitution', 'charisma'], skillChoices: ['Arcana', 'Deception', 'Insight', 'Intimidation', 'Persuasion', 'Religion'], numSkills: 2, subclasses: ['Draconic Bloodline', 'Wild Magic'], subclassLevel: 1, subclassDescs: { 'Draconic Bloodline': 'Dragon ancestry grants extra HP, natural armor (AC 13+DEX), and elemental affinity at higher levels.', 'Wild Magic': 'Unpredictable surges of random magic. Chaotic but potentially very powerful effects on every spell.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Spellcasting (CHA) — 4 cantrips known, 2 first-level spell slots, 2 spells known', 'Sorcerous Origin — Choose your Sorcerer subclass (Sorcerous Origin), the source of your innate magic, gaining its features'], equipment: ['(a) a light crossbow and 20 bolts or (b) any simple weapon', '(a) a component pouch or (b) an arcane focus', "(a) a dungeoneer's pack or (b) an explorer's pack", 'Two daggers'] },
+  Warlock: { desc: 'A spellcaster who made a pact with a powerful being for magical power. Few spell slots but they recover on short rests, plus unique invocations.', hitDice: 'd8', hpBase: 8, primaryAbility: 'charisma', armorProf: 'Light armor', weaponProf: 'Simple weapons', savingThrows: ['wisdom', 'charisma'], skillChoices: ['Arcana', 'Deception', 'History', 'Intimidation', 'Investigation', 'Nature', 'Religion'], numSkills: 2, subclasses: ['The Archfey', 'The Fiend', 'The Great Old One'], subclassLevel: 1, subclassDescs: { 'The Archfey': 'Pact with a fey lord. Charm and frighten enemies, misty escape, and beguiling defenses.', 'The Fiend': 'Pact with a demon or devil. Gain temp HP on kills, luck manipulation, and fire resistance.', 'The Great Old One': 'Pact with an eldritch being. Telepathy, thought shield, and mind-bending abilities.' }, spellcasting: true, spellcastingAbility: 'charisma', features: ['Otherworldly Patron — Choose your Warlock subclass (Otherworldly Patron), gaining its features and patron spells', 'Pact Magic (CHA) — 2 cantrips known, 1 first-level spell slot (recovers on short rest), 2 spells known'], equipment: ['(a) a light crossbow and 20 bolts or (b) any simple weapon', '(a) a component pouch or (b) an arcane focus', "(a) a scholar's pack or (b) a dungeoneer's pack", 'Leather armor, any simple weapon, and two daggers'] },
   Wizard: { desc: 'A scholarly mage who learns spells from a spellbook. The largest spell list in the game — versatile, powerful, but fragile.', hitDice: 'd6', hpBase: 6, primaryAbility: 'intelligence', armorProf: 'None', weaponProf: 'Daggers, darts, slings, quarterstaffs, light crossbows', savingThrows: ['intelligence', 'wisdom'], skillChoices: ['Arcana', 'History', 'Insight', 'Investigation', 'Medicine', 'Religion'], numSkills: 2, subclasses: ['School of Abjuration', 'School of Conjuration', 'School of Divination', 'School of Enchantment', 'School of Evocation', 'School of Illusion', 'School of Necromancy', 'School of Transmutation'], subclassLevel: 2, subclassDescs: { 'School of Abjuration': 'Protective magic. Arcane Ward absorbs damage, and your abjuration spells are cheaper to copy.', 'School of Conjuration': 'Summon creatures and objects, and teleport. Minor Conjuration creates small objects at will.', 'School of Divination': 'See the future. Portent lets you replace any roll with pre-rolled dice. Extremely powerful.', 'School of Enchantment': 'Mind control and charm magic. Hypnotic Gaze and split enchantment targets.', 'School of Evocation': 'Damage spells. Sculpt Spells around allies so fireballs never hurt your friends.', 'School of Illusion': 'Master of illusions. Make illusions real, and your illusion spells are cheaper to copy.', 'School of Necromancy': 'Raise undead minions, drain life to heal yourself. Undead thralls are stronger.', 'School of Transmutation': 'Transform matter. Transmuter\'s Stone grants buffs, and your transmutation spells are cheaper.' }, spellcasting: true, spellcastingAbility: 'intelligence', features: ['Spellcasting (INT) — 3 cantrips known, 2 first-level spell slots. Your spellbook starts with 6 first-level spells; prepare INT mod + 1 each day', 'Arcane Recovery — Once per day during a short rest, recover spell slots totaling up to half your wizard level (rounded up)'], equipment: ['(a) a quarterstaff or (b) a dagger', '(a) a component pouch or (b) an arcane focus', "(a) a scholar's pack or (b) an explorer's pack", 'A spellbook'] },
   Artificer: { desc: 'A magical inventor who infuses items with arcane power. Combines spellcasting with crafting to create magical tools, weapons, and armor.', hitDice: 'd8', hpBase: 8, primaryAbility: 'intelligence', armorProf: 'Light armor, medium armor, shields', weaponProf: 'Simple weapons', toolProf: "Thieves' tools, tinker's tools, one type of artisan's tools", savingThrows: ['constitution', 'intelligence'], skillChoices: ['Arcana', 'History', 'Investigation', 'Medicine', 'Nature', 'Perception', 'Sleight of Hand'], numSkills: 2, subclasses: ['Alchemist', 'Armorer', 'Artillerist', 'Battle Smith'], subclassLevel: 3, subclassDescs: { 'Alchemist': 'Brew magical elixirs that grant random buffs. Healing and support focused.', 'Armorer': 'Infuse armor with magical power. Guardian mode for tanking, Infiltrator for stealth.', 'Artillerist': 'Create magical cannons (force ballista, flamethrower, or protector). Blasting focused.', 'Battle Smith': 'Fight with a Steel Defender companion. Use INT for weapon attacks instead of STR/DEX.' }, spellcasting: true, spellcastingAbility: 'intelligence', features: ['Magical Tinkering — Imbue a tiny nonmagical object with a magical property: emit light, play a sound, emit an odor, or display a short message. INT mod objects at a time', 'Spellcasting (INT) — 2 cantrips known, 2 first-level spell slots. Prepare INT mod + 1 spells each day. Requires tools as a spellcasting focus'], equipment: ['Two any simple weapons', "(a) a light crossbow and 20 bolts or (b) any simple weapon", "(a) a dungeoneer's pack or (b) an explorer's pack", 'Leather armor, any simple weapon, thieves\' tools'] },
 };
@@ -367,6 +367,16 @@ const ARTIFICER_SLOTS = {
   17: [4,3,3,3,1], 18: [4,3,3,3,1], 19: [4,3,3,3,2], 20: [4,3,3,3,2],
 };
 
+// One-third casters (Eldritch Knight / Arcane Trickster): same table in both
+// rulesets, 4 entries [1st..4th], nothing before class level 3.
+export const THIRD_CASTER_SLOTS = {
+  3:  [2,0,0,0], 4:  [3,0,0,0], 5:  [3,0,0,0], 6:  [3,0,0,0],
+  7:  [4,2,0,0], 8:  [4,2,0,0], 9:  [4,2,0,0], 10: [4,3,0,0],
+  11: [4,3,0,0], 12: [4,3,0,0], 13: [4,3,2,0], 14: [4,3,2,0],
+  15: [4,3,2,0], 16: [4,3,3,0], 17: [4,3,3,0], 18: [4,3,3,0],
+  19: [4,3,3,1], 20: [4,3,3,1],
+};
+
 /**
  * Get spell slots for a class at a given level.
  * Returns array of 9 numbers [1st..9th] for standard casters,
@@ -400,6 +410,12 @@ const RULESET_2024_SUBCLASS = {
   Wizard:   { name: 'Arcane Tradition', from: 2 },
 };
 
+// 2024: 2014 placeholders that no longer exist. The 2024 Cleric domains grant
+// features only at 3/6/17 (Divine Strike moved to the class as Blessed Strikes).
+const RULESET_2024_REMOVE = {
+  Cleric: { 2: ['Domain Feature'], 8: ['Domain Feature'] },
+};
+
 // Class feature progression, adjusted for the chosen ruleset.
 export function getClassLevels(className, ruleset = '2014') {
   const base = CLASS_LEVELS[className] || {};
@@ -407,6 +423,10 @@ export function getClassLevels(className, ruleset = '2014') {
   // Copy every level array so we can mutate safely.
   const result = {};
   for (const [lvl, feats] of Object.entries(base)) result[lvl] = [...feats];
+  // Drop 2014 placeholders the 2024 class no longer has.
+  for (const [lvl, names] of Object.entries(RULESET_2024_REMOVE[className] || {})) {
+    if (result[lvl]) result[lvl] = result[lvl].filter(f => !names.includes(f));
+  }
   // Move the subclass-selection feature to level 3.
   const sc = RULESET_2024_SUBCLASS[className];
   if (sc) {
@@ -422,14 +442,35 @@ export function getClassLevels(className, ruleset = '2014') {
       for (const f of feats) if (!result[lvl].includes(f)) result[lvl].push(f);
     }
   }
-  // De-dupe across levels (keep the earliest) so promoted features (e.g. Paladin/
-  // Ranger Spellcasting now at L1) don't also appear at their old level.
+  // De-dupe across levels (keep the earliest) ONLY for the names 2024 promotes
+  // (e.g. Paladin/Ranger Spellcasting now at L1), so they don't also appear at their
+  // old level. 'ASI', '<X> Feature' placeholders and every other name that repeats
+  // by design must stay at every level they appear.
+  const promoted = new Set([
+    ...Object.values(RULESET_2024_ADD[className] || {}).flat(),
+    RULESET_2024_SUBCLASS[className]?.name,
+  ].filter(Boolean));
   const seen = new Set();
   for (let lv = 1; lv <= 20; lv++) {
     if (!result[lv]) continue;
-    result[lv] = result[lv].filter(f => (seen.has(f) ? false : (seen.add(f), true)));
+    result[lv] = result[lv].filter(f => {
+      if (!promoted.has(f)) return true;
+      if (seen.has(f)) return false;
+      seen.add(f);
+      return true;
+    });
   }
   return result;
+}
+
+// Level-1 feature descriptions for the creator. Under 2024 the subclass choice
+// that 2014 made at level 1 (Cleric/Sorcerer/Warlock) is a level-3 feature, so it
+// is left out.
+export function getLevel1Features(className, ruleset = '2014') {
+  const features = CLASSES[className]?.features || [];
+  const moved = ruleset === '2024' ? RULESET_2024_SUBCLASS[className]?.name : null;
+  if (!moved) return features;
+  return features.filter(f => String(f).split(' — ')[0] !== moved);
 }
 
 // 2024: every class chooses its subclass at level 3 (2014 varied: 1/2/3).
@@ -438,9 +479,11 @@ export function getSubclassLevel(className, ruleset = '2014') {
   return CLASSES[className]?.subclassLevel || 3;
 }
 
-export function getSpellSlots(className, level, ruleset = '2014') {
+export function getSpellSlots(className, level, ruleset = '2014', subclass = '') {
   if (!className || !level) return null;
   const cls = className.trim();
+  // Eldritch Knight (Fighter) and Arcane Trickster (Rogue) — 1/3 casters from class level 3.
+  if (isThirdCaster(cls, subclass)) return THIRD_CASTER_SLOTS[level] || null;
   // 2024 Ranger & Paladin cast from level 1 (2 first-level slots); level 2+ matches the half-caster table
   if (ruleset === '2024' && (cls === 'Ranger' || cls === 'Paladin') && level === 1) return [2, 0, 0, 0, 0];
   const fullCasters = ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Wizard'];
@@ -449,7 +492,6 @@ export function getSpellSlots(className, level, ruleset = '2014') {
   if (halfCasters.includes(cls)) return HALF_CASTER_SLOTS[level] || null;
   if (cls === 'Warlock') return { pact: true, ...(WARLOCK_PACT_SLOTS[level] || { slots: 0, level: 0 }) };
   if (cls === 'Artificer') return ARTIFICER_SLOTS[level] || null;
-  // Eldritch Knight (Fighter) and Arcane Trickster (Rogue) — 1/3 casters
   return null;
 }
 
@@ -459,10 +501,21 @@ export function getSpellSlots(className, level, ruleset = '2014') {
 // Arcane Trickster) add level÷3 (down). Warlock's Pact Magic is NOT combined.
 const FULL_CASTERS = ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Wizard'];
 const HALF_CASTERS = ['Paladin', 'Ranger'];
-const isThirdCaster = (c) => (c.class === 'Fighter' && c.subclass === 'Eldritch Knight')
-  || (c.class === 'Rogue' && c.subclass === 'Arcane Trickster');
+// One-third casters are a (class, subclass) pair — the class alone never casts.
+export const THIRD_CASTER_SUBCLASSES = { Fighter: 'Eldritch Knight', Rogue: 'Arcane Trickster' };
+export function isThirdCaster(cls, subclass) {
+  return !!cls && !!subclass && THIRD_CASTER_SUBCLASSES[cls] === subclass;
+}
+// Spellcasting ability for a class entry: the class's own, or INT for a third caster.
+export function spellcastingAbilityFor(cls, subclass) {
+  return CLASSES[cls]?.spellcastingAbility || (isThirdCaster(cls, subclass) ? 'intelligence' : null);
+}
+// Which class spell list a class entry draws from (third casters use the Wizard list).
+export function spellListClassFor(cls, subclass) {
+  return isThirdCaster(cls, subclass) ? 'Wizard' : cls;
+}
 const isStandardCaster = (c) => FULL_CASTERS.includes(c.class) || HALF_CASTERS.includes(c.class)
-  || c.class === 'Artificer' || isThirdCaster(c);
+  || c.class === 'Artificer' || isThirdCaster(c.class, c.subclass);
 
 export function getMulticlassCasterLevel(classes) {
   let cl = 0;
@@ -471,7 +524,7 @@ export function getMulticlassCasterLevel(classes) {
     if (FULL_CASTERS.includes(c.class)) cl += lvl;
     else if (HALF_CASTERS.includes(c.class)) cl += Math.floor(lvl / 2);
     else if (c.class === 'Artificer') cl += Math.ceil(lvl / 2);
-    else if (isThirdCaster(c)) cl += Math.floor(lvl / 3);
+    else if (isThirdCaster(c.class, c.subclass)) cl += Math.floor(lvl / 3);
   }
   return cl;
 }
@@ -492,8 +545,7 @@ export function getMulticlassSpellSlots(classes, ruleset = '2014') {
   if (standardCasters.length === 1) {
     // Single standard caster uses its own class progression table.
     const c = standardCasters[0];
-    standard = getSpellSlots(c.class, c.level, ruleset);
-    // Third-caster single-class returns null (unsupported alone) — leave as null.
+    standard = getSpellSlots(c.class, c.level, ruleset, c.subclass);
   } else if (standardCasters.length > 1) {
     const casterLevel = getMulticlassCasterLevel(standardCasters);
     if (casterLevel > 0) standard = FULL_CASTER_SLOTS[Math.min(casterLevel, 20)] || null;
@@ -553,14 +605,24 @@ export const RACE_DEFENSES = {
   'Half-Orc': { resistances: [], immunities: [], vulnerabilities: [] },
 };
 
-// Class-granted defenses (e.g., Bear Totem Barbarian gets resistance to all damage except psychic while raging)
-export function getClassDefenses(className, level, subclass) {
+// Class-granted defenses. A 2014 Totem Warrior who took the Bear spirit at level 3
+// resists all damage except psychic while raging. The pick is stored as the feature
+// `Totem Spirit (Lv3): Bear` (entries may be objects from old saves) and/or as the
+// level-3 `totem` level choice (bare or class-namespaced key). The 2024 Wild Heart
+// picks its animal each rage, so it stays descriptive.
+export function getClassDefenses(className, level, subclass, { features = [], levelChoices = {} } = {}) {
   const defenses = { resistances: [], immunities: [], vulnerabilities: [] };
   if (className === 'Barbarian') {
     // Rage grants resistance to bludgeoning/piercing/slashing (while raging — always show)
     defenses.resistances.push('Bludgeoning (while raging)', 'Piercing (while raging)', 'Slashing (while raging)');
-    if (subclass === 'Path of the Bear Totem' && level >= 3) {
-      defenses.resistances = ['All except Psychic (while raging)'];
+    if (subclass === 'Path of the Totem Warrior' && level >= 3) {
+      const bearFeature = (features || []).some(f => {
+        const name = typeof f === 'string' ? f : f?.name;
+        return typeof name === 'string' && /^Totem Spirit \(Lv3\):\s*Bear$/.test(name.trim());
+      });
+      const lc = levelChoices || {};
+      const bearChoice = lc['3']?.totem === 'Bear' || lc['Barbarian:3']?.totem === 'Bear';
+      if (bearFeature || bearChoice) defenses.resistances = ['All except Psychic (while raging)'];
     }
   }
   return defenses;

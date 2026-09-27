@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { getLevelChoices, migrateSingleClassChoices, asiChoiceEffect, relocateOrphanedChoices } from './levelChoices';
+import {
+  getLevelChoices, migrateSingleClassChoices, asiChoiceEffect, relocateOrphanedChoices,
+  getHunterOptions, getLandOptions, HUNTER_OPTIONS, LAND_TERRAINS, LAND_TERRAINS_2024,
+} from './levelChoices';
 
 describe('getLevelChoices — every choice knows its own level', () => {
   // Regression: only totem and hunter-option carried `level`. The Progression tab
@@ -153,5 +156,117 @@ describe('relocateOrphanedChoices — repair picks saved under the wrong level',
 
   it('copes with a missing or empty levelChoices', () => {
     expect(relocateOrphanedChoices(undefined, opts('Rogue'))).toEqual({ changed: false, levelChoices: {} });
+  });
+});
+
+// ─── Subclass-dependent choices per ruleset (subclass rework, Increment 6) ───
+
+const typeAt = (choices, type) => choices.find(c => c.type === type);
+
+describe('Circle of the Land — land choice follows the subclass level', () => {
+  it('2024 picks the land at 3, stamped with its edition', () => {
+    expect(getLevelChoices('Druid', 3, 'Circle of the Land', '2024')).toContainEqual(expect.objectContaining({ type: 'land-terrain', edition: '2024' }));
+    expect(typeAt(getLevelChoices('Druid', 2, 'Circle of the Land', '2024'), 'land-terrain')).toBeUndefined();
+  });
+  it('2014 keeps level 2', () => {
+    expect(getLevelChoices('Druid', 2, 'Circle of the Land', '2014')).toContainEqual(expect.objectContaining({ type: 'land-terrain', edition: '2014' }));
+    expect(typeAt(getLevelChoices('Druid', 3, 'Circle of the Land', '2014'), 'land-terrain')).toBeUndefined();
+  });
+});
+
+describe('Hunter — per-edition choice points', () => {
+  const hunterLevels = (rs) => Array.from({ length: 20 }, (_, i) => i + 1)
+    .filter(l => typeAt(getLevelChoices('Ranger', l, 'Hunter', rs), 'hunter-option'));
+  it('2024 chooses at 3 and 7 only; 2014 at 3/7/11/15', () => {
+    expect(hunterLevels('2024')).toEqual([3, 7]);
+    expect(hunterLevels('2014')).toEqual([3, 7, 11, 15]);
+    expect(typeAt(getLevelChoices('Ranger', 7, 'Hunter', '2024'), 'hunter-option')).toMatchObject({ label: 'Defensive Tactics', edition: '2024' });
+  });
+  it('getHunterOptions per edition', () => {
+    expect(getHunterOptions(3, '2024').options.map(o => o.name).sort()).toEqual(['Colossus Slayer', 'Horde Breaker']);
+    expect(getHunterOptions(7, '2024').options.map(o => o.name).sort()).toEqual(['Escape the Horde', 'Multiattack Defense']);
+    expect(getHunterOptions(3, '2014').options).toHaveLength(3);
+  });
+  it('appends a stored pick from the other edition, labelled', () => {
+    const legacy = getHunterOptions(3, '2024', 'Giant Killer').options;
+    expect(legacy).toHaveLength(3);
+    expect(legacy[legacy.length - 1]).toMatchObject({ name: 'Giant Killer', legacy: true });
+    expect(legacy[legacy.length - 1].label).toMatch(/Giant Killer \(2014 rules\)/);
+    expect(getHunterOptions(3, '2014', 'Giant Killer').options).toHaveLength(3);
+    expect(getHunterOptions(3, '2024', 'Colossus Slayer').options).toHaveLength(2);
+  });
+  it('[guard] keeps the 2014 HUNTER_OPTIONS export', () => {
+    expect(Object.keys(HUNTER_OPTIONS)).toEqual(['3', '7', '11', '15']);
+  });
+});
+
+describe('Champion — Additional Fighting Style per edition', () => {
+  it('2024 at 7, 2014 at 10, flagged additional', () => {
+    expect(getLevelChoices('Fighter', 7, 'Champion', '2024')).toContainEqual(expect.objectContaining({ type: 'fighting-style', additional: true }));
+    expect(typeAt(getLevelChoices('Fighter', 10, 'Champion', '2024'), 'fighting-style')).toBeUndefined();
+    expect(getLevelChoices('Fighter', 10, 'Champion', '2014')).toContainEqual(expect.objectContaining({ type: 'fighting-style', additional: true }));
+    expect(typeAt(getLevelChoices('Fighter', 7, 'Champion', '2014'), 'fighting-style')).toBeUndefined();
+    expect(typeAt(getLevelChoices('Fighter', 1, 'Champion', '2014'), 'fighting-style').additional).toBeFalsy();
+  });
+});
+
+describe('Unchanged schedules', () => {
+  it('[guard] a legacy Totem Warrior keeps 3/6/14; Battle Master maneuvers unchanged', () => {
+    expect(typeAt(getLevelChoices('Barbarian', 6, 'Path of the Totem Warrior', '2024'), 'totem')).toBeDefined();
+    expect(typeAt(getLevelChoices('Fighter', 7, 'Battle Master', '2024'), 'maneuvers')).toBeDefined();
+  });
+});
+
+describe('relocateOrphanedChoices — per-edition picks', () => {
+  const opts = (cls, extra = {}) => ({ cls, subclass: '', ruleset: '2014', namespaced: false, ...extra });
+
+  it('[guard] a 2014 Hunter L11 pick stays put under 2024', () => {
+    expect(relocateOrphanedChoices({ 11: { 'hunter-option': 'Volley' } }, opts('Ranger', { subclass: 'Hunter', ruleset: '2024' })).changed).toBe(false);
+  });
+  it('never moves level-specific picks (hunter options, totems)', () => {
+    expect(relocateOrphanedChoices({ 5: { 'hunter-option': 'Colossus Slayer' } }, opts('Ranger', { subclass: 'Hunter' })).changed).toBe(false);
+    expect(relocateOrphanedChoices({ 5: { totem: 'Bear' } }, opts('Barbarian', { subclass: 'Path of the Totem Warrior' })).changed).toBe(false);
+  });
+  it('moves a 2014 land pick to the 2024 card at 3', () => {
+    expect(relocateOrphanedChoices({ 2: { 'land-terrain': 'Forest' } }, opts('Druid', { subclass: 'Circle of the Land', ruleset: '2024' })))
+      .toEqual({ changed: true, levelChoices: { 3: { 'land-terrain': 'Forest' } } });
+    expect(relocateOrphanedChoices({ 'Druid:2': { 'land-terrain': 'Forest' } }, opts('Druid', { subclass: 'Circle of the Land', ruleset: '2024', namespaced: true })).levelChoices)
+      .toEqual({ 'Druid:3': { 'land-terrain': 'Forest' } });
+  });
+  it('a Champion additional style only moves to an additional card', () => {
+    expect(relocateOrphanedChoices({ 7: { 'fighting-style': 'Defense' } }, opts('Fighter', { subclass: 'Champion', ruleset: '2014' })).levelChoices)
+      .toEqual({ 10: { 'fighting-style': 'Defense' } });
+  });
+  it('[guard] a correctly placed 2014 Champion pick never moves', () => {
+    expect(relocateOrphanedChoices({ 10: { 'fighting-style': 'Defense' } }, opts('Fighter', { subclass: 'Champion', ruleset: '2014' })).changed).toBe(false);
+  });
+  it('a 2014 Champion L10 style moves to the 2024 L7 card', () => {
+    expect(relocateOrphanedChoices({ 10: { 'fighting-style': 'Defense' } }, opts('Fighter', { subclass: 'Champion', ruleset: '2024' })).levelChoices)
+      .toEqual({ 7: { 'fighting-style': 'Defense' } });
+  });
+  it('a 2024 Champion with L1 and L7 styles stays put', () => {
+    expect(relocateOrphanedChoices({ 1: { 'fighting-style': 'Dueling' }, 7: { 'fighting-style': 'Defense' } }, opts('Fighter', { subclass: 'Champion', ruleset: '2024' })).changed).toBe(false);
+  });
+});
+
+describe('land option helpers and text', () => {
+  it('lists each edition\'s lands and appends a legacy pick', () => {
+    expect(getLandOptions('2024').map(o => o.name)).toEqual(['Arid', 'Polar', 'Temperate', 'Tropical']);
+    const legacy = getLandOptions('2024', 'Arctic');
+    expect(legacy).toHaveLength(5);
+    expect(legacy[legacy.length - 1]).toMatchObject({ name: 'Arctic', legacy: true });
+    expect(legacy[legacy.length - 1].label).toMatch(/\(2014 rules\)/);
+    expect(getLandOptions('2024', 'Polar')).toHaveLength(4);
+    const other = getLandOptions('2014', 'Polar');
+    expect(other[other.length - 1].label).toMatch(/\(2024 rules\)/);
+  });
+  it('land tables keep their keys and list every circle spell', () => {
+    expect(Object.keys(LAND_TERRAINS)).toEqual(['Arctic', 'Coast', 'Desert', 'Forest', 'Grassland', 'Mountain', 'Swamp', 'Underdark']);
+    expect(Object.keys(LAND_TERRAINS_2024)).toEqual(['Arid', 'Polar', 'Temperate', 'Tropical']);
+    expect(LAND_TERRAINS.Arctic).toContain('Ice Storm');
+    expect(LAND_TERRAINS.Arctic).toContain('Freedom of Movement');
+    expect(LAND_TERRAINS.Swamp).toContain("Melf's Acid Arrow");
+    expect(LAND_TERRAINS.Swamp).toContain('Scrying');
+    expect(LAND_TERRAINS_2024.Polar).toContain('Ray of Frost');
   });
 });

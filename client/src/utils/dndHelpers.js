@@ -1,5 +1,6 @@
-import { XP_THRESHOLDS, RARITY_COLORS, CANTRIPS_KNOWN, SPELLS_KNOWN } from './dndConstants';
+import { XP_THRESHOLDS, RARITY_COLORS, CANTRIPS_KNOWN, SPELLS_KNOWN, SUBCLASS_UNARMORED_AC } from './dndConstants';
 import { parseDiceFormula } from './diceFormula';   // no imports of its own — no cycle
+import { thirdCasterSpellInfo } from './subclassData'; // subclassData never imports dndHelpers — no cycle
 
 // ─── Core Helpers ────────────────────────────────────────────────────
 
@@ -16,12 +17,21 @@ export function hitDiceAfterLongRest(total, remaining) {
 }
 
 // Base AC with no armor on. Unarmored Defense: Barbarian 10 + DEX + CON (a shield
-// still allowed), Monk 10 + DEX + WIS (only without a shield). Alternative AC
-// formulas don't stack — use the best one available. The shield's +2 is added by the caller.
-export function unarmoredBaseAC(classNames, { dex = 0, con = 0, wis = 0 } = {}, hasShield = false) {
+// still allowed), Monk 10 + DEX + WIS (only without a shield). Subclass formulas come
+// from SUBCLASS_UNARMORED_AC (Draconic Bloodline 13 + DEX, Draconic Sorcery 10 + DEX + CHA;
+// shield allowed). Alternative AC formulas don't stack — use the best one available.
+// `classes` may hold class-name strings or getCharClasses `{ class, subclass }` objects.
+// The shield's +2 is added by the caller.
+export function unarmoredBaseAC(classes, { dex = 0, con = 0, wis = 0, cha = 0 } = {}, hasShield = false) {
+  const entries = (classes || []).map(c => (typeof c === 'string' ? { class: c, subclass: '' } : { class: c?.class, subclass: c?.subclass || '' }));
+  const mods = { dex, con, wis, cha };
   let ac = 10 + dex;
-  if (classNames.includes('Barbarian')) ac = Math.max(ac, 10 + dex + con);
-  if (classNames.includes('Monk') && !hasShield) ac = Math.max(ac, 10 + dex + wis);
+  for (const e of entries) {
+    if (e.class === 'Barbarian') ac = Math.max(ac, 10 + dex + con);
+    if (e.class === 'Monk' && !hasShield) ac = Math.max(ac, 10 + dex + wis);
+    const formula = SUBCLASS_UNARMORED_AC[e.subclass];
+    if (formula) ac = Math.max(ac, formula.base + formula.add.reduce((sum, ab) => sum + (mods[ab] || 0), 0));
+  }
   return ac;
 }
 
@@ -64,7 +74,10 @@ export function hpColor(current, max) {
 
 // ─── Spell Helpers ───────────────────────────────────────────────────
 
-export function maxSpellLevel(cls, lvl, ruleset = '2014') {
+export function maxSpellLevel(cls, lvl, ruleset = '2014', subclass = '') {
+  // Eldritch Knight / Arcane Trickster: 1/3 caster from class level 3.
+  const third = thirdCasterSpellInfo(cls, subclass, lvl, ruleset);
+  if (third) return third.maxLevel;
   if (['Bard','Cleric','Druid','Sorcerer','Wizard'].includes(cls)) {
     if (lvl >= 17) return 9; if (lvl >= 15) return 8; if (lvl >= 13) return 7;
     if (lvl >= 11) return 6; if (lvl >= 9) return 5; if (lvl >= 7) return 4;
@@ -87,7 +100,15 @@ export function maxSpellLevel(cls, lvl, ruleset = '2014') {
   return 0;
 }
 
-export function getSpellInfo(cls, lvl, abilityMod, CLASSES, ruleset = '2014') {
+export function getSpellInfo(cls, lvl, abilityMod, CLASSES, ruleset = '2014', subclass = '') {
+  // Eldritch Knight / Arcane Trickster — their class alone never casts, so this
+  // runs before the CLASSES[cls].spellcasting gate. Counts live in one table.
+  const third = thirdCasterSpellInfo(cls, subclass, lvl, ruleset);
+  if (third) {
+    return third.type === 'prepared'
+      ? { cantrips: third.cantrips, prepareCount: third.spells, type: 'prepared', maxLevel: third.maxLevel }
+      : { cantrips: third.cantrips, spellsKnown: third.spells, type: 'known', maxLevel: third.maxLevel };
+  }
   const hasSpells = CLASSES[cls]?.spellcasting;
   if (!hasSpells) return null;
   // 2024 Paladin/Ranger gain Spellcasting at level 1; in 2014 they start at level 2.

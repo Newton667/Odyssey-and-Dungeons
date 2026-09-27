@@ -44,7 +44,7 @@ export const FEATURE_DESCRIPTIONS = {
   'Superior Inspiration': 'When you roll initiative and have no Bardic Inspiration uses left, you regain one.',
 
   // ── Cleric ──
-  'Divine Domain': 'Choose your Cleric subclass (Divine Domain) at 1st level, gaining domain spells and features.',
+  'Divine Domain': 'Choose your Cleric subclass (Divine Domain), gaining domain spells and features.',
   'Destroy Undead': 'When you Turn Undead, undead of a low enough challenge rating are instantly destroyed instead of turned (CR threshold rises with level).',
   'Divine Intervention': 'Call on your deity to intervene: roll d100, succeeding if you roll under your cleric level (automatic at 20th level).',
 
@@ -81,7 +81,7 @@ export const FEATURE_DESCRIPTIONS = {
   'Divine Sense': 'As an action, detect celestials, fiends, and undead within 60 feet until the end of your next turn. Uses equal to 1 + your Charisma modifier per long rest.',
   'Lay on Hands': 'You have a pool of healing equal to 5 × your paladin level. As an action, touch a creature to restore HP from the pool, or spend 5 points to cure a disease or neutralize a poison.',
   'Divine Smite': 'When you hit with a melee weapon, expend a spell slot to deal an extra 2d8 radiant damage (+1d8 per slot level above 1st, and extra against undead and fiends).',
-  'Sacred Oath': 'Choose your Paladin subclass (Sacred Oath) at 3rd level, gaining oath spells and Channel Divinity options.',
+  'Sacred Oath': 'Choose your Paladin subclass (Sacred Oath), gaining oath spells and Channel Divinity options.',
   'Aura of Protection': 'You and friendly creatures within 10 feet add your Charisma modifier (minimum +1) to saving throws.',
   'Aura of Courage': "You and friendly creatures within 10 feet can't be frightened while you are conscious.",
   'Improved Divine Smite': 'Your melee weapon hits deal an extra 1d8 radiant damage.',
@@ -112,13 +112,13 @@ export const FEATURE_DESCRIPTIONS = {
   'Stroke of Luck': 'Once per short or long rest, turn a missed attack into a hit or a failed ability check into a 20.',
 
   // ── Sorcerer ──
-  'Sorcerous Origin': 'Choose your Sorcerer subclass (Origin) at 1st level, gaining its features.',
+  'Sorcerous Origin': 'Choose your Sorcerer subclass (Sorcerous Origin), gaining its features.',
   'Font of Magic': 'You have Sorcery Points you can convert to and from spell slots and use to fuel Metamagic.',
   'Metamagic': 'Alter your spells using Metamagic options (e.g., Twinned, Quickened, Subtle Spell) by spending Sorcery Points.',
   'Sorcerous Restoration': 'You regain 4 expended Sorcery Points when you finish a short rest.',
 
   // ── Warlock ──
-  'Otherworldly Patron': 'Choose your Warlock subclass (Patron) at 1st level, gaining its features and expanded spells.',
+  'Otherworldly Patron': 'Choose your Warlock subclass (Otherworldly Patron), gaining its features and patron spells.',
   'Pact Magic': 'You cast spells using a small number of slots that are always your highest level and recover on a short rest (see the Spells tab).',
   'Eldritch Invocations': 'You learn Eldritch Invocations — magical abilities that enhance your warlock (listed in your Features).',
   'Pact Boon': 'Gain a Pact Boon: Pact of the Chain, Pact of the Blade, or Pact of the Tome.',
@@ -127,7 +127,7 @@ export const FEATURE_DESCRIPTIONS = {
 
   // ── Wizard ──
   'Arcane Recovery': 'Once per day on a short rest, recover expended spell slots with a combined level up to half your wizard level (rounded up).',
-  'Arcane Tradition': 'Choose your Wizard subclass (Arcane Tradition) at 2nd level, gaining its features.',
+  'Arcane Tradition': 'Choose your Wizard subclass (Arcane Tradition), gaining its features.',
   'Spell Mastery': 'Choose a 1st- and a 2nd-level spell you can cast at will without expending a spell slot.',
   'Signature Spells': 'Choose two 3rd-level spells you always have prepared and can each cast once without a slot per short rest.',
 

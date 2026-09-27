@@ -3,6 +3,8 @@
 
 import { getSubclassLevel } from './classData';
 import { FEAT_ABILITY_BONUSES } from './dndConstants';
+import { subclassEdition } from './subclassData';      // subclassData never imports levelChoices — no cycle
+import { LAND_SPELLS_2014, LAND_SPELLS_2024 } from './subclassSpells';
 
 export const METAMAGIC_OPTIONS = {
   'Careful Spell': 'Spend 1 sorcery point: chosen creatures auto-succeed on your spell\'s saving throw.',
@@ -112,16 +114,69 @@ export const HUNTER_OPTIONS = {
   },
 };
 
-export const LAND_TERRAINS = {
-  'Arctic': 'Bonus spells: Hold Person, Spike Growth, Sleet Storm, Slow, Commune with Nature, Cone of Cold',
-  'Coast': 'Bonus spells: Mirror Image, Misty Step, Water Breathing, Water Walk, Conjure Elemental, Scrying',
-  'Desert': 'Bonus spells: Blur, Silence, Create Food and Water, Protection from Energy, Blight, Hallucinatory Terrain',
-  'Forest': 'Bonus spells: Barkskin, Spider Climb, Call Lightning, Plant Growth, Divination, Freedom of Movement',
-  'Grassland': 'Bonus spells: Invisibility, Pass Without Trace, Daylight, Haste, Divination, Freedom of Movement',
-  'Mountain': 'Bonus spells: Spider Climb, Spike Growth, Lightning Bolt, Meld into Stone, Passwall, Stone Shape',
-  'Swamp': 'Bonus spells: Darkness, Acid Arrow, Water Walk, Stinking Cloud, Freedom of Movement, Locate Creature',
-  'Underdark': 'Bonus spells: Spider Climb, Web, Gaseous Form, Stinking Cloud, Greater Invisibility, Cloudkill',
+// 2024 Hunter: two choice points only (3 and 7); 11 and 15 are fixed features.
+export const HUNTER_OPTIONS_2024 = {
+  3: {
+    label: "Hunter's Prey",
+    options: {
+      'Colossus Slayer': 'Once per turn, deal an extra 1d8 damage to a creature that is missing any of its HP.',
+      'Horde Breaker': 'Once per turn, make one extra attack with the same weapon against a different creature within 5 ft of the original target.',
+    },
+  },
+  7: {
+    label: 'Defensive Tactics',
+    options: {
+      'Escape the Horde': 'Opportunity attacks against you have disadvantage.',
+      'Multiattack Defense': 'After a creature hits you, its other attack rolls against you this turn have disadvantage.',
+    },
+  },
 };
+
+const withEditionLabel = (name, desc, edition) => ({
+  name, desc: desc || '', label: edition ? `${name} (${edition} rules)` : `${name} (custom)`, legacy: !!edition,
+});
+
+/**
+ * The Hunter card for `level` under a subclass edition: `{ label, options: [{ name, desc, label?, legacy }] }`,
+ * or null when that level has no card. A stored `current` pick that isn't one of the
+ * options (e.g. a 2014 "Giant Killer" on a 2024 card) is appended with its edition
+ * label, so it is always visible and selected.
+ */
+export function getHunterOptions(level, edition = '2014', current = '') {
+  const is24 = edition === '2024';
+  const entry = (is24 ? HUNTER_OPTIONS_2024 : HUNTER_OPTIONS)[level];
+  if (!entry) return null;
+  const options = Object.entries(entry.options).map(([name, desc]) => ({ name, desc, legacy: false }));
+  if (current && !entry.options[current]) {
+    const other = is24 ? HUNTER_OPTIONS : HUNTER_OPTIONS_2024;
+    const found = Object.values(other).find(e => e.options[current]);
+    options.push(withEditionLabel(current, found?.options[current], found ? (is24 ? '2014' : '2024') : null));
+  }
+  return { label: entry.label, options };
+}
+
+// Circle of the Land — descriptions are generated from the always-prepared spell
+// tables (subclassSpells.js), so they always list every circle spell.
+const landDescs = (table) => Object.fromEntries(Object.entries(table).map(([land, byLevel]) => [
+  land, `Always-prepared circle spells: ${Object.values(byLevel).flat().join(', ')}`,
+]));
+export const LAND_TERRAINS = landDescs(LAND_SPELLS_2014);
+export const LAND_TERRAINS_2024 = landDescs(LAND_SPELLS_2024);
+
+/**
+ * Land options for a subclass edition: `[{ name, desc, label?, legacy }]`. A stored
+ * `current` land from the other edition is appended with its edition label.
+ */
+export function getLandOptions(edition = '2014', current = '') {
+  const is24 = edition === '2024';
+  const table = is24 ? LAND_TERRAINS_2024 : LAND_TERRAINS;
+  const options = Object.entries(table).map(([name, desc]) => ({ name, desc, legacy: false }));
+  if (current && !table[current]) {
+    const other = is24 ? LAND_TERRAINS : LAND_TERRAINS_2024;
+    options.push(withEditionLabel(current, other[current], other[current] ? (is24 ? '2014' : '2024') : null));
+  }
+  return options;
+}
 
 export const FAVORED_ENEMIES = [
   'Aberrations', 'Beasts', 'Celestials', 'Constructs', 'Dragons',
@@ -154,8 +209,11 @@ export function getLevelChoices(cls, level, subclass, ruleset = '2014') {
   if ((cls === 'Fighter' && level === 1) || (cls === 'Paladin' && level === 2) || (cls === 'Ranger' && level === 2)) {
     choices.push({ type: 'fighting-style', label: 'Choose a Fighting Style' });
   }
-  if (cls === 'Fighter' && subclass === 'Champion' && level === 10) {
-    choices.push({ type: 'fighting-style', label: 'Additional Fighting Style' });
+  // Champion: Additional Fighting Style — 2014 at 10, 2024 at 7. Flagged `additional`
+  // so the sheet stores it beside (not over) the level-1 style.
+  if (cls === 'Fighter' && subclass === 'Champion'
+    && level === (subclassEdition('Fighter', subclass, ruleset) === '2024' ? 7 : 10)) {
+    choices.push({ type: 'fighting-style', label: 'Additional Fighting Style', additional: true });
   }
 
   // Subclass — ruleset-aware (2024: every class at level 3)
@@ -199,13 +257,16 @@ export function getLevelChoices(cls, level, subclass, ruleset = '2014') {
   }
 
   // Ranger (Hunter) subfeatures
+  // (the options follow the subclass's own edition, so a legacy pick keeps its cards)
   if (cls === 'Ranger' && subclass === 'Hunter') {
-    if (HUNTER_OPTIONS[level]) choices.push({ type: 'hunter-option', label: HUNTER_OPTIONS[level].label, level });
+    const edition = subclassEdition('Ranger', subclass, ruleset);
+    const card = getHunterOptions(level, edition);
+    if (card) choices.push({ type: 'hunter-option', label: card.label, level, edition });
   }
 
-  // Druid (Circle of the Land) — terrain
-  if (cls === 'Druid' && subclass === 'Circle of the Land' && level === 2) {
-    choices.push({ type: 'land-terrain', label: 'Choose Your Land' });
+  // Druid (Circle of the Land) — land, chosen when the subclass is (2014: 2, 2024: 3)
+  if (cls === 'Druid' && subclass === 'Circle of the Land' && level === getSubclassLevel('Druid', ruleset)) {
+    choices.push({ type: 'land-terrain', label: 'Choose Your Land', edition: subclassEdition('Druid', subclass, ruleset) });
   }
 
   // Expertise
@@ -256,10 +317,27 @@ export function asiChoiceEffect(selection, featAbility) {
 // no card shows it — and picking again re-applied an ASI. Move each orphan to the nearest card
 // of that type at or below its key (else the nearest above) that has no pick yet; leave it
 // where it is when there's no such card. Returns { changed, levelChoices } (a new object).
+//
+// Two exceptions:
+// - LEVEL_SPECIFIC_CHOICES (totems, Hunter options) are never moved. Their options
+//   differ per level (and per edition), and they were always stored under their own
+//   level, so they are never old-save orphans — moving one would put a pick on a card
+//   whose options don't include it (e.g. a 2014 Hunter's L11 "Volley" onto the 2024
+//   L7 Defensive Tactics card after a ruleset switch).
+// - A Champion's Additional Fighting Style (a `fighting-style` pick at 7 or 10) may only
+//   move to a card whose choice is `additional`, never onto the level-1 class style card.
+//   typesAt and the stored entry both go through choiceKey, so a correctly placed pick
+//   is recognised as its own card's.
+const LEVEL_SPECIFIC_CHOICES = new Set(['totem', 'hunter-option']);
+const CHAMPION_ADDITIONAL_LEVELS = [7, 10];
+const choiceKey = (type, additional) => type + (additional ? ':additional' : '');
+
 export function relocateOrphanedChoices(levelChoices, { cls, subclass = '', ruleset = '2014', namespaced = false }) {
   const prefix = namespaced ? `${cls}:` : '';
   const out = Object.fromEntries(Object.entries(levelChoices || {}).map(([k, v]) => [k, v && typeof v === 'object' ? { ...v } : v]));
-  const typesAt = (lvl) => new Set(getLevelChoices(cls, lvl, subclass, ruleset).map(c => c.type));
+  const typesAt = (lvl) => new Set(getLevelChoices(cls, lvl, subclass, ruleset).map(c => choiceKey(c.type, c.additional)));
+  const storedKey = (type, lvl) => choiceKey(type, type === 'fighting-style' && cls === 'Fighter'
+    && subclass === 'Champion' && CHAMPION_ADDITIONAL_LEVELS.includes(lvl));
   const keyLevel = (k) => {
     if (!k.startsWith(prefix)) return null;
     const rest = k.slice(prefix.length);
@@ -273,11 +351,13 @@ export function relocateOrphanedChoices(levelChoices, { cls, subclass = '', rule
     if (!entry || typeof entry !== 'object') continue;
     const here = typesAt(level);
     for (const type of Object.keys(entry)) {
-      if (type === 'asiAbility' || here.has(type) || entry[type] == null) continue;
+      if (type === 'asiAbility' || LEVEL_SPECIFIC_CHOICES.has(type) || entry[type] == null) continue;
+      const key = storedKey(type, level);
+      if (here.has(key)) continue;
       const below = [];
       const above = [];
       for (let l = 1; l <= 20; l++) {
-        if (!typesAt(l).has(type) || out[`${prefix}${l}`]?.[type] != null) continue;
+        if (!typesAt(l).has(key) || out[`${prefix}${l}`]?.[type] != null) continue;
         (l <= level ? below : above).push(l);
       }
       const target = below.length ? below[below.length - 1] : above[0];

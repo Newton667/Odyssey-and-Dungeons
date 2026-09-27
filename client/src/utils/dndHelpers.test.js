@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames, weaponRangeText, cantripDamage, cantripTierBonus, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, trimSpellPicks } from './dndHelpers';
+import { modVal, profBonus, maxSpellLevel, weaponDamageDice, weaponDamageFormula, normalizeFeatNames, weaponRangeText, cantripDamage, cantripTierBonus, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, trimSpellPicks, getSpellInfo } from './dndHelpers';
+import { CLASSES } from './classData';
 import { parseDiceFormula } from './diceFormula';
 
 // Seed test suite — also the reference pattern for tests written by /execute.
@@ -309,6 +310,25 @@ describe('unarmoredBaseAC', () => {
   it('never drops below 10 + DEX even with negative CON/WIS', () => {
     expect(unarmoredBaseAC(['Barbarian'], { dex: 2, con: -1, wis: 0 }, false)).toBe(12);
   });
+
+  // Subclass rework: entries may be getCharClasses objects, and Draconic adds a formula.
+  it('Draconic Bloodline 13 + DEX, shield allowed', () => {
+    expect(unarmoredBaseAC([{ class: 'Sorcerer', subclass: 'Draconic Bloodline' }], { dex: 3 })).toBe(16);
+    expect(unarmoredBaseAC([{ class: 'Sorcerer', subclass: 'Draconic Bloodline' }], { dex: 3 }, true)).toBe(16);
+  });
+  it('Draconic Sorcery 10 + DEX + CHA', () => {
+    expect(unarmoredBaseAC([{ class: 'Sorcerer', subclass: 'Draconic Sorcery' }], { dex: 3, cha: 4 })).toBe(17);
+    expect(unarmoredBaseAC([{ class: 'Sorcerer', subclass: 'Wild Magic' }], { dex: 3 })).toBe(13);
+  });
+  it('object entries keep Unarmored Defense', () => {
+    expect(unarmoredBaseAC([{ class: 'Barbarian', subclass: '' }], { dex: 2, con: 3, wis: 1 })).toBe(15);
+    expect(unarmoredBaseAC([{ class: 'Monk', subclass: '' }], { dex: 2, con: 3, wis: 1 }, true)).toBe(12);
+    expect(unarmoredBaseAC([{ class: 'Monk', subclass: '' }], { dex: 2, con: 3, wis: 1 }, false)).toBe(13);
+  });
+  it('best of, never stacked; mixed entry shapes', () => {
+    expect(unarmoredBaseAC([{ class: 'Monk', subclass: '' }, { class: 'Sorcerer', subclass: 'Draconic Bloodline' }], { dex: 3, wis: 1 })).toBe(16);
+    expect(unarmoredBaseAC(['Barbarian', { class: 'Sorcerer', subclass: 'Draconic Bloodline' }], { dex: 2, con: 0 })).toBe(15);
+  });
 });
 
 // Martial Arts die by MONK level (PHB p.76): d4 / d6 at 5 / d8 at 11 / d10 at 17.
@@ -363,5 +383,41 @@ describe('trimSpellPicks', () => {
     const info = { cantrips: 3, prepareCount: 3, maxLevel: 1 };
     expect(trimSpellPicks({ cantrips: ['Shield', 'Light', 'Light'], spells: ['Light', 'Shield', 'Shield'], available, spellInfo: info }))
       .toEqual({ cantrips: ['Light'], spells: ['Shield'] });
+  });
+});
+
+describe('maxSpellLevel — third casters', () => {
+  it('follows the one-third caster schedule', () => {
+    expect(maxSpellLevel('Fighter', 3, '2014', 'Eldritch Knight')).toBe(1);
+    expect(maxSpellLevel('Fighter', 7, '2014', 'Eldritch Knight')).toBe(2);
+    expect(maxSpellLevel('Fighter', 13, '2014', 'Eldritch Knight')).toBe(3);
+    expect(maxSpellLevel('Fighter', 19, '2014', 'Eldritch Knight')).toBe(4);
+  });
+
+  it('[guard] nothing before 3, for other subclasses, or without a subclass', () => {
+    expect(maxSpellLevel('Fighter', 2, '2014', 'Eldritch Knight')).toBe(0);
+    expect(maxSpellLevel('Fighter', 20, '2014', 'Champion')).toBe(0);
+    expect(maxSpellLevel('Fighter', 3, '2014')).toBe(0);
+  });
+});
+
+describe('getSpellInfo — third casters', () => {
+  it('2014 knows spells, 2024 prepares them', () => {
+    expect(getSpellInfo('Fighter', 10, 3, CLASSES, '2014', 'Eldritch Knight')).toEqual({ cantrips: 3, spellsKnown: 7, type: 'known', maxLevel: 2 });
+    expect(getSpellInfo('Fighter', 10, 3, CLASSES, '2024', 'Eldritch Knight')).toEqual({ cantrips: 3, prepareCount: 7, type: 'prepared', maxLevel: 2 });
+    expect(getSpellInfo('Rogue', 3, 3, CLASSES, '2014', 'Arcane Trickster')).toEqual({ cantrips: 2, spellsKnown: 3, type: 'known', maxLevel: 1 });
+  });
+
+  it('[guard] null before 3 and for other subclasses', () => {
+    expect(getSpellInfo('Fighter', 2, 3, CLASSES, '2014', 'Eldritch Knight')).toBe(null);
+    expect(getSpellInfo('Fighter', 10, 3, CLASSES, '2014', 'Champion')).toBe(null);
+  });
+
+  it('[guard] the subclass argument changes nothing for any other class', () => {
+    for (const c of Object.keys(CLASSES).filter(c => c !== 'Fighter' && c !== 'Rogue')) {
+      for (let l = 1; l <= 20; l++) {
+        for (const r of ['2014', '2024']) expect(getSpellInfo(c, l, 3, CLASSES, r, 'X'), `${c} ${l} ${r}`).toEqual(getSpellInfo(c, l, 3, CLASSES, r));
+      }
+    }
   });
 });

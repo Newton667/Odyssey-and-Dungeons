@@ -28,6 +28,31 @@ All notable changes to OND (Odyssey & Dragons) will be documented in this file.
 
 ## vX.X.X — Unreleased
 
+## v1.9.0 — 2026-09-27
+
+### Added
+- **2024 subclasses.** Characters using the 2024 rules now choose from the 2024 Player's Handbook subclasses (for example Path of the World Tree, College of Dance, Circle of the Sea, Psi Warrior, Warrior of Mercy, Soulknife, Aberrant Sorcery, Celestial Patron) and see their features at the 2024 levels. 2014 characters keep the 2014 subclasses exactly as before.
+- **Eldritch Knight and Arcane Trickster can cast spells.** Spell slots, cantrips, spells known (2014) or prepared (2024), save DC and spell attack now work on the sheet, in the creator and in the editor, including when multiclassed. 2014 characters follow the school limits (Abjuration/Evocation or Enchantment/Illusion, with the any-school picks at 3, 8, 14 and 20). Arcane Tricksters always have Mage Hand.
+- **Subclass spells are applied automatically.** Domain, oath, circle (including your chosen land) and 2024 patron/origin spells appear on the Spells tab as always prepared and don't count against your limit. 2014 Warlock patron spells are added to the list you can pick from.
+- **Draconic resilience.** Draconic Bloodline (2014) gives unarmored AC 13 + DEX, and Draconic Sorcery (2024) gives 10 + DEX + CHA. Both add +1 max HP per Sorcerer level when you take the subclass or level up. Existing Draconic characters are not changed; add any missing HP in the editor's Max HP. Switching *away* from a Draconic subclass never lowers your Max HP automatically (older characters never got the bonus) — the sheet reminds you to lower it in the editor if it was added.
+
+### Changed
+- **The editor's Subclass field is now a list** of your class's subclasses for your ruleset. A subclass you already have that isn't in the list (from the other ruleset, or a custom name) stays selected and is kept.
+- **A subclass from the other ruleset is kept, not replaced.** If you switch a character's ruleset, the subclass keeps its own features, shown with "(2014 rules)" or "(2024 rules)"; you can pick a new one on the Progression tab or in the editor.
+- **The character creator asks for the ruleset on the Class step**, so the subclass list matches the rules you're using. Level-1 features no longer list a subclass choice that comes at level 3 under the 2024 rules.
+- **Circle of the Land spell lists** now show all eight spells for each 2014 land.
+- **The Progression tab names your subclass features** on every level that grants one (for example the 2014 Cleric's level-1 domain feature), not only on levels with a "Domain Feature"-style placeholder.
+- **New 2024 subclass choices that the app has no picker for yet** — for example the Wild Heart's animal options or the Beast Master's companion type — are shown as feature descriptions only for now.
+
+### Fixed
+- **2024 characters get every Ability Score Improvement.** The 2024 class progression kept only the level-4 ASI, so the creator allowed one feat/ASI at any level and the sheet's Progression and feature lists lost later ASIs and subclass-feature levels.
+- **2024 Circle of the Land Druids can choose their land** (the choice was stuck at level 2, before the subclass unlocks).
+- **Bear Totem Barbarians get resistance to all damage except psychic while raging.**
+- **Multiclass rows in the creator can't pick a subclass before the level that unlocks it.**
+- **A Champion's Additional Fighting Style no longer replaces the first one**, and 2024 Champions get it at level 7.
+- **2024 Hunter Rangers** get the 2024 choices (Hunter's Prey and Defensive Tactics) instead of the 2014 ones.
+- **Class feature text no longer says a subclass is chosen at level 1 or 2** when the 2024 rules choose it at level 3. The 2024 Cleric's progression no longer shows domain features at levels 2 and 8.
+
 ## v1.8.1 — 2026-09-13
 
 ### Changed

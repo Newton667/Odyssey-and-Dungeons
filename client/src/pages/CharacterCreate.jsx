@@ -11,12 +11,13 @@ import {
   MULTICLASS_REQS, RACIAL_SPELL_MAP, RACIAL_SKILL_CHOICES, RACIAL_TOOL_CHOICES,
   KOBOLD_LEGACY_OPTIONS, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, CANTRIPS_KNOWN,
   SPELLS_KNOWN, CLASS_RECOMMENDED_GEAR, ALL_LANGUAGES, ARMORS, BACKGROUNDS, RARITY_COLORS,
-  PB_COSTS, MAGIC_INITIATE_CLASSES,
+  PB_COSTS, MAGIC_INITIATE_CLASSES, SUBCLASS_UNARMORED_AC,
 } from '../utils/dndConstants';
-import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras, trimSpellPicks } from '../utils/dndHelpers';
-import { RACES, CLASSES, getClassLevels, getSubclassLevel } from '../utils/classData';
+import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, getSpellInfo, getArmorCategories, canUseShield, countLangExtras, trimSpellPicks, unarmoredBaseAC } from '../utils/dndHelpers';
+import { RACES, CLASSES, getClassLevels, getSubclassLevel, getLevel1Features, spellcastingAbilityFor, spellListClassFor } from '../utils/classData';
+import { getSubclasses, getSubclassDesc, offeredSubclass, subclassHpBonus, getSubclassSpells, thirdCasterSpellInfo, thirdCasterSchoolStatus } from '../utils/subclassData';
 import { formatHitDice } from '../utils/multiclass';
-import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
+import { queryLocalEquipment, queryLocalSpells, getAllLocalSpells } from '../data/localDataService';
 
 const STEPS = ['Race', 'Class', 'Background', 'Abilities', 'Skills', 'Details', 'Combat', 'Equipment', 'Spells', 'Extras', 'Review'];
 
@@ -202,6 +203,23 @@ export default function CharacterCreate() {
 
   const bgSkills = useMemo(() => background && BACKGROUNDS[background] ? BACKGROUNDS[background].skills : [], [background]);
   const classData = useMemo(() => cls ? CLASSES[cls] : null, [cls]);
+  // The subclass as it will be saved: only when this ruleset offers it at this level.
+  // HP, AC and spells use this, so a stale pick (other ruleset, level lowered) never counts.
+  const activeSubclass = offeredSubclass(cls, subclass, level, ruleset);
+
+  // Clear subclass picks the current class/ruleset no longer offers (e.g. a 2014
+  // Knowledge Domain after switching to 2024), on the main class and every extra row.
+  useEffect(() => {
+    if (subclass && !getSubclasses(cls, ruleset).includes(subclass)) setSubclass('');
+    setExtraClasses(prev => {
+      let changed = false;
+      const next = prev.map(ec => {
+        if (ec.subclass && !getSubclasses(ec.class, ruleset).includes(ec.subclass)) { changed = true; return { ...ec, subclass: '' }; }
+        return ec;
+      });
+      return changed ? next : prev;
+    });
+  }, [cls, ruleset]);
   const numClassSkills = classData?.numSkills || 0;
   const classSkillChoices = classData?.skillChoices || [];
   // Proficiencies chosen for feats like Skilled — split into skills vs tools by whether they're in ALL_SKILLS.
@@ -255,13 +273,15 @@ export default function CharacterCreate() {
     const dexMod = modVal(finalScores.dexterity || 10);
     const conMod = modVal(finalScores.constitution || 10);
     const wisMod = modVal(finalScores.wisdom || 10);
+    const chaMod = modVal(finalScores.charisma || 10);
     const shield = hasShield ? 2 : 0;
 
     if (!selectedArmor || selectedArmor === 'none') {
       // Unarmored — check class special
       if (cls === 'Barbarian') return 10 + dexMod + conMod + shield;
       if (cls === 'Monk') return 10 + dexMod + wisMod; // monks can't use shields
-      return 10 + dexMod + shield;
+      // Subclass formulas (Draconic 13 + DEX / 10 + DEX + CHA) — best of, shield allowed.
+      return unarmoredBaseAC([{ class: cls, subclass: activeSubclass }], { dex: dexMod, cha: chaMod }, hasShield) + shield;
     }
 
     const armor = ARMORS[selectedArmor];
@@ -271,7 +291,7 @@ export default function CharacterCreate() {
     if (armor.category === 'medium') return armor.base + Math.min(dexMod, 2) + shield;
     if (armor.category === 'heavy') return armor.base + shield;
     return 10 + dexMod + shield;
-  }, [selectedArmor, hasShield, finalScores, cls]);
+  }, [selectedArmor, hasShield, finalScores, cls, activeSubclass]);
 
   // Available armor options for this class
   const availableArmors = useMemo(() => {
@@ -368,16 +388,22 @@ export default function CharacterCreate() {
     for (const feat of selectedFeats) {
       if (FEAT_HP_PER_LEVEL[feat]) hp += FEAT_HP_PER_LEVEL[feat] * totalLevel;
     }
+    // Subclass HP (Draconic resilience: +1 per Sorcerer level) for every class with a saved subclass
+    hp += subclassHpBonus({ class: cls, subclass: activeSubclass, level });
+    cleanExtraClasses.forEach(ec => {
+      hp += subclassHpBonus({ class: ec.class, subclass: offeredSubclass(ec.class, ec.subclass, ec.level, ruleset), level: ec.level });
+    });
     return Math.max(1, hp);
-  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, cleanExtraClasses, totalLevel, selectedFeats]);
+  }, [classData, finalScores, level, hpMethod, rolledHpPerLevel, cleanExtraClasses, totalLevel, selectedFeats, cls, activeSubclass, ruleset]);
 
   // Spell info for current class/level
   const spellInfo = useMemo(() => {
     if (!cls) return null;
-    const ability = CLASSES[cls]?.spellcastingAbility;
+    // A third-caster subclass (Eldritch Knight / Arcane Trickster) casts with INT.
+    const ability = spellcastingAbilityFor(cls, activeSubclass);
     const abilityMod = ability ? modVal(finalScores[ability] || 10) : 0;
-    return getSpellInfo(cls, level, abilityMod, CLASSES, ruleset);
-  }, [cls, level, finalScores, ruleset]);
+    return getSpellInfo(cls, level, abilityMod, CLASSES, ruleset, activeSubclass);
+  }, [cls, level, finalScores, ruleset, activeSubclass]);
 
   // Fetch spells when the class changes OR starts casting. Level and ruleset are set on
   // later steps, so a Paladin/Ranger passes through here at 2014 level 1 (no Spellcasting);
@@ -389,10 +415,16 @@ export default function CharacterCreate() {
       return;
     }
     setLoadingSpells(true);
-    const data = queryLocalSpells({ cls });
+    // EK/AT draw from the Wizard list; a 2014 Warlock patron's expanded spells widen the list.
+    let data = queryLocalSpells({ cls: spellListClassFor(cls, activeSubclass) });
+    const expanded = getSubclassSpells(cls, activeSubclass, level, ruleset).expanded;
+    if (expanded.length) {
+      const have = new Set(data.map(s => s.name));
+      data = data.concat(getAllLocalSpells().filter(s => expanded.includes(s.name) && !have.has(s.name)));
+    }
     setAvailableSpells(data);
     setLoadingSpells(false);
-  }, [cls, canCast]);
+  }, [cls, canCast, activeSubclass, ruleset, level]);
 
   // What the character will actually be saved with — picks that went stale when an earlier
   // choice changed (another class, a lower level) are dropped here, and the Review shows the same.
@@ -491,8 +523,9 @@ export default function CharacterCreate() {
     // the user then switched away from must not be saved (nor a language twice).
     const allLanguages = [...new Set([...fixedRaceLangs, ...extraLanguages.slice(0, totalLangExtras).filter(Boolean)])];
     const allToolProfs = [...new Set([...bgToolProfs.filter(t => t !== "Artisan's tools" && t !== 'Gaming set' && t !== 'Musical instrument'), ...toolProfs.slice(0, toolChoiceCount).filter(Boolean)])];
-    const savedSubclass = subclassUnlocked ? subclass : '';
-    const multiclassRows = cleanExtraClasses.map(ec => ({ class: ec.class, subclass: ec.subclass || '', level: Math.max(1, ec.level || 1) }));
+    // Only a subclass this ruleset offers at this level is saved (primary and multiclass rows).
+    const savedSubclass = activeSubclass;
+    const multiclassRows = cleanExtraClasses.map(ec => ({ class: ec.class, subclass: offeredSubclass(ec.class, ec.subclass, Math.max(1, ec.level || 1), ruleset), level: Math.max(1, ec.level || 1) }));
     const savedClasses = multiclassRows.length > 0 ? [{ class: cls, subclass: savedSubclass, level }, ...multiclassRows] : null;
     try {
       const { ok, data } = await createCharacter({
@@ -859,7 +892,20 @@ export default function CharacterCreate() {
       {step === 1 && (
         <div>
           <h3 style={{ fontSize: '18px', marginBottom: '4px', color: 'var(--gold)' }}>Choose Your Class</h3>
-          <p style={{ color: 'var(--text-dim)', fontSize: '13px', marginBottom: '20px' }}>Your class defines your hit dice, proficiencies, and playstyle.</p>
+          <p style={{ color: 'var(--text-dim)', fontSize: '13px', marginBottom: '12px' }}>Your class defines your hit dice, proficiencies, and playstyle.</p>
+          {/* Ruleset first: the subclass list and the level it unlocks at depend on it. Same state as the Combat step's card. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px' }}>Ruleset</span>
+            {['2014', '2024'].map(r => (
+              <button key={r} type="button" onClick={() => setRuleset(r)}
+                style={{ padding: '4px 12px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 700,
+                  background: ruleset === r ? 'var(--gold)' : 'var(--surface)',
+                  border: `1px solid ${ruleset === r ? 'var(--gold)' : 'var(--border)'}`,
+                  color: ruleset === r ? 'var(--bg-dark)' : 'var(--text-dim)' }}>
+                {r === '2014' ? '2014 (Classic)' : '2024 (Revised)'}
+              </button>
+            ))}
+          </div>
           <div className="grid-3">
             {Object.entries(CLASSES).map(([cName, cData]) => (
               <Tip key={cName} text={cData.desc}>
@@ -901,7 +947,7 @@ export default function CharacterCreate() {
               {classData.features && (
                 <div style={{ marginBottom: '14px' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>Level 1 Features</div>
-                  {classData.features.map((f, i) => {
+                  {getLevel1Features(cls, ruleset).map((f, i) => {
                     const [fName, ...rest] = f.split(' — ');
                     return (
                       <div key={i} style={{ fontSize: '12px', marginBottom: '4px' }}>
@@ -915,8 +961,8 @@ export default function CharacterCreate() {
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '6px', textTransform: 'uppercase' }}>Subclasses (lvl {getSubclassLevel(cls, ruleset)})</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {classData.subclasses?.map(sc => (
-                    <Tip key={sc} text={classData.subclassDescs?.[sc]}>
+                  {getSubclasses(cls, ruleset).map(sc => (
+                    <Tip key={sc} text={getSubclassDesc(cls, sc, ruleset)}>
                       <span style={{ fontSize: '12px', padding: '3px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'help', color: 'var(--text)' }}>{sc}</span>
                     </Tip>
                   ))}
@@ -1211,7 +1257,7 @@ export default function CharacterCreate() {
               <Field label={`Subclass${classData && !subclassUnlocked ? ` (lvl ${getSubclassLevel(cls, ruleset)}+)` : ''}`}>
                 <select value={subclass} onChange={e => setSubclass(e.target.value)} disabled={!subclassUnlocked}>
                   <option value="">— Choose {subclassUnlocked ? 'subclass' : 'later'} —</option>
-                  {classData?.subclasses.map(sc => <option key={sc}>{sc}</option>)}
+                  {getSubclasses(cls, ruleset).map(sc => <option key={sc}>{sc}</option>)}
                 </select>
               </Field>
               <Field label="Faith / Deity">
@@ -1331,7 +1377,7 @@ export default function CharacterCreate() {
                 <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>Armor Class</div>
                 <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--gold)' }}>{armorClass}</div>
                 <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
-                  {selectedArmor && selectedArmor !== 'none' ? selectedArmor : (cls === 'Barbarian' ? 'Unarmored (DEX+CON)' : cls === 'Monk' ? 'Unarmored (DEX+WIS)' : 'Unarmored')}
+                  {selectedArmor && selectedArmor !== 'none' ? selectedArmor : (cls === 'Barbarian' ? 'Unarmored (DEX+CON)' : cls === 'Monk' ? 'Unarmored (DEX+WIS)' : SUBCLASS_UNARMORED_AC[activeSubclass] ? 'Unarmored (Draconic)' : 'Unarmored')}
                   {hasShield ? ' + Shield' : ''}
                 </div>
               </div>
@@ -1422,12 +1468,19 @@ export default function CharacterCreate() {
                       </select>
                       <NumInput min={1} max={20} value={ec.level || 1} style={{ width: '60px' }}
                         onChange={v => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], level: v }; return n; })} />
-                      {ec.class && CLASSES[ec.class] && (
-                        <select value={ec.subclass} onChange={e => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], subclass: e.target.value }; return n; })}>
-                          <option value="">— Subclass —</option>
-                          {CLASSES[ec.class].subclasses.map(sc => <option key={sc}>{sc}</option>)}
-                        </select>
-                      )}
+                      {ec.class && CLASSES[ec.class] && (() => {
+                        // Same gate as the main class: no subclass before the level that unlocks it.
+                        const scLevel = getSubclassLevel(ec.class, ruleset);
+                        const unlocked = (ec.level || 1) >= scLevel;
+                        return (
+                          <select value={unlocked ? ec.subclass : ''} disabled={!unlocked}
+                            title={unlocked ? undefined : `${ec.class} chooses a subclass at level ${scLevel}`}
+                            onChange={e => setExtraClasses(prev => { const n = [...prev]; n[i] = { ...n[i], subclass: e.target.value }; return n; })}>
+                            <option value="">{unlocked ? '— Subclass —' : `— Subclass (lvl ${scLevel}+) —`}</option>
+                            {getSubclasses(ec.class, ruleset).map(sc => <option key={sc}>{sc}</option>)}
+                          </select>
+                        );
+                      })()}
                       {ec.class && !meetsReq && (
                         <span style={{ fontSize: '11px', color: 'var(--red-light, #f06060)', padding: '2px 6px', background: 'var(--surface)', border: '1px solid var(--red-light, #f06060)', borderRadius: '4px', opacity: 0.9 }}>
                           Requires: {Object.entries(MULTICLASS_REQS[ec.class]).filter(([k]) => k !== '_or').map(([ab, min]) => `${ABBR[ab]} ${min}`).join(', ')}
@@ -1701,7 +1754,9 @@ export default function CharacterCreate() {
               </p>
               <p style={{ fontSize: '12px', color: 'var(--text-dim)', textAlign: 'center' }}>
                 {cls && ['Paladin','Ranger'].includes(cls) && level < 2 && `${cls}s gain spellcasting at level 2.`}
-                {cls && !CLASSES[cls]?.spellcasting && 'This class does not have innate spellcasting.'}
+                {cls && ['Fighter','Rogue'].includes(cls)
+                  ? 'Fighters and Rogues cast spells only as an Eldritch Knight or Arcane Trickster, from level 3 (choose the subclass on the Details step).'
+                  : cls && !CLASSES[cls]?.spellcasting && 'This class does not have innate spellcasting.'}
               </p>
             </div>
           ) : (
@@ -1711,6 +1766,19 @@ export default function CharacterCreate() {
                 {spellInfo.type === 'prepared' && `As a level ${level} ${cls}, you know ${spellInfo.cantrips} cantrips and can prepare up to ${spellInfo.prepareCount} spells (up to level ${spellInfo.maxLevel}).`}
                 {spellInfo.type === 'spellbook' && `As a level ${level} ${cls}, you know ${spellInfo.cantrips} cantrips. Your spellbook holds ${spellInfo.spellsKnown} spells — you can prepare ${spellInfo.prepareCount} per day (up to level ${spellInfo.maxLevel}).`}
               </p>
+              {(() => {
+                // Display only — subclass spells are derived on the sheet, never saved into preparedSpells.
+                const granted = [
+                  ...getSubclassSpells(cls, activeSubclass, level, ruleset).alwaysPrepared,
+                  ...(thirdCasterSpellInfo(cls, activeSubclass, level, ruleset)?.alwaysKnownCantrips || []),
+                ];
+                if (!granted.length) return null;
+                return (
+                  <p style={{ color: 'var(--text-dim)', fontSize: '12px', margin: '-8px 0 0' }}>
+                    Always prepared from {activeSubclass}: <span style={{ color: 'var(--gold)' }}>{granted.join(', ')}</span> (don't count against your picks)
+                  </p>
+                );
+              })()}
 
               {/* Search */}
               <div style={{ position: 'relative' }}>
@@ -1824,6 +1892,13 @@ export default function CharacterCreate() {
                         {spellInfo.maxLevel > 0 && (() => {
                           const maxCount = spellInfo.spellsKnown || spellInfo.prepareCount || 0;
                           const label = spellInfo.type === 'known' ? 'Known' : spellInfo.type === 'spellbook' ? 'Spellbook' : 'Prepared';
+                          // 2014 EK/AT: off-school picks are limited to the any-school allowance.
+                          const thirdInfo = thirdCasterSpellInfo(cls, activeSubclass, level, ruleset);
+                          const schoolStatus = thirdInfo?.schools
+                            ? thirdCasterSchoolStatus({ info: thirdInfo, pickedSpells: availableSpells.filter(s => selectedSpells.includes(s.name)), otherListClasses: [] })
+                            : null;
+                          const schoolBlocked = (spell) => !!schoolStatus?.atLimit
+                            && thirdCasterSchoolStatus({ info: thirdInfo, pickedSpells: [spell], otherListClasses: [] }).offSchool === 1;
                           return (
                             <div className="card">
                               <h4 style={{ fontSize: '14px', marginBottom: '4px' }}>
@@ -1849,7 +1924,7 @@ export default function CharacterCreate() {
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '6px' }}>
                                       {spellsAtLevel.map(spell => {
                                         const sel = selectedSpells.includes(spell.name);
-                                        const full = selectedSpells.length >= maxCount;
+                                        const full = selectedSpells.length >= maxCount || (!sel && schoolBlocked(spell));
                                         return renderSpellCard(spell, sel, full, () => {
                                           if (sel) setSelectedSpells(p => p.filter(n => n !== spell.name));
                                           else if (!full) setSelectedSpells(p => [...p, spell.name]);
@@ -2187,10 +2262,11 @@ export default function CharacterCreate() {
                   <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '6px' }}>{name || '(unnamed)'}</div>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
                     {race && <span className="badge badge-race">{race}{subrace ? ` · ${subrace}` : ''}</span>}
-                    {cls && <span className="badge badge-class">{cls} {level}{subclass ? ` · ${subclass}` : ''}</span>}
-                    {multiclassEnabled && extraClasses.filter(ec => ec.class).map((ec, i) => (
-                      <span key={i} className="badge badge-class">{ec.class} {ec.level}{ec.subclass ? ` · ${ec.subclass}` : ''}</span>
-                    ))}
+                    {cls && <span className="badge badge-class">{cls} {level}{activeSubclass ? ` · ${activeSubclass}` : ''}</span>}
+                    {multiclassEnabled && extraClasses.filter(ec => ec.class).map((ec, i) => {
+                      const ecSub = offeredSubclass(ec.class, ec.subclass, ec.level || 1, ruleset);
+                      return <span key={i} className="badge badge-class">{ec.class} {ec.level}{ecSub ? ` · ${ecSub}` : ''}</span>;
+                    })}
                     {multiclassEnabled && <span className="badge badge-level">Total Lvl {totalLevel}</span>}
                     {!multiclassEnabled && <span className="badge badge-level">Level {level}</span>}
                     {background && <span className="badge" style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}>{background}</span>}
@@ -2284,7 +2360,7 @@ export default function CharacterCreate() {
             {classData?.features && (
               <div className="card" style={{ gridColumn: '1 / -1' }}>
                 <h4 style={{ fontSize: '12px', marginBottom: '10px', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Level 1 Class Features</h4>
-                {classData.features.map((f, i) => {
+                {getLevel1Features(cls, ruleset).map((f, i) => {
                   const [fName, ...rest] = f.split(' — ');
                   return (
                     <div key={i} style={{ fontSize: '12px', marginBottom: '6px' }}>

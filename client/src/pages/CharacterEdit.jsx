@@ -6,10 +6,12 @@ import Tip from '../components/Tip';
 import {
   ABILITIES, ABBR, ALIGNMENTS, ALL_SKILLS, SKILLS_WITH_ABILITY, STANDARD_ARRAY, PB_COSTS,
   TOOL_OPTIONS, FEATS, FEAT_EFFECTS, FEAT_PROFICIENCY_GRANTS, FEAT_ABILITY_BONUSES, FEAT_HP_PER_LEVEL, RARITY_COLORS, RARITY_ORDER, HIT_DICE,
-  CANTRIPS_KNOWN, SPELLS_KNOWN, BACKGROUNDS, MAGIC_INITIATE_CLASSES,
+  CANTRIPS_KNOWN, SPELLS_KNOWN, BACKGROUNDS, MAGIC_INITIATE_CLASSES, SUBCLASS_HP_PER_LEVEL,
 } from '../utils/dndConstants';
 import { modVal, modStr, profBonus, xpForLevel, rarityColor, rarityBg, maxSpellLevel, normalizeFeatNames } from '../utils/dndHelpers';
-import { CLASSES, RACES, SAVING_THROWS_BY_CLASS } from '../utils/classData';
+import { CLASSES, RACES, SAVING_THROWS_BY_CLASS, getSubclassLevel, spellcastingAbilityFor, spellListClassFor } from '../utils/classData';
+import { subclassSelectOptions, subclassEdition, subclassHpDelta, thirdCasterSpellInfo, thirdCasterSchoolStatus } from '../utils/subclassData';
+import { extraSpellNames, getAlwaysPreparedSpells } from '../utils/spellAccess';
 import { getCharClasses, isMulticlass, syncPrimaryFromClasses, formatHitDice, formatClasses } from '../utils/multiclass';
 import { queryLocalEquipment, queryLocalSpells } from '../data/localDataService';
 import { readHomebrew } from '../utils/homebrew';
@@ -40,11 +42,8 @@ const ASI_LEVELS = {
 
 const SPELLCASTING_CLASSES = ['Bard', 'Cleric', 'Druid', 'Sorcerer', 'Warlock', 'Wizard', 'Paladin', 'Ranger', 'Artificer'];
 
-// Spellcasting ability by class
-const CLASS_SPELL_ABILITY = {
-  Bard: 'charisma', Cleric: 'wisdom', Druid: 'wisdom', Paladin: 'charisma',
-  Ranger: 'wisdom', Sorcerer: 'charisma', Warlock: 'charisma', Wizard: 'intelligence', Artificer: 'intelligence',
-};
+// Spellcasting ability: derived per class entry with spellcastingAbilityFor(cls, subclass)
+// (classData), which also covers Eldritch Knight / Arcane Trickster.
 
 // `featNames` are the character's normalised feat names. Magic Initiate grants
 // 2 cantrips + 1 first-level spell on top of any class allowance — and to a
@@ -55,7 +54,7 @@ const CLASS_SPELL_ABILITY = {
 const MAGIC_INITIATE_CANTRIPS = 2;
 const MAGIC_INITIATE_SPELLS = 1;
 
-function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014', featNames = []) {
+function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014', featNames = [], subclass = '') {
   const mi = featNames.includes('Magic Initiate');
   // A feat-only caster: no class spellcasting at all, but the feat still grants
   // spells. Level 1 is the cap — Magic Initiate never scales past 1st level.
@@ -67,6 +66,19 @@ function getSpellLimits(cls, lvl, abilityMod, ruleset = '2014', featNames = []) 
   const featOnly = () => (mi
     ? { cantrips: MAGIC_INITIATE_CANTRIPS, maxSpells: MAGIC_INITIATE_SPELLS, type: 'prepared', maxLevel: 1, featOnly: true, ...bonus }
     : null);
+
+  // Eldritch Knight / Arcane Trickster: the class alone never casts, so this runs before the
+  // class gate. Numbers come from the shared third-caster table; Magic Initiate stacks as usual.
+  const third = thirdCasterSpellInfo(cls, subclass, lvl, ruleset);
+  if (third) {
+    return {
+      cantrips: third.cantrips + (mi ? MAGIC_INITIATE_CANTRIPS : 0),
+      maxSpells: third.spells + bonus.bonusSpells,
+      type: third.type,
+      maxLevel: Math.max(third.maxLevel, mi ? 1 : 0),
+      ...bonus,
+    };
+  }
 
   if (!SPELLCASTING_CLASSES.includes(cls)) return featOnly();
   // 2024 Paladin/Ranger gain Spellcasting at level 1; in 2014 they start at level 2.
@@ -297,23 +309,32 @@ export default function CharacterEdit() {
   // Caster classes with their OWN levels. For a multiclass character, limits used to come
   // from the primary class at the total level (Fighter 5 / Wizard 3 → "not a spellcaster";
   // Wizard 3 / Fighter 5 → 4th-level spells).
+  // (Includes a third-caster subclass — Eldritch Knight / Arcane Trickster — with INT.)
   const formCasterClasses = useMemo(
-    () => getCharClasses(form).filter(c => SPELLCASTING_CLASSES.includes(c.class)),
+    () => getCharClasses(form).filter(c => spellcastingAbilityFor(c.class, c.subclass)),
     [form.class, form.level, form.subclass, form.classes],
   );
-  const casterKey = formCasterClasses.map(c => c.class).join('|');
+  // The spell LISTS those classes draw from (a third caster uses the Wizard list).
+  const casterKey = formCasterClasses.map(c => spellListClassFor(c.class, c.subclass)).join('|');
+  // 2014 Warlock patron expanded spells widen the list without being prepared.
+  const extrasKey = [...extraSpellNames(form)].sort().join('|');
+  // Subclass spells the character always has prepared — shown separately, never counted.
+  const alwaysPreparedNames = useMemo(() => getAlwaysPreparedSpells(form).map(a => a.name),
+    [form.class, form.level, form.subclass, form.classes, form.ruleset, form.features, form.levelChoices]);
   const [allSpells, setAllSpells] = useState([]);
   useEffect(() => {
     const castingClasses = casterKey ? casterKey.split('|') : [];
+    const extras = extrasKey ? new Set(extrasKey.split('|')) : new Set();
     if (!castingClasses.length && !featClasses.length) { setAllSpells([]); return; }
     setSpellLoading(true);
     const byId = new Map();
     for (const cls of [...castingClasses, ...featClasses].filter(Boolean)) {
       for (const sp of queryLocalSpells({ cls })) if (!byId.has(sp._id)) byId.set(sp._id, sp);
     }
+    if (extras.size) for (const sp of queryLocalSpells({})) if (extras.has(sp.name) && !byId.has(sp._id)) byId.set(sp._id, sp);
     setAllSpells([...byId.values()]);
     setSpellLoading(false);
-  }, [casterKey, featClasses]);
+  }, [casterKey, featClasses, extrasKey]);
 
   // Auto-calculate proficiency bonus from level
   const computedProfBonus = useMemo(() => profBonus(form.level || 1), [form.level]);
@@ -357,7 +378,8 @@ export default function CharacterEdit() {
   // Spell limits
   // The creator never saves `spellcastingAbility`, so fall back to the caster class's own
   // ability — otherwise every new character's prepared-spell limit ignored its modifier.
-  const castingAbility = form.spellcastingAbility || CLASS_SPELL_ABILITY[formCasterClasses[0]?.class || form.class] || '';
+  const castingAbility = form.spellcastingAbility
+    || spellcastingAbilityFor(formCasterClasses[0]?.class || form.class, formCasterClasses[0] ? formCasterClasses[0].subclass : form.subclass) || '';
   const spellcastingMod = useMemo(() => {
     if (!castingAbility || !scores[castingAbility]) return 0;
     return modVal(scores[castingAbility]);
@@ -367,12 +389,12 @@ export default function CharacterEdit() {
     const ruleset = form.ruleset || '2014';
     if (formCasterClasses.length <= 1) {
       const c = formCasterClasses[0];
-      return getSpellLimits(c ? c.class : form.class, c ? c.level : (form.level || 1), spellcastingMod, ruleset, featNames);
+      return getSpellLimits(c ? c.class : form.class, c ? c.level : (form.level || 1), spellcastingMod, ruleset, featNames, c ? c.subclass : form.subclass);
     }
     // Two or more caster classes: add up each class's allowance at its own level (using
     // its own casting ability); Magic Initiate's bonus is counted once.
     const parts = formCasterClasses.map((c, i) => getSpellLimits(
-      c.class, c.level, modVal(scores[CLASS_SPELL_ABILITY[c.class]] ?? 10), ruleset, i === 0 ? featNames : [],
+      c.class, c.level, modVal(scores[spellcastingAbilityFor(c.class, c.subclass)] ?? 10), ruleset, i === 0 ? featNames : [], c.subclass,
     )).filter(Boolean);
     if (!parts.length) return null;
     return {
@@ -404,7 +426,7 @@ export default function CharacterEdit() {
     const newAsi = (ASI_LEVELS[newClass] || []).filter(l => l <= (form.level || 1)).length;
     const oldIsCaster = SPELLCASTING_CLASSES.includes(oldClass);
     const newIsCaster = SPELLCASTING_CLASSES.includes(newClass);
-    const newSpellAbility = CLASS_SPELL_ABILITY[newClass] || '';
+    const newSpellAbility = spellcastingAbilityFor(newClass, '') || '';
 
     // Set dialog with loading state
     setClassChangeDialog({
@@ -614,10 +636,13 @@ export default function CharacterEdit() {
                             if (isMulticlass(form)) {
                               // Advance the primary class and re-sync summary fields
                               const classes = getCharClasses(form).map(c => ({ ...c }));
+                              const beforeEntry = { ...classes[0] };
                               classes[0].level += 1;
                               const hd = CLASSES[classes[0].class]?.hitDice || HIT_DICE[classes[0].class] || 'd8';
                               const avg = Math.floor(parseInt(hd.replace('d', '')) / 2) + 1;
-                              const hpGain = Math.max(1, avg + conMod) + featHp;
+                              // Subclass HP (Draconic resilience: +1 per Sorcerer level) on the level-up event
+                              const subHp = subclassHpDelta(beforeEntry, classes[0]);
+                              const hpGain = Math.max(1, avg + conMod) + featHp + subHp;
                               const patch = syncPrimaryFromClasses(classes);
                               set('classes', patch.classes);
                               set('level', patch.level);
@@ -627,14 +652,18 @@ export default function CharacterEdit() {
                               set('maxHp', (form.maxHp || 0) + hpGain);
                               setPendingHpGain(g => g + hpGain);
                               set('hitDice', formatHitDice({ classes }));
-                              alert(`${classes[0].class} leveled to ${classes[0].level} (total ${patch.level}). +${hpGain} HP.`);
+                              alert(`${classes[0].class} leveled to ${classes[0].level} (total ${patch.level}). +${hpGain} HP${subHp ? ` (incl. +${subHp} Draconic)` : ''}.`);
                               return;
                             }
                             const newLevel = (form.level || 1) + 1;
                             const hd = HIT_DICE[form.class] || 'd8';
                             const dieMax = parseInt(hd.replace('d', ''));
                             const avg = Math.floor(dieMax / 2) + 1;
-                            const hpGain = Math.max(1, avg + conMod) + featHp;
+                            const subHp = subclassHpDelta(
+                              { class: form.class, subclass: form.subclass || '', level: form.level || 1 },
+                              { class: form.class, subclass: form.subclass || '', level: newLevel },
+                            );
+                            const hpGain = Math.max(1, avg + conMod) + featHp + subHp;
                             const newMaxHp = (form.maxHp || 0) + hpGain;
                             const newPB = newLevel <= 4 ? 2 : newLevel <= 8 ? 3 : newLevel <= 12 ? 4 : newLevel <= 16 ? 5 : 6;
                             set('level', newLevel);
@@ -642,7 +671,7 @@ export default function CharacterEdit() {
                             setPendingHpGain(g => g + hpGain);
                             set('hitDice', `${newLevel}${hd}`);
                             set('proficiencyBonus', newPB);
-                            alert(`Leveled up to ${newLevel}!\n+${hpGain} HP (${hd} avg ${avg} + ${conMod} CON${featHp ? ` + ${featHp} feats` : ''})\nNew Max HP: ${newMaxHp}`);
+                            alert(`Leveled up to ${newLevel}!\n+${hpGain} HP (${hd} avg ${avg} + ${conMod} CON${featHp ? ` + ${featHp} feats` : ''}${subHp ? ` + ${subHp} Draconic` : ''})\nNew Max HP: ${newMaxHp}`);
                           }}>
                           Lv Up
                         </button>
@@ -718,12 +747,48 @@ export default function CharacterEdit() {
                 <div style={st.grid2}>
                   <div>
                     <label style={st.label}>Subclass</label>
-                    <input style={st.input} value={form.subclass} onChange={e => {
-                      const v = e.target.value;
-                      setForm(prev => (isMulticlass(prev)
-                        ? { ...prev, subclass: v, classes: getCharClasses(prev).map((c, i) => (i === 0 ? { ...c, subclass: v } : c)) }
-                        : { ...prev, subclass: v }));
-                    }} />
+                    {(() => {
+                      // The class's subclasses for this ruleset. A value that isn't in the list (from the
+                      // other ruleset, or a custom name) is appended and kept — never destroyed.
+                      const rs = form.ruleset || '2014';
+                      const primary = getCharClasses(form)[0];
+                      const primaryClass = primary?.class || form.class || '';
+                      const primaryLevel = primary?.level || form.level || 1;
+                      const unlockLevel = getSubclassLevel(primaryClass, rs);
+                      const current = form.subclass || '';
+                      const options = subclassSelectOptions(primaryClass, current, rs);
+                      const locked = primaryLevel < unlockLevel && !current;
+                      const inList = options.find(o => o.value === current && !o.legacy && !o.label.endsWith('(custom)'));
+                      const edition = current && !inList ? subclassEdition(primaryClass, current, rs) : null;
+                      return (
+                        <>
+                          <select style={st.input} value={current} disabled={locked} onChange={e => {
+                            const v = e.target.value;
+                            // Write both the summary field and classes[0] (a one-element classes array is not authoritative).
+                            setForm(prev => (isMulticlass(prev)
+                              ? { ...prev, subclass: v, classes: getCharClasses(prev).map((c, i) => (i === 0 ? { ...c, subclass: v } : c)) }
+                              : { ...prev, subclass: v }));
+                          }}>
+                            <option value="">— None —</option>
+                            {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          {locked && primaryClass && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{primaryClass} chooses a subclass at level {unlockLevel}.</div>
+                          )}
+                          {current && !inList && edition && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>From the {edition} rules — its features are kept</div>
+                          )}
+                          {current && !inList && !edition && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>Not a built-in subclass — no features will be listed</div>
+                          )}
+                          {SUBCLASS_HP_PER_LEVEL[current] && primaryClass === 'Sorcerer' && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>
+                              <strong style={{ color: 'var(--gold)' }}>{current}</strong>: Draconic resilience adds +{SUBCLASS_HP_PER_LEVEL[current]} max HP per Sorcerer level — adjust <strong>Max HP</strong> if this is a new pick.
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div>
                     <label style={st.label}>Background</label>
@@ -1347,19 +1412,29 @@ export default function CharacterEdit() {
             // Separate current spells into cantrips vs leveled based on allSpells data
             const spellsByName = {};
             allSpells.forEach(s => { spellsByName[s.name] = s; });
-            const currentCantrips = currentSpells.filter(name => spellsByName[name]?.level === 0);
-            const currentLeveled = currentSpells.filter(name => spellsByName[name] && spellsByName[name].level > 0);
+            // Always-prepared subclass spells never count against the limits.
+            const granted = new Set(alwaysPreparedNames);
+            const currentCantrips = currentSpells.filter(name => spellsByName[name]?.level === 0 && !granted.has(name));
+            const currentLeveled = currentSpells.filter(name => spellsByName[name] && spellsByName[name].level > 0 && !granted.has(name));
+            // 2014 EK/AT school budget (off-school Wizard picks limited to the any-school allowance).
+            // Override lifts it like every other limit; skipped when the character also has Wizard levels.
+            const schoolRules = spellOverride || getCharClasses(form).some(c => c.class === 'Wizard') ? [] : getCharClasses(form)
+              .map(c => ({ subclass: c.subclass, info: thirdCasterSpellInfo(c.class, c.subclass, c.level, form.ruleset || '2014') }))
+              .filter(x => x.info?.schools)
+              .map(x => ({ ...x, status: thirdCasterSchoolStatus({ info: x.info, pickedSpells: currentLeveled.map(n => spellsByName[n]), otherListClasses: featClasses }) }));
+            const schoolBlock = (spell) => schoolRules.find(r => r.status.atLimit
+              && thirdCasterSchoolStatus({ info: r.info, pickedSpells: [spell], otherListClasses: featClasses }).offSchool === 1);
             const currentOther = currentSpells.filter(name => !spellsByName[name]); // racial/multiclass spells not in this class list
 
             const filteredSpells = spellSearch
               ? allSpells.filter(s => s.name.toLowerCase().includes(spellSearch.toLowerCase()))
               : allSpells;
 
-            const renderSpellCard = (spell, sel, full, onToggle) => {
+            const renderSpellCard = (spell, sel, full, onToggle, title) => {
               const isOpen = expandedSpell === spell._id;
               const tooHigh = spellLimits && spell.level > 0 && spell.level > spellLimits.maxLevel;
               return (
-                <div key={spell._id} style={{
+                <div key={spell._id} title={title} style={{
                   borderRadius: '6px',
                   background: sel ? 'var(--accent)' : 'var(--input-bg)',
                   border: sel ? '1px solid var(--gold-dim)' : '1px solid var(--border)',
@@ -1522,6 +1597,16 @@ export default function CharacterEdit() {
                     {spellLimits.type === 'prepared' && `As a level ${form.level} ${form.class}, you know ${spellLimits.cantrips} cantrips and can prepare up to ${spellLimits.maxSpells} spells (up to level ${spellLimits.maxLevel}).`}
                     {spellLimits.type === 'spellbook' && `As a level ${form.level} ${form.class}, you know ${spellLimits.cantrips} cantrips. Your spellbook holds ${spellLimits.maxSpells} spells — you can prepare ${spellLimits.prepareCount} per day (up to level ${spellLimits.maxLevel}).`}
                   </p>
+                  {alwaysPreparedNames.length > 0 && (
+                    <p style={{ color: 'var(--text-dim)', fontSize: '12px', margin: '-8px 0 16px' }}>
+                      Always prepared (subclass): <span style={{ color: 'var(--gold)' }}>{alwaysPreparedNames.join(', ')}</span> — shown on the sheet, not counted here.
+                    </p>
+                  )}
+                  {schoolRules.map(r => (
+                    <p key={r.subclass} style={{ color: 'var(--text-dim)', fontSize: '12px', margin: '-8px 0 16px' }}>
+                      {r.subclass} spells must be {r.info.schools.join(' or ')} ({r.status.offSchool} of {r.status.allowed} any-school picks used).
+                    </p>
+                  ))}
 
                   {/* Search */}
                   <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -1598,12 +1683,14 @@ export default function CharacterEdit() {
                                       // the class allowance is spent, only level-1 picks remain.
                                       const baseMax = maxCount - (spellLimits.bonusSpells || 0);
                                       const bonusCap = spellLimits.bonusMaxLevel ?? Infinity;
+                                      const blockedBy = !sel ? schoolBlock(spell) : null;
                                       const full = currentLeveled.length >= maxCount
-                                        || (currentLeveled.length >= baseMax && spLvl > bonusCap);
+                                        || (currentLeveled.length >= baseMax && spLvl > bonusCap)
+                                        || !!blockedBy;
                                       return renderSpellCard(spell, sel, full, () => {
                                         if (sel) set('preparedSpells', currentSpells.filter(n => n !== spell.name));
                                         else if (!full) set('preparedSpells', [...currentSpells, spell.name]);
-                                      });
+                                      }, blockedBy ? `${blockedBy.subclass} spells must be ${blockedBy.info.schools.join(' or ')} (${blockedBy.status.offSchool} of ${blockedBy.status.allowed} any-school picks used)` : undefined);
                                     })}
                                   </div>
                                 </div>

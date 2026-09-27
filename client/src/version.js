@@ -1,2 +1,2 @@
 // Auto-read from CHANGELOG.md — update this when you bump version
-export const VERSION = 'v1.8.1';
+export const VERSION = 'v1.9.0';

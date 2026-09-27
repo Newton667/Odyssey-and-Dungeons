@@ -55,14 +55,77 @@ the selected ASI also re-applied it.
   once on load with `relocateOrphanedChoices` (a pick whose key level has no choice of that type
   moves to the nearest free card of that type at or below it, else above). Without that, removing
   the cross-level fallback made those picks look unchosen and re-picking applied the ASI twice.
+- **Some picks must never be relocated.** `relocateOrphanedChoices` skips
+  `LEVEL_SPECIFIC_CHOICES = new Set(['totem', 'hunter-option'])`: their options differ per level (and,
+  for the Hunter, per edition), and they were always stored under their own level, so they are never
+  old-save orphans. It runs on every `char.ruleset` change — without the exclusion a 2014 Hunter's L11
+  "Volley" moved onto the 2024 L7 Defensive Tactics card, whose options don't include it.
+- **The Champion's Additional Fighting Style is its own card and its own feature.** `getLevelChoices`
+  flags it `additional: true` (2014 at level 10, 2024 at 7). The sheet stores it as
+  `Fighting Style (Champion): X` and leaves `fightingStyle` / the `Fighting Style: X` feature alone —
+  it used to overwrite them, so the level-1 style was lost. The `fightingStyles` regex reads both.
+  In relocation, `typesAt` and the stored entry share one key function
+  (`type + (additional ? ':additional' : '')`, a `fighting-style` pick at 7 or 10 on a Champion being
+  "additional"), so an additional-style orphan only moves to an additional card, never the L1 style
+  card, and a correctly placed pick is recognised as its own card's.
+- **Subclass-dependent choices follow the subclass's own edition.** Hunter options, the Champion level
+  and the Circle of the Land card (at `getSubclassLevel('Druid', ruleset)`: 2 in 2014, 3 in 2024) go
+  through `subclassEdition`, so a legacy 2014 pick on a 2024 character keeps its 2014 cards.
+  `getHunterOptions(level, edition, current)` / `getLandOptions(edition, current)` append a stored pick
+  from the other edition with an "(2014 rules)" / "(2024 rules)" label, so it stays visible and selected.
+
+## Subclass data is ruleset-keyed — go through `subclassData.js`
+
+Subclass lists, descriptions and feature tables used to exist only in 2014 form
+(`CLASSES[cls].subclasses` / `subclassDescs`, `SUBCLASS_FEATURES`), read directly by every picker and
+display, so 2024 characters got the 2014 subclasses at the 2014 levels. The 2014 data stays where it is;
+2024 data lives in `SUBCLASSES_2024` (`subclassData.js`) and `SUBCLASS_FEATURES_2024`
+(`subclassFeatures2024.js`).
+
+**Rules:**
+- A page never reads `CLASSES[cls].subclasses`, `subclassDescs` or `SUBCLASS_FEATURES` directly. Use
+  `getSubclasses(cls, ruleset)`, `getSubclassDesc`, `getSubclassFeatures(cls, subclass, ruleset)` /
+  `listSubclassFeatures(…, maxLevel)`, and for pickers `offeredSubclass` (creator save trim) or
+  `subclassSelectOptions` (editor). Check: `rg -n "SUBCLASS_FEATURES|\.subclasses\b|subclassDescs" client/src/pages`
+  returns nothing.
+- `getSubclasses(cls, '2014')` returns the **same array reference** as `CLASSES[cls].subclasses`, and the
+  resolver returns the same `SUBCLASS_FEATURES` objects — tests pin both with `toBe`, which is how
+  "2014 is unchanged" stays provable. Artificer is `SAME_IN_BOTH_RULESETS`.
+- **Legacy picks are kept, never rewritten.** `subclassEdition(cls, subclass, ruleset)` returns the ruleset
+  when it offers the name, the *other* edition when only that one does, else `null`. A legacy pick uses its
+  own edition's features, choices and spells and is labelled "(2014 rules)" / "(2024 rules)"; a `null`
+  (homebrew / typo) shows "No built-in feature data" on the sheet and "(custom)" in the editor.
+- **Subclass spells are derived, never stored.** `getSubclassSpells` / `getAlwaysPreparedSpells` produce
+  domain/oath/circle/2024 subclass lists at render; the sheet merges them as tagged copies
+  (`resolveSheetSpells`, `_alwaysPrepared`) and `spellLimitCounts` ignores them. Never write them into
+  `preparedSpells` — old characters that added "Bless" by hand would double-count. 2014 Warlock patron
+  lists are `expanded` (they only widen the browser, via `extraSpellNames`).
+- **Draconic HP is event-applied** (creator, Level Up, Progression pick, editor Lv Up) through
+  `SUBCLASS_HP_PER_LEVEL` / `subclassHpBonus` / `subclassHpDelta`, like `FEAT_HP_PER_LEVEL`. A subclass
+  re-pick goes through `subclassRepickHp`: a gain is applied, a loss is **never** subtracted (older Draconic
+  characters never got the bonus) — the sheet shows a notice instead. Draconic AC is render-time
+  (`SUBCLASS_UNARMORED_AC` in `unarmoredBaseAC`), because AC is recomputed every render anyway.
+- `unarmoredBaseAC` takes class-name strings **or** `getCharClasses` objects; it normalizes both, so the
+  Barbarian/Monk branches keep working when you pass objects to get subclass formulas.
+
+## `getClassLevels` 2024 de-dupe only drops promoted names
+
+The 2024 branch of `getClassLevels` de-duplicated **every** name that repeated across levels, keeping the
+earliest. It was meant for the features 2024 promotes (Paladin/Ranger `Spellcasting` moving to level 1),
+but it also deleted every later `'ASI'` (so the creator allowed one feat at any level ≥ 4 and the
+Progression tab lost later ASI rows) and every repeated `'<X> Feature'` subclass placeholder.
+**Rule:** the de-dupe is restricted to `promoted` = the names in `RULESET_2024_ADD[cls]` plus
+`RULESET_2024_SUBCLASS[cls].name`. Placeholders a 2024 class really no longer has are removed explicitly
+in `RULESET_2024_REMOVE` (the Cleric's `Domain Feature` at 2 and 8). A catch-all test in
+`classData.test.js` checks that every other repeated name keeps all its levels.
 
 ## Store the whole value where the reader looks — `spellcastingAbility` is not saved by the creator
 
 The creator never writes `char.spellcastingAbility`, so every reader that used it alone was wrong
 for new characters: the Actions tab and spell side panel fell back to INT for every caster, and
 the editor's prepared-spell limit used a modifier of 0. **Rule:** derive the ability from the class —
-`getSpellcastingClasses(char)[0]?.ability` on the sheet, `CLASS_SPELL_ABILITY[class]` in the editor —
-and treat the stored field as an override. Same family: `getSpellcastingClasses` now skips a 2014
+`getSpellcastingClasses(char)[0]?.ability` on the sheet, `spellcastingAbilityFor(cls, subclass)` in the
+editor (it also gives an Eldritch Knight / Arcane Trickster INT) — and treat the stored field as an override. Same family: `getSpellcastingClasses` now skips a 2014
 Paladin/Ranger below class level 2 (`spellcastingStartLevel`); a limit of 0 from a caster class that
 hasn't started casting is a real cap, not "uncapped".
 
@@ -342,7 +405,7 @@ Heavy armor does NOT add DEX modifier. The `calcAC` useMemo must check subcatego
 ### `char.features` Is Not Populated for Most Classes
 **Gotcha:** At creation, `CharacterCreate` only sets `char.features` when the character has a **fighting style** (see the `...(fightingStyle && { features: [...] })` spread). A fresh Barbarian/Wizard/Cleric/Rogue/**level-1 Paladin** has **no `features` array at all** — which is why class features (e.g. Lay on Hands) historically showed up nowhere.
 
-**Rule:** For display, derive class features from class data by level (`CLASS_LEVELS[class]` for names, `CLASSES[class].features` + `SUBCLASS_FEATURES[subclass]` for descriptions) rather than trusting `char.features`. The Actions tab's "Class Features & Actions" list does exactly this and merges any stored `char.features` extras on top. Filter bookkeeping rows with the `isNoise()` predicate: `ASI`, `Fighting Style`, and generic `<X> Feature` subclass placeholders (`Oath Feature`, `Domain Feature`, etc.), which are replaced by real `SUBCLASS_FEATURES` entries.
+**Rule:** For display, derive class features from class data by level (`getClassLevels(class, ruleset)` for names, `CLASSES[class].features` + `listSubclassFeatures(class, subclass, ruleset, level)` for descriptions) rather than trusting `char.features`. The Actions tab's "Class Features & Actions" list does exactly this and merges any stored `char.features` extras on top. Filter bookkeeping rows with the `isNoise()` predicate: `ASI`, `Fighting Style`, and generic `<X> Feature` subclass placeholders (`Oath Feature`, `Domain Feature`, etc. — matched by `isSubclassPlaceholder`), which are replaced by the resolved subclass features. On the Progression rows, match placeholders with `isSubclassPlaceholder` **only**, never the whole noise predicate: it also matches `ASI` and would append the subclass feature twice on the 2014 Cleric 8 row.
 
 ### Feat Effects on the Character Sheet
 Feats affect the sheet through two channels:
@@ -382,6 +445,8 @@ The sheet and editor read ability scores through an effective `scores` object = 
 ### Ruleset (2014/2024) must be threaded through spell math in three places
 Spell limits live in **three parallel spots** that all take a `ruleset` argument and must stay in sync: `maxSpellLevel` and `getSpellInfo` (in `dndHelpers.js`, used by the **creator**), and `getSpellLimits` (local to `CharacterEdit.jsx`, used by the **editor**). The sheet derives its own limits inline (search `PREPARED_HALF`/`rangerPrepared2024` in `CharacterSheet.jsx`) and reads slots via ruleset-aware `getSpellSlots`/`getMulticlassSpellSlots`. The 2024 differences: **Paladin & Ranger gain Spellcasting at level 1** (2014 = level 2 — don't `return null` below level 2 when `ruleset === '2024'`), and **2024 Ranger is a prepared caster** (WIS + ½ level) instead of known. Paladins/Rangers have **no cantrips** in either edition (no `CANTRIPS_KNOWN` entry) — that's correct, not a gap. If you change one copy, change all of them, or "switching ruleset" silently fails to propagate.
 
+**Eldritch Knight / Arcane Trickster** are subclass casters, so all four sites (`maxSpellLevel`, `getSpellInfo`, the editor's `getSpellLimits`, the sheet's inline limits) call `thirdCasterSpellInfo(cls, subclass, level, ruleset)` (`subclassData.js`) **before** any class gate — the numbers live once, in `THIRD_CASTER_PROGRESSION` (`subclassSpells.js`; the 2024 counts are the least-certain data). Each takes a trailing `subclass` argument. `isThirdCaster(cls, subclass)` keys on the subclass; `getSpellSlots(cls, level, ruleset, subclass)` uses `THIRD_CASTER_SLOTS`, `spellcastingAbilityFor` gives INT and `spellListClassFor` the Wizard list. The 2014 school rule (Abjuration/Evocation or Enchantment/Illusion, plus any-school picks at 3/8/14/20) is `thirdCasterSchoolStatus` — the sheet, creator and editor all enforce it the same way.
+
 ### Versatile weapons — two grips, two rolls
 A versatile weapon stores its one-handed die in `damage` (e.g. `1d8`) and its two-handed die inside a property string, `"versatile (1d10)"` (magic weapons may read `"versatile (1d10+1)"` — parse only the `\d+d\d+`, the `+N` is already in `wpn.bonus`). The sheet renders both a 1H and a 2H damage button. Fighting-style riders are grip-specific: **Great Weapon Fighting** reroll applies to the two-handed grip only (and to pure two-handed weapons), **Dueling** to the one-handed grip only — so the 2H roll's damage bonus drops the Dueling +2.
 
@@ -404,7 +469,7 @@ Multiclass characters carry a canonical `char.classes = [{class, subclass, level
 `CharacterSheet` reads the character's fighting styles from `char.fightingStyle` (single-class) **and** from features named `Fighting Style (Cls): X` (multiclass) into the `fightingStyles` set. Combat effects: Archery (+2 ranged hit), Dueling (+2 one-handed melee damage), Defense (+1 AC in armor, in `calcAC`), Great Weapon Fighting (reroll damage dice ≤2 for two-handed/versatile melee), Two-Weapon Fighting (light melee — the app already adds the ability mod to all weapon damage, so this is a badge only). **GWF reroll gotcha:** it's applied numerically in `doRollWithResult` via the `rerollLow` option (post-processing `result.results`), not in the 3D physics — the reported total reflects the reroll but the settled 3D die faces show the original roll.
 
 ### Ruleset (2014 / 2024)
-Characters carry a `ruleset` field (`'2014'` default, or `'2024'`). Class-derived data must flow through the ruleset-aware helpers so revised-rules characters compute correctly: use `getClassLevels(cls, ruleset)` (not `CLASS_LEVELS[cls]` directly) for features/progression, `getSubclassLevel(cls, ruleset)` (not `CLASSES[cls].subclassLevel`) for when a subclass unlocks, and pass `ruleset` to `getSpellSlots(cls, level, ruleset)` / `getMulticlassSpellSlots(classes, ruleset)`. 2024 level-1 additions live in the `RULESET_2024_ADD` table (classData); descriptions for the new feature names live in `featureDescriptions.js`. Current 2024 coverage: Weapon Mastery at L1 (Barbarian/Fighter/Monk/Paladin/Ranger/Rogue), Spellcasting at L1 (Paladin/Ranger with L1 slots), Divine Order/Primal Order/Innate Sorcery/Eldritch Invocations@1/Ritual Adept, and subclass choice at level 3 for all classes. Extend `RULESET_2024_ADD` (and `RULESET_2024_ADD` descriptions) to add more; keep 2014 behavior untouched and write feature text in the app's own words.
+Characters carry a `ruleset` field (`'2014'` default, or `'2024'`). Class-derived data must flow through the ruleset-aware helpers so revised-rules characters compute correctly: use `getClassLevels(cls, ruleset)` (not `CLASS_LEVELS[cls]` directly) for features/progression, `getSubclassLevel(cls, ruleset)` (not `CLASSES[cls].subclassLevel`) for when a subclass unlocks, and pass `ruleset` to `getSpellSlots(cls, level, ruleset)` / `getMulticlassSpellSlots(classes, ruleset)`. 2024 level-1 additions live in the `RULESET_2024_ADD` table (classData); descriptions for the new feature names live in `featureDescriptions.js`. Current 2024 coverage: Weapon Mastery at L1 (Barbarian/Fighter/Monk/Paladin/Ranger/Rogue), Spellcasting at L1 (Paladin/Ranger with L1 slots), Divine Order/Primal Order/Innate Sorcery/Eldritch Invocations@1/Ritual Adept, and subclass choice at level 3 for all classes. Extend `RULESET_2024_ADD` (and `RULESET_2024_ADD` descriptions) to add more; keep 2014 behavior untouched and write feature text in the app's own words. **Subclass** lists, features and spells are ruleset-keyed too — never read `CLASSES[cls].subclasses` or `SUBCLASS_FEATURES` from a page; see "Subclass data is ruleset-keyed — go through `subclassData.js`".
 
 **Weapon Mastery is 2024-only and the gate belongs on the consumer.** The Actions-row mastery badge checks `mastery && WEAPON_MASTERY_CLASSES[char.class] && char.ruleset === '2024'`; without that last term a **2014** Fighter also saw the badge. The Homebrewer itself is deliberately **not** ruleset-aware — it has no character in context, `ond-homebrew` is global across every character on the browser, and the same custom weapon may be used by a 2014 and a 2024 character at the same table. Homebrew weapons therefore always offer the mastery field; the consumer decides whether to honour it.
 
@@ -442,7 +507,8 @@ Cantrip damage scales on the **5/11/17** tiers by **character** level, in both 2
 `SPELL_WEAPON_RIDERS` (dndConstants) maps spells like Hunter's Mark/Hex to `{ die, type }`. `char.activeBuffs` holds the currently-active ones; the Spells tab's Activate toggle spends a slot and adds the name, `doLongRest` clears them, and the Actions tab appends `+die` to weapon damage formulas and shows a badge. To add a spell, add it to `SPELL_WEAPON_RIDERS` — no other change needed.
 
 ### Spell Slot Types
-Three slot systems coexist:
+Four slot systems coexist:
 1. **Full casters** (Wizard, Cleric, etc.) — Standard slot progression
-2. **Half casters** (Paladin, Ranger) — Half the slots, start at level 2
-3. **Pact Magic** (Warlock) — Few slots, all at highest level, recharge on short rest
+2. **Half casters** (Paladin, Ranger) — Half the slots; 2014 from level 2, 2024 from level 1 (Artificer: rounded-up half caster from 1)
+3. **Third casters** (Eldritch Knight Fighter, Arcane Trickster Rogue) — `THIRD_CASTER_SLOTS` from class level 3 (max 1st/2nd/3rd/4th at 3/7/13/19), the same in both rulesets; they add ⌊level ÷ 3⌋ to a multiclass caster level
+4. **Pact Magic** (Warlock) — Few slots, all at highest level, recharge on short rest

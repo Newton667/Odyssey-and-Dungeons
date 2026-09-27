@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCharClasses, isMulticlass, getSpellcastingClasses } from './multiclass';
+import { getCharClasses, isMulticlass, getSpellcastingClasses, spellcastingStartLevel } from './multiclass';
 
 describe('getCharClasses — which copy of class/level/subclass wins', () => {
   // Regression: the sheet's Level Up used to persist `classes: [{…}]` for a
@@ -59,5 +59,37 @@ describe('getSpellcastingClasses — Spellcasting starts at the class level the 
     expect(getSpellcastingClasses({ class: 'Wizard', level: 1 })).toEqual([
       { class: 'Wizard', subclass: '', level: 1, ability: 'intelligence' },
     ]);
+  });
+});
+
+describe('getSpellcastingClasses — third casters', () => {
+  it('Eldritch Knight / Arcane Trickster cast with INT from level 3', () => {
+    expect(getSpellcastingClasses({ class: 'Fighter', subclass: 'Eldritch Knight', level: 3, ruleset: '2014' }))
+      .toEqual([{ class: 'Fighter', subclass: 'Eldritch Knight', level: 3, ability: 'intelligence' }]);
+    const at = getSpellcastingClasses({ class: 'Rogue', subclass: 'Arcane Trickster', level: 3, ruleset: '2024' });
+    expect(at).toHaveLength(1);
+    expect(at[0].ability).toBe('intelligence');
+  });
+
+  it('[guard] no casting at level 2 or for other subclasses', () => {
+    expect(getSpellcastingClasses({ class: 'Fighter', subclass: 'Eldritch Knight', level: 2 })).toEqual([]);
+    expect(getSpellcastingClasses({ class: 'Fighter', subclass: 'Champion', level: 10 })).toEqual([]);
+  });
+
+  it('lists an EK alongside a Wizard when multiclassed', () => {
+    const char = { ruleset: '2014', class: 'Wizard', level: 11, classes: [{ class: 'Wizard', level: 5 }, { class: 'Fighter', subclass: 'Eldritch Knight', level: 6 }] };
+    expect(getSpellcastingClasses(char).map(c => c.class)).toEqual(['Wizard', 'Fighter']);
+  });
+});
+
+describe('spellcastingStartLevel', () => {
+  it('third casters start at 3', () => {
+    expect(spellcastingStartLevel('Fighter', '2014', 'Eldritch Knight')).toBe(3);
+    expect(spellcastingStartLevel('Rogue', '2024', 'Arcane Trickster')).toBe(3);
+  });
+
+  it('[guard] half casters unchanged', () => {
+    expect(spellcastingStartLevel('Paladin', '2014')).toBe(2);
+    expect(spellcastingStartLevel('Paladin', '2024')).toBe(1);
   });
 });

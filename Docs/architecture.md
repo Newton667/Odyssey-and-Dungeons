@@ -84,4 +84,5 @@ When a MongoDB URI is configured:
 - **Local-first**: App works fully offline, database is optional
 - **No authentication**: Designed for local/trusted network use
 - **Widget-based layout**: Character sheet sections are draggable/reorderable
+- **Subclass data is ruleset-keyed, and legacy picks are preserved**: every subclass read goes through `client/src/utils/subclassData.js` (`getSubclasses`, `getSubclassFeatures`, `getSubclassSpells`, `thirdCasterSpellInfo`, …), which serves the untouched 2014 data (`CLASSES`, `SUBCLASS_FEATURES`) or the 2024 tables (`SUBCLASSES_2024`, `SUBCLASS_FEATURES_2024`, `subclassSpells.js`). A subclass from the other ruleset is never rewritten when the ruleset changes — it keeps its own edition's features, choices and spells and is labelled "(2014 rules)" / "(2024 rules)". Subclass spells are derived at render (never stored in `preparedSpells`); Draconic HP is applied on events
 - **3D dice**: All rolls use Three.js physics-based dice for visual feedback

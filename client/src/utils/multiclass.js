@@ -4,7 +4,7 @@
 // these helpers synthesize one from char.class/subclass/level so every caller
 // can treat all characters uniformly. Existing saves keep working untouched.
 
-import { CLASSES, getExtraAttacks } from './classData';
+import { CLASSES, getExtraAttacks, isThirdCaster, spellcastingAbilityFor } from './classData';
 import { HIT_DICE } from './dndConstants';
 
 // Canonical per-class breakdown: [{ class, subclass, level }] (per-class levels).
@@ -72,21 +72,22 @@ export function getMulticlassExtraAttacks(char) {
 }
 
 // Class level at which Spellcasting begins. 2014 Paladins and Rangers wait until
-// level 2; the 2024 revision grants it at level 1. Mirrors getSpellInfo/maxSpellLevel.
-export function spellcastingStartLevel(className, ruleset = '2014') {
+// level 2; the 2024 revision grants it at level 1. Eldritch Knights and Arcane
+// Tricksters (third casters) start at 3 in both editions. Mirrors getSpellInfo/maxSpellLevel.
+export function spellcastingStartLevel(className, ruleset = '2014', subclass = '') {
+  if (isThirdCaster(className, subclass)) return 3;
   return (className === 'Paladin' || className === 'Ranger') && ruleset !== '2024' ? 2 : 1;
 }
 
 // The spellcasting ability for each caster class the character has.
-// Returns [{ class, ability }] for classes that actually cast at their current level.
+// Returns [{ class, subclass, level, ability }] for classes that actually cast at
+// their current level — including a third-caster subclass (INT).
 export function getSpellcastingClasses(char) {
   const out = [];
   for (const c of getCharClasses(char)) {
-    const info = CLASSES[c.class];
-    if (c.level < spellcastingStartLevel(c.class, char?.ruleset)) continue;
-    if (info?.spellcasting && info.spellcastingAbility) {
-      out.push({ class: c.class, subclass: c.subclass, level: c.level, ability: info.spellcastingAbility });
-    }
+    if (c.level < spellcastingStartLevel(c.class, char?.ruleset, c.subclass)) continue;
+    const ability = spellcastingAbilityFor(c.class, c.subclass);
+    if (ability) out.push({ class: c.class, subclass: c.subclass, level: c.level, ability });
   }
   return out;
 }

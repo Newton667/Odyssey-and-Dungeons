@@ -130,6 +130,22 @@ export const FEAT_HP_PER_LEVEL = {
   Tough: 2,
 };
 
+// Subclasses that add flat max-HP per level of their class (Sorcerer entries only).
+// Applied on EVENTS (creator, Level Up, Progression pick, editor Lv Up) via
+// subclassHpBonus/subclassHpDelta — never at render, since maxHp is stored.
+// Both editions total +1 per Sorcerer level (2024: +3 at 3rd, then +1 per level).
+export const SUBCLASS_HP_PER_LEVEL = {
+  'Draconic Bloodline': 1,
+  'Draconic Sorcery': 1,
+};
+
+// Subclass unarmored AC formulas: base + the listed ability modifiers. Competes with
+// the other unarmored formulas (best wins, never stacks); a shield still applies.
+export const SUBCLASS_UNARMORED_AC = {
+  'Draconic Bloodline': { base: 13, add: ['dex'] },
+  'Draconic Sorcery': { base: 10, add: ['dex', 'cha'] },
+};
+
 // Unconditional, always-on ADDITIVE numeric bonuses that feats apply to DERIVED character-sheet
 // stats (initiative, passive scores). Summed by CharacterSheet's `featEffects` memo.
 // - Ability-score increases from feats (+1 STR, etc.) are applied to abilityScores at creation,

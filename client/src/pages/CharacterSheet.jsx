@@ -6,16 +6,16 @@ import NumInput from '../components/NumInput';
 import DebouncedTextarea from '../components/DebouncedTextarea';
 import Tip from '../components/Tip';
 import { ABILITIES, ABBR, SKILLS_WITH_ABILITY, HIT_DICE, RARITY_COLORS, RARITY_ORDER, FEATS, FEAT_EFFECTS, FEAT_HP_PER_LEVEL, FEAT_ABILITY_BONUSES, FIGHTING_STYLES, FIGHTING_STYLE_CLASSES, WEAPON_MASTERIES, WEAPON_MASTERY_MAP, WEAPON_MASTERY_CLASSES, MULTICLASS_REQS, MULTICLASS_PROFICIENCIES, CANTRIPS_KNOWN, SPELLS_KNOWN, SPELL_WEAPON_RIDERS } from '../utils/dndConstants';
-import { CLASS_LEVELS, CLASSES, NATURAL_WEAPONS, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses } from '../utils/classData';
+import { CLASS_LEVELS, CLASSES, NATURAL_WEAPONS, getSpellSlots, getExtraAttacks, getMulticlassSpellSlots, getClassLevels, getSubclassLevel, RACE_DEFENSES, getClassDefenses, spellcastingAbilityFor } from '../utils/classData';
 import { getCharClasses, getTotalLevel, isMulticlass, formatClasses, getHitDicePools, formatHitDice, getMulticlassExtraAttacks, getSpellcastingClasses, syncPrimaryFromClasses } from '../utils/multiclass';
 import { featureDescription } from '../utils/featureDescriptions';
 import { computeFeatureUses, baseFeatureName } from '../utils/featureUses';
 import { featureRoll } from '../utils/featureRolls';
-import { getLevelChoices, asiChoiceEffect, migrateSingleClassChoices, relocateOrphanedChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, HUNTER_OPTIONS, LAND_TERRAINS, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
-import { SUBCLASS_FEATURES } from '../utils/subclassFeatures';
+import { getLevelChoices, asiChoiceEffect, migrateSingleClassChoices, relocateOrphanedChoices, METAMAGIC_OPTIONS, ELDRITCH_INVOCATIONS, PACT_BOONS, MANEUVERS, TOTEM_SPIRITS, getHunterOptions, getLandOptions, FAVORED_ENEMIES, FAVORED_TERRAINS } from '../utils/levelChoices';
+import { getSubclasses, getSubclassDesc, subclassEdition, getSubclassFeatures, listSubclassFeatures, isSubclassPlaceholder, subclassHpDelta, subclassRepickHp, thirdCasterSpellInfo, thirdCasterSchoolStatus } from '../utils/subclassData';
 import { modVal, modStr, xpForLevel, rarityColor, rarityBg, hpColor, weaponDamageDice, weaponDamageFormula, weaponRangeText, cantripDamage, hitDiceAfterLongRest, unarmoredBaseAC, martialArtsDie, normalizeFeatNames } from '../utils/dndHelpers';
 import { parseDiceFormula } from '../utils/diceFormula';
-import { allowedSpellClasses, spellMatchesClasses } from '../utils/spellAccess';
+import { allowedSpellClasses, spellMatchesClasses, extraSpellNames, getAlwaysPreparedSpells, resolveSheetSpells, spellLimitCounts } from '../utils/spellAccess';
 import { queryLocalEquipment, queryLocalSpells, getLocalEquipmentByName, getAllLocalSpells } from '../data/localDataService';
 import { readHomebrew, matchesEquipCategory, defaultAmmoCount } from '../utils/homebrew';
 
@@ -225,8 +225,8 @@ function SpellCard({ spell, onClick }) {
         padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
         background: 'var(--input-bg)', border: `1px solid ${castLevel > spell.level ? '#2a6a2a' : 'var(--border)'}`,
       }}>
-      {/* Unprepare button */}
-      {!isRacial && (
+      {/* Unprepare button — not for subclass spells, which are always prepared */}
+      {!isRacial && !spell._alwaysPrepared && (
         <button onClick={(e) => {
           e.stopPropagation();
           const current = char.preparedSpells || [];
@@ -238,6 +238,11 @@ function SpellCard({ spell, onClick }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
           {spell.name}
+          {spell._alwaysPrepared && (
+            <span title={`Always prepared — ${spell._alwaysPrepared}`} style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(201, 162, 39, 0.12)', border: '1px solid var(--gold-dim)', color: 'var(--gold)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              {spell._alwaysPrepared}
+            </span>
+          )}
           {canUpcast && (
             <select value={castLevel} onClick={e => e.stopPropagation()} onChange={e => { e.stopPropagation(); setUpcast(spell.name, parseInt(e.target.value)); }}
               style={{ padding: '1px 4px', fontSize: '10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', color: castLevel > spell.level ? '#4ade80' : 'var(--text-dim)', cursor: 'pointer', fontWeight: 600 }}>
@@ -400,6 +405,7 @@ export default function CharacterSheet() {
   const [rollLog, setRollLog] = useState([]);
   const [rollToast, setRollToast] = useState(null);
   const [healToast, setHealToast] = useState(null);
+  const [noticeToast, setNoticeToast] = useState(null); // { title, message } — e.g. Draconic Resilience HP notices
   const [longRestToast, setLongRestToast] = useState(null);
   const [showRollLog, setShowRollLog] = useState(false);
   const [defensePicker, setDefensePicker] = useState(null); // null or { field, label, color }
@@ -415,6 +421,7 @@ export default function CharacterSheet() {
   const spellBrowserTimer = useRef(null);
   const toastTimer = useRef(null);
   const healTimer = useRef(null);
+  const noticeTimer = useRef(null);
   const longRestTimer = useRef(null);
 
   // One-time repair for old saves: Progression picks used to be stored under the class's
@@ -448,15 +455,26 @@ export default function CharacterSheet() {
     }
   }, [char?._id]);
 
+  // Subclass spells the character always has prepared (domain / oath / circle / 2024
+  // subclass lists, the Arcane Trickster's Mage Hand). Derived, never stored in
+  // preparedSpells, so nothing double-counts and no migration is needed.
+  const alwaysPrepared = useMemo(() => getAlwaysPreparedSpells(char),
+    [char?.class, char?.subclass, char?.level, char?.classes, char?.ruleset, char?.features, char?.levelChoices]);
+  const alwaysPreparedKey = alwaysPrepared.map(a => `${a.name}|${a.source}`).join(',');
+  const [missingAlwaysPrepared, setMissingAlwaysPrepared] = useState([]);
+
   useEffect(() => {
-    if (!char?.preparedSpells?.length) { setSpellData([]); return; }
+    const prepared = char?.preparedSpells || [];
+    if (!prepared.length && !alwaysPrepared.length) { setSpellData([]); setMissingAlwaysPrepared([]); return; }
     setLoadingSpells(true);
-    const names = new Set(char.preparedSpells);
     // concat, never push — `all` must not be mutated even though the getter now copies.
     const all = getAllLocalSpells().concat(readHomebrew({ type: 'spell' }));
-    setSpellData(all.filter(s => names.has(s.name)));
+    // Always-prepared spells come back as tagged COPIES; the shared list is untouched.
+    const { spells, missing } = resolveSheetSpells({ preparedNames: prepared, alwaysPrepared, allSpells: all });
+    setSpellData(spells);
+    setMissingAlwaysPrepared(missing);
     setLoadingSpells(false);
-  }, [char?.preparedSpells]);
+  }, [char?.preparedSpells, alwaysPreparedKey]);
 
   // Spell browser search
   useEffect(() => {
@@ -478,12 +496,14 @@ export default function CharacterSheet() {
       // Filter to the lists the character can actually draw from: all of their
       // classes (multiclass included) plus any feat-granted list.
       const allowed = allowedSpellClasses(char);
+      // 2014 Warlock patron "expanded spells" widen the list without being prepared.
+      const extras = extraSpellNames(char);
       if (allowed.length) {
-        filtered = filtered.filter(s => spellMatchesClasses(s, allowed));
+        filtered = filtered.filter(s => spellMatchesClasses(s, allowed) || extras.has(s.name));
       }
       setSpellBrowserResults(filtered.slice(0, 50));
     }, 200);
-  }, [spellBrowserSearch, spellBrowserLevel, showSpellBrowser, char?.class, char?.classes, char?.featSpellLists]);
+  }, [spellBrowserSearch, spellBrowserLevel, showSpellBrowser, char?.class, char?.subclass, char?.level, char?.ruleset, char?.classes, char?.featSpellLists]);
 
   const invSearchTimer = useRef(null);
   useEffect(() => {
@@ -740,7 +760,12 @@ export default function CharacterSheet() {
     }
     // Flat per-level HP feats (Tough: +2) — the creator applies these too.
     const featHp = normalizeFeatNames(char.feats).reduce((s, f) => s + (FEAT_HP_PER_LEVEL[f] || 0), 0);
-    const gain = Math.max(1, hpGain) + featHp;
+    // Subclass HP (Draconic resilience): +1 per Sorcerer level, so a Draconic level-up
+    // gives +1 and a 2024 pick at 3 gives +3. Applied here, on the event — never at render.
+    const beforeEntry = before.find(c => c.class === targetClass) || { class: targetClass, subclass: '', level: 0 };
+    const afterEntry = classes.find(c => c.class === targetClass);
+    const subclassHp = subclassHpDelta(beforeEntry, afterEntry);
+    const gain = Math.max(1, hpGain) + featHp + subclassHp;
     const patch = syncPrimaryFromClasses(classes);
     // A single class keeps class/level/subclass as the source of truth; a one-element
     // `classes` array would freeze them (see getCharClasses). Drop any leftover one.
@@ -982,16 +1007,17 @@ export default function CharacterSheet() {
         if (ac > baseAC) { baseAC = ac + dexMod; hasArmor = true; }
       }
     }
-    // Unarmored Defense (Barbarian CON / Monk WIS) — only with no armor on.
+    // Unarmored Defense (Barbarian CON / Monk WIS) and subclass formulas (Draconic) —
+    // only with no armor on. Entries are { class, subclass } so subclasses count.
     if (!hasArmor) {
-      baseAC = unarmoredBaseAC(getCharClasses(char).map(c => c.class), {
-        dex: dexMod, con: modVal(scores.constitution ?? 10), wis: modVal(scores.wisdom ?? 10),
+      baseAC = unarmoredBaseAC(getCharClasses(char), {
+        dex: dexMod, con: modVal(scores.constitution ?? 10), wis: modVal(scores.wisdom ?? 10), cha: modVal(scores.charisma ?? 10),
       }, hasShield);
     }
     // Defense fighting style: +1 AC while wearing armor
     if (hasArmor && fightingStyles.has('Defense')) baseAC += 1;
     return baseAC + shieldBonus + (char.acBonus || 0);
-  }, [char?.equippedItems, char?.acBonus, char?.acOverride, char?.class, char?.classes, dexMod, scores.constitution, scores.wisdom, equipDataLoaded, featSet, fightingStyles]);
+  }, [char?.equippedItems, char?.acBonus, char?.acOverride, char?.class, char?.subclass, char?.level, char?.classes, dexMod, scores.constitution, scores.wisdom, scores.charisma, equipDataLoaded, featSet, fightingStyles]);
 
   // Check if equipped armor gives stealth disadvantage
   const hasStealthDisadvantage = useMemo(() => {
@@ -1044,15 +1070,15 @@ export default function CharacterSheet() {
     if (colon !== -1) return { name: str.slice(0, colon).trim(), desc: str.slice(colon + 2).trim() };
     return { name: str.trim(), desc: '' };
   };
-  const isFeatureNoise = (n) => n === 'ASI' || n === 'Fighting Style'
-    || /^(Path|Oath|Domain|Archetype|College|Circle|Tradition|Patron|Specialist|Origin) Feature$/.test(n);
+  const isFeatureNoise = (n) => n === 'ASI' || n === 'Fighting Style' || isSubclassPlaceholder(n);
   const classFeatureList = (() => {
     const raw = [];
     for (const cc of charClasses) {
-      const subMap = cc.subclass ? (SUBCLASS_FEATURES[cc.subclass] || {}) : {};
+      // Ruleset-aware subclass features (a legacy pick keeps its own edition's table).
+      const subList = cc.subclass ? listSubclassFeatures(cc.class, cc.subclass, char.ruleset, 20) : [];
       const featureDesc = {};
       (CLASSES[cc.class]?.features || []).forEach(f => { const p = parseFeatureStr(f); if (p.name) featureDesc[p.name] = p.desc; });
-      Object.values(subMap).forEach(f => { if (f?.name) featureDesc[f.name] = f.desc; });
+      subList.forEach(f => { if (f.name) featureDesc[f.name] = f.desc; });
       const clsLevels = getClassLevels(cc.class, char.ruleset);
       for (let lv = 1; lv <= cc.level; lv++) {
         (clsLevels[lv] || []).forEach(name => {
@@ -1063,9 +1089,9 @@ export default function CharacterSheet() {
           });
         });
       }
-      Object.entries(subMap)
-        .filter(([lvl]) => parseInt(lvl) <= cc.level)
-        .forEach(([lvl, f]) => { if (f?.name) raw.push({ name: f.name, desc: f.desc || '', level: parseInt(lvl), source: cc.subclass }); });
+      subList
+        .filter(f => f.level <= cc.level)
+        .forEach(f => { if (f.name) raw.push({ name: f.name, desc: f.desc || '', level: f.level, source: f.legacy ? `${cc.subclass} (${f.edition} rules)` : cc.subclass }); });
     }
     (char.features || []).map(parseFeatureStr).forEach(p => {
       if (p.name && !raw.some(a => a.name === p.name)) raw.push({ ...p, desc: p.desc || featureDescription(p.name), source: char.class });
@@ -1088,7 +1114,7 @@ export default function CharacterSheet() {
   // Resistances / Immunities / Vulnerabilities (aggregated across all classes)
   const raceDef = RACE_DEFENSES[char.race] || { resistances: [], immunities: [], vulnerabilities: [] };
   const classDef = charClasses.reduce((acc, c) => {
-    const d = getClassDefenses(c.class, c.level, c.subclass);
+    const d = getClassDefenses(c.class, c.level, c.subclass, { features: char.features, levelChoices: char.levelChoices });
     return {
       resistances: [...acc.resistances, ...(d.resistances || [])],
       immunities: [...acc.immunities, ...(d.immunities || [])],
@@ -2330,6 +2356,9 @@ export default function CharacterSheet() {
     const PREPARED_HALF = ['Paladin', 'Artificer'];
     let cantripLimit = 0, leveledLimit = 0;
     for (const c of casterClasses) {
+      // Eldritch Knight / Arcane Trickster: numbers from the shared third-caster table.
+      const third = thirdCasterSpellInfo(c.class, c.subclass, c.level, char.ruleset);
+      if (third) { cantripLimit += third.cantrips; leveledLimit += third.spells; continue; }
       cantripLimit += CANTRIPS_KNOWN[c.class]?.[c.level - 1] || 0;
       // 2024 Ranger is a prepared (WIS mod + half level) caster instead of a known caster
       const rangerPrepared2024 = char.ruleset === '2024' && c.class === 'Ranger';
@@ -2339,9 +2368,20 @@ export default function CharacterSheet() {
     }
     // Magic Initiate grants 2 cantrips + 1 first-level spell on top of any class allowance.
     if (featSet.has('Magic Initiate')) { cantripLimit += 2; leveledLimit += 1; }
-    // Count non-racial prepared spells by tier
-    const cantripCount = spellData.filter(s => s.level === 0 && s.source !== 'race').length;
-    const leveledCount = spellData.filter(s => (s.level || 0) >= 1 && s.source !== 'race').length;
+    // Count prepared spells by tier — racial and always-prepared subclass spells don't count
+    const { cantrips: cantripCount, leveled: leveledCount } = spellLimitCounts(spellData);
+    // 2014 EK/AT school budget: off-school Wizard picks are limited to the any-school allowance.
+    // (Skipped when the character also has Wizard levels — the shared list can't tell which
+    // class learned a spell, and a Wizard may learn any school.)
+    const allowedLists = allowedSpellClasses(char);
+    const countedPicks = spellData.filter(s => s.source !== 'race' && !s._alwaysPrepared);
+    const schoolRules = charClasses.some(c => c.class === 'Wizard') ? [] : charClasses
+      .map(c => ({ subclass: c.subclass, info: thirdCasterSpellInfo(c.class, c.subclass, c.level, char.ruleset) }))
+      .filter(x => x.info?.schools)
+      .map(x => ({ ...x, status: thirdCasterSchoolStatus({ info: x.info, pickedSpells: countedPicks, otherListClasses: allowedLists }) }));
+    const schoolBlock = (sp) => schoolRules.find(r => r.status.atLimit
+      && thirdCasterSchoolStatus({ info: r.info, pickedSpells: [sp], otherListClasses: allowedLists }).offSchool === 1);
+    const alwaysPreparedBy = new Map(alwaysPrepared.map(a => [a.name, a.source]));
     // A limit of 0 normally means "no cap" (a Fighter's feat-free browser). But a caster
     // class whose Spellcasting hasn't started (2014 level-1 Paladin/Ranger) really has 0.
     const casterNotStarted = casterClasses.length === 0 && charClasses.some(c => CLASSES[c.class]?.spellcasting);
@@ -2503,20 +2543,26 @@ export default function CharacterSheet() {
           {spellBrowserResults.length > 0 ? (
             <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {spellBrowserResults.map(sp => {
-                const isPrepared = (char.preparedSpells || []).includes(sp.name);
-                const capped = !isPrepared && ((sp.level === 0 && atCantripCap) || ((sp.level || 0) >= 1 && atLeveledCap));
+                const grantedBy = alwaysPreparedBy.get(sp.name);   // subclass spell: shown as granted
+                const isPrepared = !!grantedBy || (char.preparedSpells || []).includes(sp.name);
+                const limitCapped = !isPrepared && ((sp.level === 0 && atCantripCap) || ((sp.level || 0) >= 1 && atLeveledCap));
+                const schoolRule = !isPrepared && !limitCapped ? schoolBlock(sp) : null;
+                const capped = limitCapped || !!schoolRule || !!grantedBy;
+                const capTitle = grantedBy ? `Always prepared — ${grantedBy}`
+                  : schoolRule ? `${schoolRule.subclass} spells must be ${schoolRule.info.schools.join(' or ')} (${schoolRule.status.offSchool} of ${schoolRule.status.allowed} any-school picks used)`
+                  : limitCapped ? `At your ${sp.level === 0 ? 'cantrip' : 'spell'} limit — remove one first` : undefined;
                 return (
-                  <div key={sp._id || sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}`, opacity: capped ? 0.45 : 1 }}>
+                  <div key={sp._id || sp.name} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px', borderRadius: '4px', background: isPrepared ? 'rgba(201,162,39,0.1)' : 'transparent', border: `1px solid ${isPrepared ? 'var(--gold-dim)' : 'transparent'}`, opacity: capped && !grantedBy ? 0.45 : 1 }}>
                     <button
                       disabled={capped}
-                      title={capped ? `At your ${sp.level === 0 ? 'cantrip' : 'spell'} limit — remove one first` : undefined}
+                      title={capTitle}
                       onClick={() => {
                         if (capped) return;
                         const current = char.preparedSpells || [];
                         if (isPrepared) updateField('preparedSpells', current.filter(n => n !== sp.name));
                         else updateField('preparedSpells', [...current, sp.name]);
                       }}
-                      style={{ width: '22px', height: '22px', borderRadius: '4px', cursor: capped ? 'not-allowed' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, background: isPrepared ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${isPrepared ? 'var(--gold)' : 'var(--border)'}`, color: isPrepared ? 'var(--bg-dark)' : 'var(--text-dim)', padding: 0 }}>
+                      style={{ width: '22px', height: '22px', borderRadius: '4px', cursor: grantedBy ? 'default' : capped ? 'not-allowed' : 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, background: isPrepared ? 'var(--gold)' : 'var(--surface)', border: `1px solid ${isPrepared ? 'var(--gold)' : 'var(--border)'}`, color: isPrepared ? 'var(--bg-dark)' : 'var(--text-dim)', padding: 0 }}>
                       {isPrepared ? '✓' : '+'}
                     </button>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -2535,6 +2581,11 @@ export default function CharacterSheet() {
         </div>
       )}
 
+      {missingAlwaysPrepared.length > 0 && (
+        <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px' }}>
+          Always prepared (not in the spell list): {missingAlwaysPrepared.join(', ')}
+        </div>
+      )}
       {loadingSpells ? (
         <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-dim)' }}>Loading spells...</div>
       ) : spellData.length === 0 ? (
@@ -2825,15 +2876,19 @@ export default function CharacterSheet() {
 
   const renderFeaturesTab = () => {
     // Subclass features up to each class's level (one card per subclass for multiclass)
+    // A legacy pick (subclass from the other ruleset) is labelled with its edition; a
+    // subclass with no built-in data (homebrew / typo) gets a card saying so.
     const subclassCards = charClasses
-      .filter(cc => cc.subclass && SUBCLASS_FEATURES[cc.subclass])
-      .map(cc => ({
-        subclass: cc.subclass,
-        features: Object.entries(SUBCLASS_FEATURES[cc.subclass])
-          .filter(([lvl]) => parseInt(lvl) <= cc.level)
-          .map(([lvl, feat]) => ({ ...feat, level: parseInt(lvl) })),
-      }))
-      .filter(c => c.features.length > 0);
+      .filter(cc => cc.subclass)
+      .map(cc => {
+        const resolved = getSubclassFeatures(cc.class, cc.subclass, char.ruleset);
+        return {
+          subclass: resolved?.legacy ? `${cc.subclass} (${resolved.edition} rules)` : cc.subclass,
+          noData: !resolved,
+          features: listSubclassFeatures(cc.class, cc.subclass, char.ruleset, cc.level),
+        };
+      })
+      .filter(c => c.noData || c.features.length > 0);
 
     return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2841,6 +2896,9 @@ export default function CharacterSheet() {
       {subclassCards.map((card, ci) => (
         <div key={ci} style={st.sideCard}>
           <div style={st.sideLabel}>{card.subclass}</div>
+          {card.noData && (
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', fontStyle: 'italic' }}>No built-in feature data for this subclass.</div>
+          )}
           {card.features.map((f, i) => (
             <div key={i} style={{ fontSize: '12px', marginBottom: '8px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
@@ -2938,12 +2996,15 @@ export default function CharacterSheet() {
     const SINGLE_PICK_CHOICES = new Set(['subclass', 'pact-boon', 'land-terrain']);
     const featureText = (f) => (typeof f === 'string' ? f : (f?.name || ''));
     // Fighting style is stored per-class in features for multiclass ("Fighting Style (Cls): X")
-    const fightingStyleOf = (clsName) => {
-      const pref = charIsMulticlass ? `Fighting Style (${clsName}):` : 'Fighting Style:';
+    const styleFromFeature = (pref) => {
       const f = (char.features || []).find(x => (typeof x === 'string' ? x : (x?.name || '')).startsWith(pref));
       if (!f) return null;
       return (typeof f === 'string' ? f : (f.name || '')).slice(pref.length).trim();
     };
+    const fightingStyleOf = (clsName) => styleFromFeature(charIsMulticlass ? `Fighting Style (${clsName}):` : 'Fighting Style:');
+    // The Champion's Additional Fighting Style lives beside the class style.
+    const CHAMPION_STYLE_PREFIX = 'Fighting Style (Champion):';
+    const championStyle = () => styleFromFeature(CHAMPION_STYLE_PREFIX);
 
     // Renders the full progression UI for ONE class (single-class characters have one section)
     const renderClassSection = (ctx) => {
@@ -2958,9 +3019,16 @@ export default function CharacterSheet() {
       // Choice storage + expand-state keys are namespaced by class when multiclass
       const skey = (level) => charIsMulticlass ? `${cls}:${level}` : String(level);
       const kp = charIsMulticlass ? `${cls}-` : '';
+      // This class's subclass feature table for the character's ruleset (a legacy pick
+      // resolves to its own edition's table; homebrew → null).
+      const subTable = subclass ? (getSubclassFeatures(cls, subclass, char.ruleset)?.features || null) : null;
+      const subEdition = subclass ? subclassEdition(cls, subclass, char.ruleset) : null;
+      const subIsLegacy = !!subEdition && subEdition !== (char.ruleset === '2024' ? '2024' : '2014');
+      const spellAbility = spellcastingAbilityFor(cls, subclass);
 
-    // Get options for a choice type
-    const getChoiceOptions = (choice) => {
+    // Get options for a choice type. `current` is the card's stored pick, so a legacy
+    // Hunter option / land from the other edition is listed (labelled) and stays selected.
+    const getChoiceOptions = (choice, current) => {
       switch (choice.type) {
         case 'asi': {
           // Generate ASI options: +2 to one score, +1 to two, or a feat
@@ -2982,14 +3050,14 @@ export default function CharacterSheet() {
           const styles = fsData ? fsData.styles : Object.keys(FIGHTING_STYLES);
           return { options: styles.map(s => ({ name: s, desc: FIGHTING_STYLES[s] })) };
         }
-        case 'subclass': return { options: (classInfo.subclasses || []).map(s => ({ name: s, desc: classInfo.subclassDescs?.[s] || '' })) };
+        case 'subclass': return { options: getSubclasses(cls, char.ruleset).map(s => ({ name: s, desc: getSubclassDesc(cls, s, char.ruleset) })) };
         case 'metamagic': return { options: Object.entries(METAMAGIC_OPTIONS).map(([k, v]) => ({ name: k, desc: v })) };
         case 'invocations': return { options: Object.entries(ELDRITCH_INVOCATIONS).map(([k, v]) => ({ name: k, ...v })) };
         case 'pact-boon': return { options: Object.entries(PACT_BOONS).map(([k, v]) => ({ name: k, desc: v })) };
         case 'maneuvers': return { options: Object.entries(MANEUVERS).map(([k, v]) => ({ name: k, desc: v })) };
         case 'totem': return { options: Object.entries(TOTEM_SPIRITS[choice.level] || {}).map(([k, v]) => ({ name: k, desc: v })) };
-        case 'hunter-option': return { options: Object.entries(HUNTER_OPTIONS[choice.level]?.options || {}).map(([k, v]) => ({ name: k, desc: v })) };
-        case 'land-terrain': return { options: Object.entries(LAND_TERRAINS).map(([k, v]) => ({ name: k, desc: v })) };
+        case 'hunter-option': return { options: getHunterOptions(choice.level, choice.edition, typeof current === 'string' ? current : '')?.options || [] };
+        case 'land-terrain': return { options: getLandOptions(choice.edition, typeof current === 'string' ? current : '') };
         case 'favored-enemy': return { options: FAVORED_ENEMIES.map(e => ({ name: e })) };
         case 'favored-terrain': return { options: FAVORED_TERRAINS.map(t => ({ name: t })) };
         // Expertise needs a skill you're already proficient in; ones you already have expertise in are fine to re-pick.
@@ -2999,7 +3067,6 @@ export default function CharacterSheet() {
     };
 
     const renderChoiceCard = (choice, idx) => {
-      const data = getChoiceOptions(choice);
       const key = `${choice.type}-${idx}`;
       const expanded = expandedChoices[key];
       // Get saved choices for this type
@@ -3020,6 +3087,8 @@ export default function CharacterSheet() {
         }
         // Check direct character fields
         if (choiceKey === 'subclass') return subclass || null;
+        // A Champion's Additional Fighting Style is its own feature, never the class style.
+        if (choiceKey === 'fighting-style' && choice.additional) return championStyle();
         if (choiceKey === 'fighting-style') return charIsMulticlass ? fightingStyleOf(cls) : (char.fightingStyle || null);
         return null;
       };
@@ -3027,6 +3096,7 @@ export default function CharacterSheet() {
       // Normalize: selections might be objects {name, desc, prereq} from old saves — extract name
       const normalizeSelection = (s) => typeof s === 'object' && s !== null ? (s.name || String(s)) : s;
       const selected = Array.isArray(rawSelected) ? rawSelected.map(normalizeSelection) : normalizeSelection(rawSelected);
+      const data = getChoiceOptions(choice, selected);
       const isMulti = choice.count && choice.count > 1;
       const selectedArr = Array.isArray(selected) ? selected : (selected ? [selected] : []);
 
@@ -3060,8 +3130,32 @@ export default function CharacterSheet() {
           } else {
             updates.subclass = name;
           }
+          // Subclass HP (Draconic resilience) on the pick event. A gain is applied; a loss is
+          // never subtracted (older Draconic characters never received it) — remind instead.
+          const cur = getCharClasses(char).find(c => c.class === cls);
+          const beforeEntry = { class: cls, subclass: cur?.subclass || '', level: cur?.level || lvl };
+          const hp = subclassRepickHp(beforeEntry, { ...beforeEntry, subclass: name });
+          if (hp.apply > 0) {
+            const newMax = (char.maxHp || 0) + hp.apply;
+            updates.maxHp = newMax;
+            updates.currentHp = Math.min(newMax, Math.max(0, (char.currentHp || 0) + hp.apply));
+          }
+          let notice = null;
+          if (hp.remind > 0) {
+            notice = `Draconic Resilience no longer applies — lower Max HP by ${hp.remind} in the editor if it was added.`;
+          } else if (hp.apply > 0 && hp.switched) {
+            notice = `Max HP +${hp.apply} (Draconic Resilience). If you switched away from Draconic earlier without lowering Max HP, lower it by ${hp.apply} in the editor so it isn't counted twice.`;
+          }
+          if (notice) {
+            setNoticeToast({ title: 'Subclass HP', message: notice });
+            if (noticeTimer.current) clearTimeout(noticeTimer.current);
+            noticeTimer.current = setTimeout(() => setNoticeToast(null), 5000);
+          }
         }
-        if (choiceKey === 'fighting-style') {
+        if (choiceKey === 'fighting-style' && choice.additional) {
+          // Champion: store the extra style on its own; the level-1 style stays untouched.
+          updates.features = [...(char.features || []).filter(f => !featureText(f).startsWith(CHAMPION_STYLE_PREFIX)), `${CHAMPION_STYLE_PREFIX} ${name}`];
+        } else if (choiceKey === 'fighting-style') {
           if (charIsMulticlass) {
             const pref = `Fighting Style (${cls}):`;
             updates.features = [...(char.features || []).filter(f => !(typeof f === 'string' ? f : (f?.name || '')).startsWith(pref)), `${pref} ${name}`];
@@ -3140,7 +3234,7 @@ export default function CharacterSheet() {
           updates.features = [...nonTotem, `${totemPrefix} ${name}`];
         }
         if (choiceKey === 'hunter-option') {
-          const label = HUNTER_OPTIONS[choice.level]?.label || 'Hunter Feature';
+          const label = getHunterOptions(choice.level, choice.edition)?.label || 'Hunter Feature';
           const nonHunter = (char.features || []).filter(f => !featureText(f).startsWith(`${label}:`));
           updates.features = [...nonHunter, `${label}: ${name}`];
         }
@@ -3197,6 +3291,11 @@ export default function CharacterSheet() {
             </div>
             <span style={{ color: 'var(--gold)', fontSize: '14px' }}>{expanded ? '▾' : '▸'}</span>
           </div>
+          {choiceKey === 'subclass' && subIsLegacy && (
+            <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', marginTop: '4px' }}>
+              Kept from the {subEdition} rules — pick a {char.ruleset === '2024' ? '2024' : '2014'} subclass to switch.
+            </div>
+          )}
           {choiceKey === 'asi' && typeof selected === 'string' && FEAT_ABILITY_BONUSES[selected]?.choice && (
             <div onClick={e => e.stopPropagation()} style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', fontSize: '11px' }}>
               <span style={{ color: 'var(--text-dim)' }}>{selected} +1 to:</span>
@@ -3220,6 +3319,7 @@ export default function CharacterSheet() {
             <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '400px', overflowY: 'auto' }}>
               {data.options.map((opt, oi) => {
                 const name = typeof opt === 'string' ? opt : opt.name;
+                const optLabel = (typeof opt === 'object' && opt.label) || name;   // legacy picks carry "(2014 rules)"
                 const desc = typeof opt === 'object' ? opt.desc : (choice.type === 'asi' ? FEATS[opt]?.desc : null);
                 const prereq = typeof opt === 'object' ? opt.prereq : (choice.type === 'asi' ? FEATS[opt]?.prereq : null);
                 const isSelected = selectedArr.includes(name);
@@ -3244,7 +3344,7 @@ export default function CharacterSheet() {
                         {isSelected ? '✓' : ''}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: isSelected ? '#4ade80' : 'var(--text)' }}>{name}</div>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: isSelected ? '#4ade80' : 'var(--text)' }}>{optLabel}</div>
                         {prereq && <div style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic' }}>Requires: {prereq}</div>}
                         {desc && <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>{desc}</div>}
                       </div>
@@ -3295,8 +3395,8 @@ export default function CharacterSheet() {
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-dim)', marginBottom: '8px' }}>
             <span>Hit Die: <strong style={{ color: 'var(--text)' }}>{classInfo.hitDice || HIT_DICE[cls] || 'd8'}</strong></span>
             <span>Subclass at Level: <strong style={{ color: 'var(--text)' }}>{getSubclassLevel(cls, char.ruleset)}</strong></span>
-            {classInfo.spellcasting && <span>Spellcasting: <strong style={{ color: 'var(--text)' }}>{classInfo.spellcastingAbility}</strong></span>}
-            {subclass && <span>Subclass: <strong style={{ color: 'var(--gold)' }}>{subclass}</strong></span>}
+            {spellAbility && <span>Spellcasting: <strong style={{ color: 'var(--text)' }}>{spellAbility}</strong></span>}
+            {subclass && <span>Subclass: <strong style={{ color: 'var(--gold)' }}>{subclass}{subIsLegacy ? ` (${subEdition} rules)` : ''}</strong></span>}
           </div>
         </div>
 
@@ -3311,7 +3411,12 @@ export default function CharacterSheet() {
               const isPast = l < lvl;
               const isFuture = l > lvl;
               const isNext = l === nextLvl;
-              const hasContent = features.length > 0 || choices.length > 0;
+              // The resolved subclass feature at this level: appended to a "<X> Feature"
+              // placeholder, or shown on its own line when the row has no placeholder
+              // (2014 L1 domain/origin features, 2024 L3 features).
+              const subEntry = subTable?.[l] || null;
+              const hasPlaceholder = features.some(isSubclassPlaceholder);
+              const hasContent = features.length > 0 || choices.length > 0 || !!subEntry;
               if (!hasContent && !isCurrent) return null;
               const levelExpanded = expandedChoices[`${kp}lvl-${l}`];
               return (
@@ -3337,9 +3442,9 @@ export default function CharacterSheet() {
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2px' }}>
                       {features.map((feat, fi) => {
                         const isASI = feat === 'ASI';
-                        // Check if this is a generic subclass feature placeholder
-                        const isSubFeature = feat.includes('Feature') && (feat.includes('Path') || feat.includes('Archetype') || feat.includes('Tradition') || feat.includes('College') || feat.includes('Domain') || feat.includes('Circle') || feat.includes('Origin') || feat.includes('Patron') || feat.includes('Oath') || feat.includes('Specialist'));
-                        const subFeatData = isSubFeature && subclass && SUBCLASS_FEATURES[subclass]?.[l];
+                        // Only a generic "<X> Feature" placeholder gets the subclass feature name
+                        // (not isFeatureNoise — that also matches ASI and would append it twice).
+                        const subFeatData = isSubclassPlaceholder(feat) ? subEntry : null;
                         return (
                           <div key={fi} style={{
                             fontSize: '12px', fontWeight: isASI ? 600 : 400,
@@ -3353,6 +3458,11 @@ export default function CharacterSheet() {
                           </div>
                         );
                       })}
+                      {subEntry && !hasPlaceholder && (
+                        <div style={{ fontSize: '12px', color: isCurrent ? 'var(--text)' : 'var(--text-dim)', padding: '1px 0' }}>
+                          {isPast ? '✓ ' : ''}<span style={{ color: 'var(--gold-dim)' }}>◆ {subEntry.name}</span>
+                        </div>
+                      )}
                       {choices.filter(c => c.type !== 'asi').map((c, ci) => (
                         <div key={`c${ci}`} style={{ fontSize: '11px', color: 'var(--gold-dim)', fontStyle: 'italic', padding: '1px 0' }}>
                           ↳ {c.label}
@@ -3988,6 +4098,22 @@ export default function CharacterSheet() {
         </>
       )}
 
+      {/* ═══ NOTICE TOAST (subclass HP reminders) ═══ */}
+      {noticeToast && (
+        <div role="status" style={{
+          position: 'fixed', bottom: '80px', left: 0, right: 0, marginInline: 'auto', width: 'fit-content', maxWidth: 'min(520px, 90vw)',
+          background: 'radial-gradient(ellipse at center, rgba(40, 32, 12, 0.97), rgba(20, 16, 6, 0.97))',
+          border: '2px solid var(--gold)', borderRadius: '16px', padding: '16px 24px',
+          zIndex: 9500, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+          boxShadow: '0 0 40px rgba(200, 168, 78, 0.3), 0 8px 32px rgba(0,0,0,0.8)', animation: 'fadeIn 0.3s ease',
+        }}>
+          <div style={{ fontSize: '14px', color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'Cinzel, serif', fontWeight: 600 }}>
+            {noticeToast.title}
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text)', textAlign: 'center', lineHeight: 1.5 }}>{noticeToast.message}</div>
+        </div>
+      )}
+
       {/* ═══ HEAL TOAST ═══ */}
       {healToast && (
         <div style={{
@@ -4291,7 +4417,8 @@ export default function CharacterSheet() {
         const resultingLevel = lu.isNew ? 1 : (targetCurrent ? targetCurrent.level + 1 : 1);
         const existingSubclass = lu.isNew ? '' : (targetCurrent?.subclass || '');
         // Prompt for subclass whenever the class reaches its unlock level without one set
-        const needsSubclass = (targetInfo.subclasses || []).length > 0 && !existingSubclass
+        const subclassOptions = getSubclasses(lu.targetClass, char.ruleset);
+        const needsSubclass = subclassOptions.length > 0 && !existingSubclass
           && resultingLevel >= getSubclassLevel(lu.targetClass, char.ruleset);
         const eligible = !lu.isNew || meetsReq(lu.targetClass);
         const hd = targetInfo.hitDice || HIT_DICE[lu.targetClass] || 'd8';
@@ -4356,7 +4483,7 @@ export default function CharacterSheet() {
                   <select value={lu.subclass || ''} onChange={e => setLevelUpModal(prev => ({ ...prev, subclass: e.target.value }))}
                     style={{ width: '100%', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)' }}>
                     <option value="">— Choose subclass —</option>
-                    {(targetInfo.subclasses || []).map(s => <option key={s} value={s}>{s}</option>)}
+                    {subclassOptions.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
               )}
